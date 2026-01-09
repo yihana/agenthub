@@ -1,0 +1,146 @@
+.process-node {
+  background: white;
+  border: 2px solid #e2e8f0;
+  border-radius: 0.75rem;
+  padding: 1rem;
+  min-width: 200px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.process-node:hover {
+  border-color: #3b82f6;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.process-node.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.node-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.node-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.status-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  display: inline-block;
+  min-width: 50px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.status-badge.status-completed {
+  background-color: #10b981;
+}
+
+.status-badge.status-in_progress {
+  background-color: #f59e0b;
+}
+
+.status-badge.status-pending {
+  background-color: #6b7280;
+}
+
+.status-badge.status-rejected {
+  background-color: #ef4444;
+}
+
+.status-badge.status-error {
+  background-color: #dc2626;
+}
+
+.node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.kpi-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.kpi-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: #f8fafc;
+  border-radius: 0.375rem;
+}
+
+.kpi-label {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+}
+
+.kpi-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.backlog-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: #fef3c7;
+  border-radius: 0.375rem;
+  border-left: 3px solid #f59e0b;
+}
+
+.backlog-label {
+  font-size: 0.75rem;
+  color: #92400e;
+  font-weight: 500;
+}
+
+.backlog-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #92400e;
+}
+
+.errors-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: #fee2e2;
+  border-radius: 0.375rem;
+  border-left: 3px solid #ef4444;
+}
+
+.errors-label {
+  font-size: 0.75rem;
+  color: #991b1b;
+  font-weight: 500;
+}
+
+.errors-count {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #991b1b;
+}

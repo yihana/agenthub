@@ -1,0 +1,256 @@
+.process-visualization {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+}
+
+/* 프로세스 검색 섹션 */
+.process-search-section {
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 1rem 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.process-search-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.search-input-group {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  flex: 1;
+  max-width: 400px;
+}
+
+.search-input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  background-color: #f3f4f6;
+  color: #252c37;
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  background-color: white;
+}
+
+.search-button {
+  padding: 0.75rem 1.5rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.search-button:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.search-button:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+
+.process-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.process-header h1 {
+  margin: 0;
+  color: #1e293b;
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.process-controls {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.search-input {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  width: 200px;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.back-btn {
+  padding: 0.5rem 1rem;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  margin-left: 0.5rem;
+}
+
+.back-btn:hover {
+  background: #4b5563;
+}
+
+.refresh-btn {
+  padding: 0.75rem 1.5rem;
+  background: #6b7280;
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+  height: 44px;
+  box-sizing: border-box;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background: #4b5563;
+}
+
+.refresh-btn:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.process-content {
+  flex: 1;
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+  overflow: hidden;
+}
+
+.process-graph {
+  flex: 1;
+  background: white;
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.process-panels {
+  width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* React Flow 스타일 오버라이드 */
+.react-flow__node {
+  font-size: 0.875rem;
+}
+
+.react-flow__controls {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.375rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.react-flow__controls-button {
+  background: white;
+  border: none;
+  color: #6b7280;
+  transition: color 0.2s;
+}
+
+.react-flow__controls-button:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+.react-flow__background {
+  background-color: #f8fafc;
+}
+
+.react-flow__background-pattern {
+  stroke: #e2e8f0;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .process-search-section {
+    padding: 1rem;
+  }
+  
+  .process-search-container {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+  
+  .search-input-group {
+    max-width: none;
+    gap: 20px;
+  }
+  
+  .search-input {
+    border-radius: 0.375rem;
+    height: 44px;
+  }
+  
+  .search-button {
+    border-radius: 0.375rem;
+    height: 44px;
+  }
+  
+  .process-controls {
+    display: flex;
+    justify-content: center;
+  }
+}

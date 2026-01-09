@@ -1,0 +1,86 @@
+# Node modules
+node_modules/
+server/node_modules/
+web/node_modules/
+server/test-apis/node_modules/
+
+# NPM cache (매우 중요! 배포 패키지 크기를 크게 증가시킴)
+.npm-cache/
+**/.npm-cache/
+server/.npm-cache/
+web/.npm-cache/
+.npm/
+
+# Development files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.DS_Store
+*.swp
+*.swo
+*~
+
+# IDE
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Environment files (환경변수는 BTP에서 직접 설정)
+.env
+.env.local
+.env.*.local
+
+# Build artifacts - 주의: dist는 배포에 필요하므로 제외하지 않음!
+# server/dist/ - 빌드된 파일 필요함
+# web/dist/ - 빌드된 파일 필요함
+
+# Git
+.git/
+.gitignore
+.github/
+
+# Test files
+**/*.test.js
+**/*.test.ts
+**/*.spec.js
+**/*.spec.ts
+test/
+tests/
+__tests__/
+coverage/
+
+# Documentation
+*.md
+docs/
+FIELD_MAPPING_DEBUG.md
+README-*.md
+TEST_API_GUIDE.md
+
+# Development scripts
+debug-*.js
+test-*.js
+fix-*.js
+generate-*.js
+migrate-*.js
+server/test-apis/
+simple-server.js
+test-server.js
+
+# SQL migration files (필요시 포함)
+*.sql
+
+# 주의: dist/ 폴더는 제외하지 않음 (빌드된 파일 필요)
+
+# Uploads (프로덕션에서는 별도 스토리지 사용)
+server/uploads/
+
+# OS specific
+Thumbs.db
+desktop.ini
+
+# Batch files
+*.bat
+*.sh
+

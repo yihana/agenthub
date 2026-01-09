@@ -1,0 +1,63 @@
+{
+  "xsappname": "ear-dev-xsuaa",
+  "tenant-mode": "dedicated",
+  "description": "EAR Application Security Configuration",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Administrator",
+      "description": "Administrator Scope"
+    },
+    {
+      "name": "$XSAPPNAME.User",
+      "description": "User Scope"
+    },
+    {
+      "name": "$XSAPPNAME.5TIER",
+      "description": "5TIER Scope"
+    },
+    {
+      "name": "$XSAPPNAME.5TIER-ETC",
+      "description": "5TIER-ETC Scope"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "EAR-ADMIN",
+      "description": "EAR Administrator Role",
+      "scope-references": [
+        "$XSAPPNAME.Administrator"
+      ]
+    },
+    {
+      "name": "EAR-USER",
+      "description": "EAR User Role",
+      "scope-references": [
+        "$XSAPPNAME.User"
+      ]
+    },
+    {
+      "name": "EAR-5TIER",
+      "description": "EAR 5TIER Role",
+      "scope-references": [
+        "$XSAPPNAME.5TIER"
+      ]
+    },
+    {
+      "name": "EAR-5TIER-ETC",
+      "description": "EAR 5TIER-ETC Role",
+      "scope-references": [
+        "$XSAPPNAME.5TIER-ETC"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "token-validity": 43200,
+    "redirect-uris": [
+      "https://ear-dev.sk.com/api/auth/callback",
+      "https://ear-dev.sk.com/**",
+      "https://ear-dev.cfapps.ap12.hana.ondemand.com/api/auth/callback",
+      "https://ear-dev.cfapps.ap12.hana.ondemand.com/**"
+    ]
+  }
+}
+

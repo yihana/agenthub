@@ -1,0 +1,76 @@
+{
+  "xsappname": "ear-xsuaa",
+  "tenant-mode": "dedicated",
+  "description": "EAR Application Security Configuration",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Administrator",
+      "description": "Administrator Scope"
+    },
+    {
+      "name": "$XSAPPNAME.User",
+      "description": "User Scope"
+    },
+    {
+      "name": "$XSAPPNAME.5TIER",
+      "description": "5TIER Scope"
+    },
+    {
+      "name": "$XSAPPNAME.5TIER-ETC",
+      "description": "5TIER-ETC Scope"
+    }
+  ],
+  "attributes": [
+    {
+      "name": "employee_number", 
+      "description": "employee number from IAS",
+      "valueType": "string"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "EAR-ADMIN",
+      "description": "EAR Administrator Role",
+      "scope-references": [
+        "$XSAPPNAME.Administrator"
+      ],
+      "attribute-references": [
+        "employee_number" 
+      ]
+    },
+    {
+      "name": "EAR-USER",
+      "description": "EAR User Role",
+      "scope-references": [
+        "$XSAPPNAME.User"
+      ],
+      "attribute-references": [
+        "employee_number" 
+      ]
+    },
+    {
+      "name": "EAR-5TIER",
+      "description": "EAR 5TIER Role",
+      "scope-references": [
+        "$XSAPPNAME.5TIER"
+      ]
+    },
+    {
+      "name": "EAR-5TIER-ETC",
+      "description": "EAR 5TIER-ETC Role",
+      "scope-references": [
+        "$XSAPPNAME.5TIER-ETC"
+      ]
+    }
+  ],
+  "oauth2-configuration": {
+    "token-validity": 43200,
+    "redirect-uris": [
+      "https://ear.sk.com/api/auth/callback",
+      "https://ear.sk.com/**",
+      "https://ear-prd.cfapps.ap12.hana.ondemand.com/api/auth/callback",
+      "https://ear-prd.cfapps.ap12.hana.ondemand.com/**"
+    ]
+  }
+}
+

@@ -1,0 +1,33 @@
+{
+  "name": "rag-app",
+  "version": "1.0.0",
+  "description": "EAR Base Version (React + LangChain + Postgres/pgvector)",
+  "main": "server/index.ts",
+  "engines": {
+    "node": "18.x || 20.x || 22.x",
+    "npm": ">=9.0.0"
+  },
+  "scripts": {
+    "dev": "concurrently --raw \"npm run dev:server\" \"npm run dev:web\"",
+    "dev:old": "npm run dev:server & npm run dev:web",
+    "dev:server": "cd server && npm run dev",
+    "dev:web": "cd web && npm run dev",
+    "dev:ref1": "concurrently -n server,web --kill-others-off --success first \"npm run dev:server\" \"npm run dev:web\"",
+    "postgres": "concurrently \"npm run postgres:server\" \"npm run dev:web\"",
+    "postgres:server": "cd server && npm run postgres",
+    "build": "npm run build:web && npm run build:server",
+    "build:web": "cd web && npm run build",
+    "build:server": "cd server && npm run build",
+    "start": "cd server && npm start",
+    "cf:build": "npm run build",
+    "cf:push": "npm run cf:build && cf push"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "workspaces": [
+    "server",
+    "web"
+  ]
+}
+

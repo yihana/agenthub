@@ -1,0 +1,32 @@
+---
+applications:
+  - name: ear-prd
+    memory: 2G
+    disk_quota: 2G
+    instances: 2
+    buildpacks:
+      - nodejs_buildpack
+    command: npm start
+    env:
+      NODE_ENV: production
+      NODE_VERSION: 22.x
+      DB_TYPE: hana
+      EMBEDDING_MODEL: text-embedding-3-large
+      CHAT_MODEL: gpt-4o-mini
+      JWT_SECRET: your-super-secret-jwt-key-min-32-chars
+      USE_XSUAA: "true"  # XSUAA 활성화 (XSUAA 서비스 바인딩 시 자동으로 활성화됨)
+      DEFAULT_IDP: "sap.custom"  # Identity Provider 고정 (선택 화면 건너뛰기)
+      SCIM_SCOPE: "openid scim.read"
+      IAS_BASE_URL: "https://abppvbjd5.accounts.ondemand.com"
+      C4C_BASE_URL: "https://my1002036.au1.crm.cloud.sap"  # C4C API Base URL (운영 환경)
+      SKN_RAG_URL: "https://adxp.adotbiz.ai/api/v1/agent_gateway/82af4d92-3346-46c9-a956-8293ef716173/invoke"
+      ADOTBIZ_PRIVATE_LINK_IP: "10.220.5.115"
+    services:
+      - EAR-PRD
+      - ear-xsuaa
+      - destination-service
+      - connectivity-service
+      - privatelink-prd
+    health-check-type: http
+    health-check-http-endpoint: /health
+    timeout: 180

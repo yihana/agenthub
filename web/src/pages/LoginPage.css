@@ -1,0 +1,271 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: 20px;
+}
+
+.login-container {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  width: 100%;
+  max-width: 400px;
+  position: relative;
+}
+
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.login-icon {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #667eea;
+}
+
+.login-header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.login-header p {
+  color: #718096;
+  font-size: 16px;
+  margin: 0;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.form-group label {
+  font-weight: 600;
+  color: #2d3748;
+  font-size: 14px;
+}
+
+.input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.input-icon {
+  position: absolute;
+  left: 12px;
+  color: #a0aec0;
+  z-index: 1;
+}
+
+.input-group input {
+  width: 100%;
+  padding: 12px 12px 12px 44px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 16px;
+  transition: all 0.2s ease;
+  background: white;
+}
+
+/* 아이콘이 있는 입력창에 명시적인 패딩 적용 */
+.input-group input[type="text"][name="userid"],
+.input-group input[type="password"],
+.input-group input[type="text"][name="password"] {
+  padding-left: 44px;
+}
+
+.input-group input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.input-group input:disabled {
+  background-color: #f7fafc;
+  cursor: not-allowed;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 12px;
+  background: none;
+  border: none;
+  color: #a0aec0;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+  color: #667eea;
+}
+
+.password-toggle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.error-message {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  background-color: #fed7d7;
+  border: 1px solid #feb2b2;
+  border-radius: 8px;
+  color: #c53030;
+  font-size: 14px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+}
+
+.btn-primary:disabled {
+  background: #a0aec0;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn-secondary {
+  background: #e2e8f0;
+  color: #4a5568;
+}
+
+.btn-secondary:hover:not(:disabled) {
+  background: #cbd5e0;
+}
+
+.btn-login {
+  margin-top: 8px;
+}
+
+.login-footer {
+  margin-top: 32px;
+  text-align: center;
+  color: #718096;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.login-footer p {
+  margin: 4px 0;
+}
+
+/* 로그인된 사용자 정보 스타일 */
+.user-info {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.user-avatar {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 16px;
+  color: #667eea;
+}
+
+.user-details h2 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2d3748;
+  margin: 0 0 8px 0;
+}
+
+.user-details p {
+  color: #718096;
+  margin: 4px 0;
+}
+
+.admin-badge {
+  display: inline-block;
+  background: #667eea;
+  color: white;
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 8px;
+}
+
+.login-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 480px) {
+  .login-container {
+    padding: 24px;
+    margin: 16px;
+  }
+  
+  .login-header h1 {
+    font-size: 24px;
+  }
+  
+  .input-group input {
+    font-size: 16px; /* iOS 줌 방지 */
+  }
+}
+
+/* 접근성 개선 */
+.input-group input:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+.btn:focus-visible {
+  outline: 2px solid #667eea;
+  outline-offset: 2px;
+}
+
+/* 로딩 상태 애니메이션 */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.btn-primary:disabled {
+  animation: pulse 2s infinite;
+}

@@ -1,0 +1,22 @@
+{
+  "name": "interface-automation-test-apis",
+  "version": "1.0.0",
+  "description": "인터페이스 연동 자동화 테스트용 API 서버들",
+  "main": "start-test-apis.js",
+  "scripts": {
+    "start": "node start-test-apis.js",
+    "start:api1": "node employees-api-1.js",
+    "start:api2": "node employees-api-2.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "keywords": [
+    "test",
+    "api",
+    "employee",
+    "interface-automation"
+  ],
+  "author": "EAR System",
+  "license": "MIT"
+}
