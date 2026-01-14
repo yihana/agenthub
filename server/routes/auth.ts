@@ -105,17 +105,37 @@ router.post('/login', async (req, res) => {
         return res.status(401).json({ error: '사용자ID 또는 비밀번호가 올바르지 않습니다.' });
       }
       if (userResult.rows.length === 0 && LOCAL_ONLY) {
-        const defaultPassword = 'local-dev';
-        const passwordHash = await bcrypt.hash(defaultPassword, 10);
-        await db.query(
-          `INSERT INTO users (userid, password_hash, full_name, is_admin, is_active)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [userid, passwordHash, `${userid} (local)`, true, true]
+        const existingLocal = await db.query(
+          'SELECT * FROM users WHERE is_active = true ORDER BY id ASC LIMIT 1',
+          []
         );
-        userResult = await db.query(
-          'SELECT * FROM users WHERE userid = $1 AND is_active = true',
-          [userid]
-        );
+        if (existingLocal.rows.length > 0) {
+          userResult = existingLocal;
+        } else {
+          const defaultPassword = 'local-dev';
+          const passwordHash = await bcrypt.hash(defaultPassword, 10);
+          try {
+            await db.query(
+              `INSERT INTO users (userid, password_hash, full_name, is_admin, is_active)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [userid, passwordHash, `${userid} (local)`, true, true]
+            );
+          } catch (error: any) {
+            if (error?.code !== '23505') {
+              throw error;
+            }
+          }
+          userResult = await db.query(
+            'SELECT * FROM users WHERE userid = $1 AND is_active = true',
+            [userid]
+          );
+          if (userResult.rows.length === 0) {
+            userResult = await db.query(
+              'SELECT * FROM users WHERE is_active = true ORDER BY id ASC LIMIT 1',
+              []
+            );
+          }
+        }
       }
     } catch (dbError) {
       console.error('DB 쿼리 오류:', dbError);
