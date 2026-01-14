@@ -2,8 +2,21 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const localOnly = process.env.LOCAL_ONLY === 'true';
+const rawDbType = (process.env.DB_TYPE || '').toLowerCase();
+
+if (localOnly && rawDbType && rawDbType !== 'postgres') {
+  console.warn(`LOCAL_ONLY=true 이므로 DB_TYPE(${process.env.DB_TYPE})을 postgres로 강제합니다.`);
+}
+
+const dbType = localOnly ? 'postgres' : (rawDbType || 'postgres');
+
+if (dbType !== 'postgres' && dbType !== 'hana') {
+  throw new Error(`Unsupported DB_TYPE: ${process.env.DB_TYPE}`);
+}
+
 // 데이터베이스 타입 결정
-export const DB_TYPE = process.env.DB_TYPE || 'postgres';
+export const DB_TYPE = dbType;
 console.log(`🔧 데이터베이스 타입: ${DB_TYPE}`);
 
 // 동적으로 적절한 DB 모듈 로드
