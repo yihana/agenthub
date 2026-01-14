@@ -23,6 +23,7 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const navigate = useNavigate();
+  const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   const checkLoginStatus = async () => {
     try {
@@ -61,6 +62,19 @@ export const useAuth = () => {
           }
         } catch (configError) {
           console.warn('인증 설정 확인 중 오류:', configError);
+          if (isLocalHost) {
+            setUser({
+              userid: 'local-admin',
+              fullName: 'Local Admin',
+              email: '',
+              isAdmin: true
+            });
+            setIsLoggedIn(true);
+            if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+              navigate('/');
+            }
+            return;
+          }
         }
       }
 
