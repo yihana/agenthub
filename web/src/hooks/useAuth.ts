@@ -15,6 +15,7 @@ interface AuthConfig {
   useXSUAA: boolean;
   iasEnabled: boolean;
   loginUrl: string | null;
+  localOnly?: boolean;
 }
 
 export const useAuth = () => {
@@ -22,6 +23,7 @@ export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [authConfig, setAuthConfig] = useState<AuthConfig | null>(null);
   const navigate = useNavigate();
+  const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   const checkLoginStatus = async () => {
     try {
@@ -50,6 +52,76 @@ export const useAuth = () => {
         return;
       }
 
+      let config: AuthConfig | null = authConfig;
+      if (!config) {
+        try {
+          const configResponse = await fetch('/api/auth/config');
+          if (configResponse.ok) {
+            config = await configResponse.json();
+            setAuthConfig(config);
+          }
+        } catch (configError) {
+          console.warn('인증 설정 확인 중 오류:', configError);
+          if (isLocalHost) {
+            setUser({
+              userid: 'local-admin',
+              fullName: 'Local Admin',
+              email: '',
+              isAdmin: true
+            });
+            setIsLoggedIn(true);
+            if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+              navigate('/');
+            }
+            return;
+          }
+        }
+      }
+
+      if (config?.localOnly) {
+        const existingToken = localStorage.getItem('token');
+        if (existingToken) {
+          const verifyResponse = await fetch('/api/auth/verify', {
+            headers: {
+              'Authorization': `Bearer ${existingToken}`
+            }
+          });
+          if (verifyResponse.ok) {
+            const data = await verifyResponse.json();
+            setUser(data.user);
+            setIsLoggedIn(true);
+            if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+              navigate('/');
+            }
+            return;
+          }
+          localStorage.removeItem('token');
+        }
+
+        const loginResponse = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ userid: 'local-admin', password: '' })
+        });
+
+        if (loginResponse.ok) {
+          const loginData = await loginResponse.json();
+          localStorage.setItem('token', loginData.token);
+          setUser(loginData.user);
+          setIsLoggedIn(true);
+          if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+            navigate('/');
+          }
+          return;
+        }
+
+        console.error('로컬 자동 로그인 실패');
+        navigate('/error');
+        return;
+      }
+
       const token = localStorage.getItem('token');
       if (!token) {
         setIsLoggedIn(false);
@@ -57,21 +129,17 @@ export const useAuth = () => {
         
         // IAS가 활성화되어 있는지 확인
         try {
-          const configResponse = await fetch('/api/auth/config');
-          if (configResponse.ok) {
-            const config = await configResponse.json();
-            if (config.iasEnabled) {
-              // IAS 로그인 URL 가져오기 (state에 원래 경로 저장)
-              const currentPath = window.location.pathname + window.location.search;
-              const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
-              
-              if (iasUrlResponse.ok) {
-                const iasData = await iasUrlResponse.json();
-                if (iasData.loginUrl) {
-                  // IAS 로그인 페이지로 직접 리다이렉트
-                  window.location.href = iasData.loginUrl;
-                  return;
-                }
+          if (config?.iasEnabled) {
+            // IAS 로그인 URL 가져오기 (state에 원래 경로 저장)
+            const currentPath = window.location.pathname + window.location.search;
+            const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
+            
+            if (iasUrlResponse.ok) {
+              const iasData = await iasUrlResponse.json();
+              if (iasData.loginUrl) {
+                // IAS 로그인 페이지로 직접 리다이렉트
+                window.location.href = iasData.loginUrl;
+                return;
               }
             }
           }
@@ -107,19 +175,15 @@ export const useAuth = () => {
         
         // 토큰 검증 실패 시에도 IAS가 활성화되어 있으면 IAS로 리다이렉트
         try {
-          const configResponse = await fetch('/api/auth/config');
-          if (configResponse.ok) {
-            const config = await configResponse.json();
-            if (config.iasEnabled) {
-              const currentPath = window.location.pathname + window.location.search;
-              const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
-              
-              if (iasUrlResponse.ok) {
-                const iasData = await iasUrlResponse.json();
-                if (iasData.loginUrl) {
-                  window.location.href = iasData.loginUrl;
-                  return;
-                }
+          if (config?.iasEnabled) {
+            const currentPath = window.location.pathname + window.location.search;
+            const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
+            
+            if (iasUrlResponse.ok) {
+              const iasData = await iasUrlResponse.json();
+              if (iasData.loginUrl) {
+                window.location.href = iasData.loginUrl;
+                return;
               }
             }
           }
@@ -138,19 +202,15 @@ export const useAuth = () => {
       
       // 에러 발생 시에도 IAS가 활성화되어 있으면 IAS로 리다이렉트
       try {
-        const configResponse = await fetch('/api/auth/config');
-        if (configResponse.ok) {
-          const config = await configResponse.json();
-          if (config.iasEnabled) {
-            const currentPath = window.location.pathname + window.location.search;
-            const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
-            
-            if (iasUrlResponse.ok) {
-              const iasData = await iasUrlResponse.json();
-              if (iasData.loginUrl) {
-                window.location.href = iasData.loginUrl;
-                return;
-              }
+        if (config?.iasEnabled) {
+          const currentPath = window.location.pathname + window.location.search;
+          const iasUrlResponse = await fetch(`/api/auth/ias-login-url?state=${encodeURIComponent(currentPath)}`);
+          
+          if (iasUrlResponse.ok) {
+            const iasData = await iasUrlResponse.json();
+            if (iasData.loginUrl) {
+              window.location.href = iasData.loginUrl;
+              return;
             }
           }
         }
