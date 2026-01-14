@@ -12,6 +12,8 @@ const router = express.Router();
 // JWT 시크릿 키
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
 
+const LOCAL_ONLY = process.env.LOCAL_ONLY === 'true';
+
 // 디버그 모드 (환경 변수로 제어)
 const DEBUG_AUTH = process.env.DEBUG_AUTH === 'true';
 
@@ -65,7 +67,7 @@ router.post('/login', async (req, res) => {
     
     logClientIpInfo(req, '로그인 시도');
 
-    if (!userid || !password) {
+    if (!userid || (!password && !LOCAL_ONLY)) {
       return res.status(400).json({ error: '사용자ID와 비밀번호를 입력해주세요.' });
     }
 
@@ -87,7 +89,7 @@ router.post('/login', async (req, res) => {
         );
       }
 
-      if (userResult.rows.length === 0) {
+      if (userResult.rows.length === 0 && !LOCAL_ONLY) {
         // 로그인 실패 기록
         if (DB_TYPE === 'postgres') {
           await db.query(
@@ -97,10 +99,23 @@ router.post('/login', async (req, res) => {
         } else {
           await db.query(
             'INSERT INTO EAR.login_history (USERID, IP_ADDRESS, USER_AGENT, LOGIN_STATUS, FAILURE_REASON) VALUES (?, ?, ?, ?, ?)',
-            [userid, clientIp, userAgent, 'failed', '사용자를 찾을 수 없습니다']
+          [userid, clientIp, userAgent, 'failed', '사용자를 찾을 수 없습니다']
           );
         }
         return res.status(401).json({ error: '사용자ID 또는 비밀번호가 올바르지 않습니다.' });
+      }
+      if (userResult.rows.length === 0 && LOCAL_ONLY) {
+        const defaultPassword = 'local-dev';
+        const passwordHash = await bcrypt.hash(defaultPassword, 10);
+        await db.query(
+          `INSERT INTO users (userid, password_hash, full_name, is_admin, is_active)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [userid, passwordHash, `${userid} (local)`, true, true]
+        );
+        userResult = await db.query(
+          'SELECT * FROM users WHERE userid = $1 AND is_active = true',
+          [userid]
+        );
       }
     } catch (dbError) {
       console.error('DB 쿼리 오류:', dbError);
@@ -139,7 +154,7 @@ router.post('/login', async (req, res) => {
     }
 
     // 비밀번호 확인
-    const isValidPassword = await bcrypt.compare(password, user.password_hash);
+    const isValidPassword = LOCAL_ONLY ? true : await bcrypt.compare(password, user.password_hash);
     
     if (!isValidPassword) {
       // 실패 횟수 증가
