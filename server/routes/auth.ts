@@ -686,7 +686,8 @@ router.get('/config', (req, res) => {
   // 최소한의 공개 정보만 반환 (보안: 민감한 설정 정보는 제거)
   const config: any = {
     useXSUAA,
-    iasEnabled: useXSUAA
+    iasEnabled: useXSUAA,
+    localOnly: LOCAL_ONLY
   };
   
   if (useXSUAA && xsuaaConfig?.url) {

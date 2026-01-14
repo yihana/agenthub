@@ -6,7 +6,8 @@ const localOnly = process.env.LOCAL_ONLY === 'true';
 const rawDbType = (process.env.DB_TYPE || '').toLowerCase();
 
 if (localOnly && rawDbType && rawDbType !== 'postgres') {
-  throw new Error('Local-only mode supports Postgres only.');
+  console.warn(`LOCAL_ONLY=true 이므로 DB_TYPE(${process.env.DB_TYPE})을 postgres로 강제합니다.`);
+
 }
 
 const dbType = localOnly ? 'postgres' : (rawDbType || 'postgres');
