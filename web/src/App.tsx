@@ -32,6 +32,11 @@ import PrivacyPolicyManagementPage from './pages/PrivacyPolicyManagementPage';
 import PromptManagementPage from './pages/PromptManagementPage';
 import RAGAgentManagementPage from './pages/RAGAgentManagementPage';
 import DestinationTestPage from './pages/DestinationTestPage';
+import AgentDashboardPage from './pages/AgentDashboardPage';
+import AgentListPage from './pages/AgentListPage';
+import AgentDetailPage from './pages/AgentDetailPage';
+import AgentFormPage from './pages/AgentFormPage';
+import AgentMonitoringPage from './pages/AgentMonitoringPage';
 import MainPrototype1 from './pages/MainPrototype1';
 import MainPrototype2 from './pages/MainPrototype2';
 import MainPrototype3 from './pages/MainPrototype3';
@@ -624,6 +629,12 @@ function App() {
         <Route path="/prompt-management" element={<RouteGuard><PromptManagementPage /></RouteGuard>} />
         <Route path="/rag-agent-management" element={<RouteGuard><RAGAgentManagementPage /></RouteGuard>} />
         <Route path="/destination-test" element={<RouteGuard><DestinationTestPage /></RouteGuard>} />
+        <Route path="/agent-dashboard" element={<RouteGuard><AgentDashboardPage /></RouteGuard>} />
+        <Route path="/agent-management" element={<RouteGuard><AgentListPage /></RouteGuard>} />
+        <Route path="/agent-management/new" element={<RouteGuard><AgentFormPage /></RouteGuard>} />
+        <Route path="/agent-management/:id" element={<RouteGuard><AgentDetailPage /></RouteGuard>} />
+        <Route path="/agent-management/:id/edit" element={<RouteGuard><AgentFormPage /></RouteGuard>} />
+        <Route path="/agent-monitoring" element={<RouteGuard><AgentMonitoringPage /></RouteGuard>} />
         <Route path="/main-prototype1" element={<RouteGuard><MainPrototype1 /></RouteGuard>} />
         <Route path="/main-prototype2" element={<RouteGuard><MainPrototype2 /></RouteGuard>} />
         <Route path="/main-prototype3" element={<RouteGuard><MainPrototype3 /></RouteGuard>} />
