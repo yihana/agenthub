@@ -50,6 +50,7 @@ function AppContent() {
   const [user, setUser] = useState<any>(null);
   const [isQuickMenuOpen, setIsQuickMenuOpen] = useState(false);
   const navigate = useNavigate();
+  const isLocalHost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
   // 최근 intent 조회 및 채팅 세션 열기 (함수 정의를 먼저)
   const checkRecentIntent = async (user: any) => {
@@ -350,6 +351,16 @@ function AppContent() {
           }
         } catch (configError) {
           console.warn('IAS 설정 확인 중 오류:', configError);
+          if (isLocalHost) {
+            setUser({
+              userid: 'local-admin',
+              fullName: 'Local Admin',
+              email: '',
+              isAdmin: true
+            });
+            setIsLoggedIn(true);
+            return;
+          }
         }
         
         // IAS가 비활성화되었거나 설정을 가져올 수 없는 경우 에러 페이지로 리다이렉트
@@ -408,6 +419,16 @@ function AppContent() {
       localStorage.removeItem('token');
       setIsLoggedIn(false);
       setUser(null);
+      if (isLocalHost) {
+        setUser({
+          userid: 'local-admin',
+          fullName: 'Local Admin',
+          email: '',
+          isAdmin: true
+        });
+        setIsLoggedIn(true);
+        return;
+      }
       
       // 에러 발생 시에도 IAS가 활성화되어 있으면 IAS로 리다이렉트
       try {
