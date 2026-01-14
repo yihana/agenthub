@@ -96,6 +96,82 @@ async function createTables(client: any) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agents (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(200) NOT NULL,
+      description TEXT,
+      type VARCHAR(100) NOT NULL,
+      status VARCHAR(50) DEFAULT 'inactive',
+      env_config JSONB,
+      max_concurrency INTEGER DEFAULT 1,
+      tags JSONB,
+      last_heartbeat TIMESTAMP,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agent_roles (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      role_name VARCHAR(100) NOT NULL,
+      UNIQUE(agent_id, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agent_metrics (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      cpu_usage NUMERIC(5,2),
+      memory_usage NUMERIC(5,2),
+      requests_processed INTEGER DEFAULT 0,
+      avg_latency NUMERIC(10,2),
+      error_rate NUMERIC(5,2),
+      queue_time NUMERIC(10,2)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agent_tasks (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      job_id VARCHAR(100),
+      status VARCHAR(50) DEFAULT 'pending',
+      received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      started_at TIMESTAMP,
+      finished_at TIMESTAMP,
+      result JSONB
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS job_queue (
+      job_id VARCHAR(100) PRIMARY KEY,
+      payload JSONB,
+      priority INTEGER DEFAULT 0,
+      status VARCHAR(50) DEFAULT 'queued',
+      assigned_agent_id INTEGER REFERENCES agents(id),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      scheduled_at TIMESTAMP
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS audit_logs (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(100),
+      event_type VARCHAR(100),
+      target_id VARCHAR(100),
+      timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      details JSONB
+    );
+  `);
   
   await client.query(`
     CREATE TABLE IF NOT EXISTS ear_keywords (
@@ -440,6 +516,20 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_prompt_management_type ON prompt_management(prompt_type);
     CREATE INDEX IF NOT EXISTS idx_prompt_management_company_code ON prompt_management(company_code);
     CREATE INDEX IF NOT EXISTS idx_prompt_management_active ON prompt_management(is_active);
+    CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+    CREATE INDEX IF NOT EXISTS idx_agents_type ON agents(type);
+    CREATE INDEX IF NOT EXISTS idx_agents_is_active ON agents(is_active);
+    CREATE INDEX IF NOT EXISTS idx_agents_last_heartbeat ON agents(last_heartbeat);
+    CREATE INDEX IF NOT EXISTS idx_agent_roles_agent_id ON agent_roles(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_roles_role_name ON agent_roles(role_name);
+    CREATE INDEX IF NOT EXISTS idx_agent_metrics_agent_id ON agent_metrics(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_metrics_timestamp ON agent_metrics(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent_id ON agent_tasks(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+    CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
+    CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned_agent_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+    CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
   `);
 }
 
@@ -537,7 +627,8 @@ async function initializeMenus(client: any) {
     { code: 'request', label: '요청관리', order: 1 },
     { code: 'rag', label: 'RAG 관리', order: 2 },
     { code: 'system', label: '시스템 관리', order: 3 },
-    { code: 'process', label: '프로세스 관리', order: 4 }
+    { code: 'process', label: '프로세스 관리', order: 4 },
+    { code: 'agent', label: '에이전트 관리', order: 5 }
   ];
   
   const menuItems = [
@@ -577,7 +668,12 @@ async function initializeMenus(client: any) {
       { parent: 'process', code: 'main-prototype3', label: 'Main Prototype3', path: '/main-prototype3', icon: 'Layout', order: 4 },
       { parent: 'process', code: 'main-prototype4', label: 'Main Prototype4', path: '/main-prototype4', icon: 'Layout', order: 5 },
       { parent: 'process', code: 'main-prototype5', label: 'Main Prototype5', path: '/main-prototype5', icon: 'Layout', order: 6 },
-      { parent: 'process', code: 'main-prototype6', label: 'Main Prototype6', path: '/main-prototype6', icon: 'Layout', order: 7 }
+      { parent: 'process', code: 'main-prototype6', label: 'Main Prototype6', path: '/main-prototype6', icon: 'Layout', order: 7 },
+
+      // 에이전트 관리 하위 메뉴
+      { parent: 'agent', code: 'agent-dashboard', label: '에이전트 대시보드', path: '/agent-dashboard', icon: 'Activity', order: 1 },
+      { parent: 'agent', code: 'agent-management', label: '에이전트 목록', path: '/agent-management', icon: 'Bot', order: 2 },
+      { parent: 'agent', code: 'agent-monitoring', label: '업무량/모니터링', path: '/agent-monitoring', icon: 'BarChart3', order: 3 }
     ];
   
   // 1차 메뉴 삽입 (없으면 추가)
@@ -710,4 +806,3 @@ export async function query(text: string, params?: any[]) {
 }
 
 export { pool };
-
