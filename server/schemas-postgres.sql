@@ -373,6 +373,87 @@ CREATE INDEX IF NOT EXISTS idx_rag_agents_info_company_code ON rag_agents_info(c
 CREATE INDEX IF NOT EXISTS idx_rag_agents_info_is_active ON rag_agents_info(is_active);
 CREATE INDEX IF NOT EXISTS idx_rag_agents_info_company_active ON rag_agents_info(company_code, is_active);
 
+-- 에이전트 라이프사이클 관리 테이블
+CREATE TABLE IF NOT EXISTS agents (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    description TEXT,
+    type VARCHAR(100) NOT NULL,
+    status VARCHAR(50) DEFAULT 'inactive',
+    env_config JSONB,
+    max_concurrency INTEGER DEFAULT 1,
+    tags JSONB,
+    last_heartbeat TIMESTAMP,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agent_roles (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    role_name VARCHAR(100) NOT NULL,
+    UNIQUE(agent_id, role_name)
+);
+
+CREATE TABLE IF NOT EXISTS agent_metrics (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    cpu_usage NUMERIC(5,2),
+    memory_usage NUMERIC(5,2),
+    requests_processed INTEGER DEFAULT 0,
+    avg_latency NUMERIC(10,2),
+    error_rate NUMERIC(5,2),
+    queue_time NUMERIC(10,2)
+);
+
+CREATE TABLE IF NOT EXISTS agent_tasks (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    job_id VARCHAR(100),
+    status VARCHAR(50) DEFAULT 'pending',
+    received_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    started_at TIMESTAMP,
+    finished_at TIMESTAMP,
+    result JSONB
+);
+
+CREATE TABLE IF NOT EXISTS job_queue (
+    job_id VARCHAR(100) PRIMARY KEY,
+    payload JSONB,
+    priority INTEGER DEFAULT 0,
+    status VARCHAR(50) DEFAULT 'queued',
+    assigned_agent_id INTEGER REFERENCES agents(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    scheduled_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(100),
+    event_type VARCHAR(100),
+    target_id VARCHAR(100),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    details JSONB
+);
+
+-- 에이전트 라이프사이클 관리 테이블 인덱스
+CREATE INDEX IF NOT EXISTS idx_agents_status ON agents(status);
+CREATE INDEX IF NOT EXISTS idx_agents_type ON agents(type);
+CREATE INDEX IF NOT EXISTS idx_agents_is_active ON agents(is_active);
+CREATE INDEX IF NOT EXISTS idx_agents_last_heartbeat ON agents(last_heartbeat);
+CREATE INDEX IF NOT EXISTS idx_agent_roles_agent_id ON agent_roles(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_roles_role_name ON agent_roles(role_name);
+CREATE INDEX IF NOT EXISTS idx_agent_metrics_agent_id ON agent_metrics(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_metrics_timestamp ON agent_metrics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent_id ON agent_tasks(agent_id);
+CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
+CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
+CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned_agent_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+
 -- 기본 관리자 계정 생성 (비밀번호: admin123)
 -- 기존 관리자 계정이 있으면 비밀번호만 업데이트
 INSERT INTO users (userid, password_hash, full_name, is_admin, is_active) 
@@ -382,4 +463,3 @@ DO UPDATE SET
   password_hash = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
   is_admin = true,
   is_active = true;
-

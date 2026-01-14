@@ -16,8 +16,11 @@ export const getIcon = (iconName: string | null | undefined) => {
     AlertTriangle: Icons.AlertTriangle,
     ClipboardList: Icons.ClipboardList,
     Menu: Icons.Menu,
+    Activity: Icons.Activity,
+    Bot: Icons.Bot,
+    BarChart3: Icons.BarChart3,
+    Layout: Icons.Layout,
   };
   
   return iconMap[iconName] || Icons.FileText;
 };
-
