@@ -5,6 +5,7 @@ import TagPill from '../../components/portal-dashboard/TagPill';
 import { usePortalRole } from '../../hooks/usePortalRole';
 
 const initialRoadmapStages = [
+
   {
     quarter: '2024 Q3',
     title: '통합 운영 센터 구축',
@@ -24,6 +25,7 @@ const initialRoadmapStages = [
     status: '계획'
   }
 ];
+
 
 const initialMilestones = [
   {
@@ -97,6 +99,7 @@ const PortalRoadmapPage: React.FC = () => {
     ]);
     setNewMilestone({ title: '', owner: '', due: '', status: '준비' });
   };
+
   return (
     <PortalDashboardLayout
       title="로드맵"
@@ -111,6 +114,7 @@ const PortalRoadmapPage: React.FC = () => {
           <button className="ear-secondary">로드맵 내보내기</button>
         </>
       }
+
     >
       <div className="ear-grid">
         <WidgetCard title="분기별 로드맵" description="전사 계획과 연계된 주요 과제">

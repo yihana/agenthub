@@ -7,11 +7,9 @@ import {
   ListChecks,
   Settings
 } from 'lucide-react';
-import '../../styles/portal-dashboard.css';
-import { usePortalRole } from '../../hooks/usePortalRole';
+import '../../styles/ear-dashboard.css';
 
-
-interface PortalDashboardLayoutProps {
+interface EARDashboardLayoutProps {
   title: string;
   subtitle?: string;
   actions?: React.ReactNode;
@@ -19,28 +17,25 @@ interface PortalDashboardLayoutProps {
 }
 
 const navItems = [
-  { to: '/portal-dashboard', label: '대시보드', icon: LayoutGrid },
-  { to: '/portal-agents', label: '에이전트 목록', icon: ListChecks },
-  { to: '/portal-usage', label: '사용 현황/효과', icon: BarChart3 },
-  { to: '/portal-roadmap', label: '로드맵', icon: Flag },
-  { to: '/portal-settings', label: '화면 구성', icon: Settings }
+  { to: '/ear-dashboard', label: '대시보드', icon: LayoutGrid },
+  { to: '/ear-agents', label: '에이전트 목록', icon: ListChecks },
+  { to: '/ear-usage', label: '사용 현황/효과', icon: BarChart3 },
+  { to: '/ear-roadmap', label: '로드맵', icon: Flag },
+  { to: '/ear-settings', label: '화면 구성', icon: Settings }
 ];
 
-const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
+const EARDashboardLayout: React.FC<EARDashboardLayoutProps> = ({
   title,
   subtitle,
   actions,
   children
 }) => {
-
-  const { role, toggleRole } = usePortalRole();
-
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">
         <div className="ear-sidebar__brand">
-          <span className="ear-badge">Agent Portal</span>
-          <strong>Agent 관리 시스템</strong>
+          <span className="ear-badge">EAR Agent</span>
+          <strong>관리 대시보드</strong>
           <p>사용자화 가능한 운영 허브</p>
         </div>
         <nav className="ear-nav">
@@ -65,19 +60,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
             <span className="ear-muted">버전</span>
             <strong>Mockup v1.0</strong>
           </div>
-
-          <div className="ear-role">
-            <span className="ear-muted">권한</span>
-            <strong>{role === 'admin' ? '관리자' : '사용자'}</strong>
-          </div>
-          <button
-            type="button"
-            className="ear-ghost"
-            onClick={toggleRole}
-          >
-            권한 전환
-          </button>
-
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>
       </aside>
@@ -95,4 +77,4 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   );
 };
 
-export default PortalDashboardLayout;
+export default EARDashboardLayout;

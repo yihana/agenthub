@@ -2,13 +2,13 @@
   --ear-bg: #f4f6fb;
   --ear-surface: #ffffff;
   --ear-border: #e4e8f0;
-  --ear-primary: #d32f2f;
-  --ear-primary-strong: #b71c1c;
+  --ear-primary: #2656f6;
+  --ear-primary-strong: #1f46c7;
   --ear-text: #1c2333;
   --ear-muted: #6b7280;
-  --ear-success: #f97316;
+  --ear-success: #1aa468;
   --ear-warning: #f59e0b;
-  --ear-info: #fbbf24;
+  --ear-info: #3b82f6;
   --ear-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
 }
 
@@ -34,7 +34,6 @@
   display: block;
   font-size: 20px;
   margin-top: 12px;
-  white-space: nowrap;
 }
 
 .ear-sidebar__brand p {
@@ -49,8 +48,8 @@
   gap: 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(211, 47, 47, 0.18);
-  color: #fecaca;
+  background: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
   font-size: 12px;
   font-weight: 600;
 }
@@ -74,7 +73,7 @@
 
 .ear-nav__item--active,
 .ear-nav__item:hover {
-  background: rgba(217, 119, 6, 0.2);
+  background: rgba(37, 99, 235, 0.2);
   color: #ffffff;
 }
 
@@ -85,13 +84,6 @@
   gap: 12px;
   font-size: 13px;
 }
-
-.ear-role {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
 
 .ear-muted {
   color: var(--ear-muted);
@@ -131,7 +123,7 @@
 }
 
 .ear-hero {
-  background: linear-gradient(120deg, #b91c1c 0%, #f59e0b 100%);
+  background: linear-gradient(120deg, #1f46c7 0%, #3b82f6 100%);
   color: #f8fafc;
   padding: 28px;
   border-radius: 18px;
@@ -143,12 +135,6 @@
 
 .ear-hero--compact {
   padding: 22px;
-}
-
-.ear-hero .ear-pill--info {
-  background: rgba(255, 255, 255, 0.22);
-  color: #ffffff;
-  border-color: transparent;
 }
 
 .ear-hero h2 {
@@ -250,7 +236,7 @@
 }
 
 .ear-stat--highlight {
-  background: rgba(217, 119, 6, 0.18);
+  background: rgba(37, 99, 235, 0.12);
 }
 
 .ear-list {
@@ -286,7 +272,7 @@
 .ear-pill {
   padding: 4px 10px;
   border-radius: 999px;
-  background: #fef3c7;
+  background: #eef2ff;
   color: #4b5563;
   font-size: 12px;
   border: 1px solid transparent;
@@ -303,8 +289,8 @@
 }
 
 .ear-pill--info {
-  background: rgba(245, 158, 11, 0.2);
-  color: #b45309;
+  background: rgba(59, 130, 246, 0.2);
+  color: #1d4ed8;
 }
 
 .ear-pill--neutral {
@@ -334,7 +320,7 @@
 }
 
 .ear-chart__bar {
-  background: linear-gradient(180deg, #f97316, #b91c1c);
+  background: linear-gradient(180deg, #3b82f6, #1f46c7);
   border-radius: 10px 10px 4px 4px;
   height: 100%;
   opacity: 0.9;
@@ -373,7 +359,7 @@
 
 .ear-progress__fill {
   height: 100%;
-  background: linear-gradient(90deg, #b91c1c, #f59e0b);
+  background: linear-gradient(90deg, #1f46c7, #3b82f6);
 }
 
 .ear-activity {
@@ -486,55 +472,6 @@
   border: 1px solid var(--ear-border);
 }
 
-.ear-form {
-  margin-top: 12px;
-  padding-top: 16px;
-  border-top: 1px dashed var(--ear-border);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.ear-form h3 {
-  margin: 0;
-  font-size: 15px;
-}
-
-.ear-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 13px;
-  color: var(--ear-muted);
-}
-
-.ear-form input,
-.ear-form select {
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--ear-border);
-}
-
-.ear-input {
-  width: 100%;
-  padding: 8px 10px;
-  border-radius: 10px;
-  border: 1px solid var(--ear-border);
-  font-size: 13px;
-}
-
-.ear-textarea {
-  resize: vertical;
-}
-
-.ear-input-group {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 8px;
-  margin-top: 8px;
-}
-
-
 .ear-roadmap {
   display: flex;
   flex-direction: column;
@@ -628,14 +565,14 @@
 }
 
 .ear-preview__item {
-  background: #fef3c7;
+  background: #eef2ff;
   padding: 12px;
   border-radius: 12px;
   font-size: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  border: 1px dashed #fcd34d;
+  border: 1px dashed #c7d2fe;
 }
 
 .ear-preview__item--small {
