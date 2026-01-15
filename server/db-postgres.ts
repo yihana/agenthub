@@ -27,6 +27,7 @@ export async function initializeDatabase() {
     
     // 테이블 생성
     await createTables(client);
+    await applyPortalDashboardMigrations(client);
     
     // 인덱스 생성
     if (process.env.LOCAL_ONLY === 'true') {
@@ -54,6 +55,9 @@ export async function initializeDatabase() {
     if (LOCAL_ONLY) {
       await seedAgentData(client);
     }
+
+    // 포털 기준값 샘플 데이터
+    await seedPortalBaselines(client);
     
     // 입력보안 설정 초기화
     await initializeInputSecurity(client);
@@ -113,6 +117,14 @@ async function createTables(client: any) {
       name VARCHAR(200) NOT NULL,
       description TEXT,
       type VARCHAR(100) NOT NULL,
+      business_type VARCHAR(100),
+      owner_user_id VARCHAR(100),
+      version VARCHAR(50),
+      model_name VARCHAR(100),
+      language VARCHAR(50),
+      supported_modes VARCHAR(100),
+      endpoint_url VARCHAR(255),
+      exec_mode VARCHAR(50),
       status VARCHAR(50) DEFAULT 'inactive',
       env_config JSONB,
       max_concurrency INTEGER DEFAULT 1,
@@ -182,6 +194,44 @@ async function createTables(client: any) {
       details JSONB
     );
   `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agent_system_mappings (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      system_cd VARCHAR(50) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(agent_id, system_cd)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS agent_erp_auth (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      system_cd VARCHAR(50) NOT NULL,
+      sys_auth_cd VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(agent_id, system_cd, sys_auth_cd)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_metric_inputs (
+      id SERIAL PRIMARY KEY,
+      metric_key VARCHAR(120) NOT NULL,
+      value NUMERIC(14,2) NOT NULL,
+      unit VARCHAR(50),
+      description TEXT,
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(metric_key, business_type, agent_type)
+    );
+  `);
   
   await client.query(`
     CREATE TABLE IF NOT EXISTS ear_keywords (
@@ -213,6 +263,8 @@ async function createTables(client: any) {
       template_id INTEGER REFERENCES ear_request_templates(id),
       form_data JSONB,
       attachments JSONB,
+      agent_id INTEGER REFERENCES agents(id),
+      business_type VARCHAR(100),
       status VARCHAR(50) DEFAULT 'pending',
       created_by VARCHAR(100),
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -472,6 +524,37 @@ async function createTables(client: any) {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+}
+
+async function applyPortalDashboardMigrations(client: any) {
+  const columns = [
+    { table: 'agents', name: 'business_type', type: 'VARCHAR(100)' },
+    { table: 'agents', name: 'owner_user_id', type: 'VARCHAR(100)' },
+    { table: 'agents', name: 'version', type: 'VARCHAR(50)' },
+    { table: 'agents', name: 'model_name', type: 'VARCHAR(100)' },
+    { table: 'agents', name: 'language', type: 'VARCHAR(50)' },
+    { table: 'agents', name: 'supported_modes', type: 'VARCHAR(100)' },
+    { table: 'agents', name: 'endpoint_url', type: 'VARCHAR(255)' },
+    { table: 'agents', name: 'exec_mode', type: 'VARCHAR(50)' },
+    { table: 'ear_requests', name: 'agent_id', type: 'INTEGER' },
+    { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' }
+  ];
+
+  for (const column of columns) {
+    await client.query(
+      `ALTER TABLE ${column.table} ADD COLUMN IF NOT EXISTS ${column.name} ${column.type};`
+    );
+  }
+}
+
+async function seedPortalBaselines(client: any) {
+  await client.query(
+    `INSERT INTO portal_metric_inputs (metric_key, value, unit, description)
+     VALUES
+       ('baseline_minutes_per_request', 12, 'minute', '요청 1건당 기준 처리 시간 (분)'),
+       ('cost_per_hour', 45000, 'KRW', '시간당 인건비 단가')
+     ON CONFLICT (metric_key, business_type, agent_type) DO NOTHING;`
+  );
 }
 
 // 인덱스 생성

@@ -78,6 +78,8 @@ CREATE TABLE IF NOT EXISTS ear_requests (
     template_id INTEGER REFERENCES ear_request_templates(id),
     form_data JSONB,
     attachments JSONB,
+    agent_id INTEGER REFERENCES agents(id),
+    business_type VARCHAR(100),
     status VARCHAR(50) DEFAULT 'pending',
     created_by VARCHAR(100),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -379,6 +381,14 @@ CREATE TABLE IF NOT EXISTS agents (
     name VARCHAR(200) NOT NULL,
     description TEXT,
     type VARCHAR(100) NOT NULL,
+    business_type VARCHAR(100),
+    owner_user_id VARCHAR(100),
+    version VARCHAR(50),
+    model_name VARCHAR(100),
+    language VARCHAR(50),
+    supported_modes VARCHAR(100),
+    endpoint_url VARCHAR(255),
+    exec_mode VARCHAR(50),
     status VARCHAR(50) DEFAULT 'inactive',
     env_config JSONB,
     max_concurrency INTEGER DEFAULT 1,
@@ -387,6 +397,38 @@ CREATE TABLE IF NOT EXISTS agents (
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS agent_system_mappings (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    system_cd VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, system_cd)
+);
+
+CREATE TABLE IF NOT EXISTS agent_erp_auth (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    system_cd VARCHAR(50) NOT NULL,
+    sys_auth_cd VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(agent_id, system_cd, sys_auth_cd)
+);
+
+CREATE TABLE IF NOT EXISTS portal_metric_inputs (
+    id SERIAL PRIMARY KEY,
+    metric_key VARCHAR(120) NOT NULL,
+    value NUMERIC(14,2) NOT NULL,
+    unit VARCHAR(50),
+    description TEXT,
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(metric_key, business_type, agent_type)
 );
 
 CREATE TABLE IF NOT EXISTS agent_roles (
