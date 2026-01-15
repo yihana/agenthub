@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import ChatPane from './components/ChatPane';
 import HistoryPane from './components/HistoryPane';
 import RequestStatusPane from './components/RequestStatusPane';
@@ -645,6 +645,8 @@ function App() {
         <Route path="/agent-management/:id" element={<RouteGuard><AgentDetailPage /></RouteGuard>} />
         <Route path="/agent-management/:id/edit" element={<RouteGuard><AgentFormPage /></RouteGuard>} />
         <Route path="/agent-monitoring" element={<RouteGuard><AgentMonitoringPage /></RouteGuard>} />
+        <Route path="/agents" element={<Navigate to="/agent-management" replace />} />
+        <Route path="/agents/monitoring" element={<Navigate to="/agent-monitoring" replace />} />
         <Route path="/main-prototype1" element={<RouteGuard><MainPrototype1 /></RouteGuard>} />
         <Route path="/main-prototype2" element={<RouteGuard><MainPrototype2 /></RouteGuard>} />
         <Route path="/main-prototype3" element={<RouteGuard><MainPrototype3 /></RouteGuard>} />
