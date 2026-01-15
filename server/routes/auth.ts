@@ -249,7 +249,7 @@ router.post('/login', async (req, res) => {
     const companyCode = user.company_code || 'SKN';
     
     // 사용자가 DB에 없거나 company_code가 없으면 SKN으로 업데이트
-    if (!user.company_code) {
+    if (!user.company_code && !LOCAL_ONLY) {
       if (DB_TYPE === 'postgres') {
         await db.query(
           'UPDATE users SET company_code = $1 WHERE id = $2',
