@@ -30,6 +30,12 @@ const AgentListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('');
 
   const loadAgents = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('인증 토큰이 필요합니다.');
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -43,8 +49,9 @@ const AgentListPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     loadAgents();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();

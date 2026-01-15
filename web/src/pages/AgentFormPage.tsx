@@ -27,7 +27,13 @@ const AgentFormPage: React.FC = () => {
 
   useEffect(() => {
     const loadAgent = async () => {
-      if (!id) return;
+      if (!id || !isLoggedIn) return;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('인증 토큰이 필요합니다.');
+        return;
+      }
+
       setLoading(true);
       setError('');
       try {
@@ -51,7 +57,7 @@ const AgentFormPage: React.FC = () => {
     };
 
     loadAgent();
-  }, [id, getAgent]);
+  }, [id, getAgent, isLoggedIn]);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = event.target;
@@ -64,6 +70,12 @@ const AgentFormPage: React.FC = () => {
     setLoading(true);
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('인증 토큰이 필요합니다.');
+        return;
+      }
+
       let envConfigObj = null;
       if (formData.envConfig.trim()) {
         envConfigObj = JSON.parse(formData.envConfig);
