@@ -430,6 +430,73 @@ CREATE INDEX idx_job_queue_assigned_agent_id ON EAR.job_queue(ASSIGNED_AGENT_ID)
 CREATE INDEX idx_audit_logs_user_id ON EAR.audit_logs(USER_ID);
 CREATE INDEX idx_audit_logs_timestamp ON EAR.audit_logs(TIMESTAMP);
 
+-- 에이전트 샘플 데이터 (로컬/개발용)
+INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE)
+SELECT 'Agent Alpha', '검색 기반 응답 에이전트', 'LLM', 'active',
+       '{"model":"gpt-4o-mini","region":"hana"}', 4, '["search","rag"]', true
+FROM DUMMY
+WHERE NOT EXISTS (SELECT 1 FROM EAR.agents WHERE NAME = 'Agent Alpha');
+
+INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE)
+SELECT 'Agent Beta', '백오피스 자동화 에이전트', 'Automation', 'running',
+       '{"runtime":"node","retries":2}', 2, '["automation"]', true
+FROM DUMMY
+WHERE NOT EXISTS (SELECT 1 FROM EAR.agents WHERE NAME = 'Agent Beta');
+
+INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE)
+SELECT 'Agent Gamma', '오류 감지 테스트 에이전트', 'Monitor', 'error',
+       '{"threshold":0.2}', 1, '["monitoring","ops"]', true
+FROM DUMMY
+WHERE NOT EXISTS (SELECT 1 FROM EAR.agents WHERE NAME = 'Agent Gamma');
+
+INSERT INTO EAR.agent_roles (AGENT_ID, ROLE_NAME)
+SELECT a.ID, r.ROLE_NAME
+FROM EAR.agents a
+JOIN (
+  SELECT 'Agent Alpha' AS AGENT_NAME, 'retrieval' AS ROLE_NAME FROM DUMMY
+  UNION ALL SELECT 'Agent Alpha', 'answering' FROM DUMMY
+  UNION ALL SELECT 'Agent Beta', 'workflow' FROM DUMMY
+  UNION ALL SELECT 'Agent Beta', 'scheduler' FROM DUMMY
+  UNION ALL SELECT 'Agent Gamma', 'monitoring' FROM DUMMY
+) r ON a.NAME = r.AGENT_NAME
+WHERE NOT EXISTS (
+  SELECT 1 FROM EAR.agent_roles ar WHERE ar.AGENT_ID = a.ID AND ar.ROLE_NAME = r.ROLE_NAME
+);
+
+INSERT INTO EAR.agent_metrics (AGENT_ID, TIMESTAMP, CPU_USAGE, MEMORY_USAGE, REQUESTS_PROCESSED, AVG_LATENCY, ERROR_RATE, QUEUE_TIME)
+SELECT a.ID, ADD_SECONDS(CURRENT_TIMESTAMP, -900), 42.5, 61.2, 120, 210.4, 1.2, 12.5
+FROM EAR.agents a
+WHERE a.NAME = 'Agent Alpha'
+  AND NOT EXISTS (
+    SELECT 1 FROM EAR.agent_metrics m WHERE m.AGENT_ID = a.ID AND m.TIMESTAMP >= ADD_SECONDS(CURRENT_TIMESTAMP, -960)
+  );
+
+INSERT INTO EAR.agent_metrics (AGENT_ID, TIMESTAMP, CPU_USAGE, MEMORY_USAGE, REQUESTS_PROCESSED, AVG_LATENCY, ERROR_RATE, QUEUE_TIME)
+SELECT a.ID, ADD_SECONDS(CURRENT_TIMESTAMP, -300), 55.1, 68.7, 140, 185.7, 0.8, 9.4
+FROM EAR.agents a
+WHERE a.NAME = 'Agent Beta'
+  AND NOT EXISTS (
+    SELECT 1 FROM EAR.agent_metrics m WHERE m.AGENT_ID = a.ID AND m.TIMESTAMP >= ADD_SECONDS(CURRENT_TIMESTAMP, -360)
+  );
+
+INSERT INTO EAR.job_queue (JOB_ID, PAYLOAD, PRIORITY, STATUS, ASSIGNED_AGENT_ID)
+SELECT 'job-1001', '{"task":"sample","jobId":"job-1001"}', 1, 'queued', a.ID
+FROM EAR.agents a
+WHERE a.NAME = 'Agent Beta'
+  AND NOT EXISTS (SELECT 1 FROM EAR.job_queue WHERE JOB_ID = 'job-1001');
+
+INSERT INTO EAR.job_queue (JOB_ID, PAYLOAD, PRIORITY, STATUS, ASSIGNED_AGENT_ID)
+SELECT 'job-1002', '{"task":"sample","jobId":"job-1002"}', 2, 'running', a.ID
+FROM EAR.agents a
+WHERE a.NAME = 'Agent Alpha'
+  AND NOT EXISTS (SELECT 1 FROM EAR.job_queue WHERE JOB_ID = 'job-1002');
+
+INSERT INTO EAR.agent_tasks (AGENT_ID, JOB_ID, STATUS, RECEIVED_AT, STARTED_AT, RESULT)
+SELECT a.ID, 'job-1002', 'running', ADD_SECONDS(CURRENT_TIMESTAMP, -1800), ADD_SECONDS(CURRENT_TIMESTAMP, -600), '{"note":"processing"}'
+FROM EAR.agents a
+WHERE a.NAME = 'Agent Alpha'
+  AND NOT EXISTS (SELECT 1 FROM EAR.agent_tasks WHERE JOB_ID = 'job-1002');
+
 -- 기본 관리자 계정 생성 (비밀번호: admin123)
 -- HANA는 MERGE 문 사용
 MERGE INTO EAR.users AS target

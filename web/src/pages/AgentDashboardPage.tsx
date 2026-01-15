@@ -29,7 +29,15 @@ const AgentDashboardPage: React.FC = () => {
   const [error, setError] = useState('');
 
   useEffect(() => {
+    if (!isLoggedIn) return;
+
     const fetchSummary = async () => {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('인증 토큰이 필요합니다.');
+        return;
+      }
+
       setLoading(true);
       setError('');
       try {
@@ -43,7 +51,7 @@ const AgentDashboardPage: React.FC = () => {
     };
 
     fetchSummary();
-  }, [getSummary]);
+  }, [getSummary, isLoggedIn]);
 
   return (
     <div className="agent-page">

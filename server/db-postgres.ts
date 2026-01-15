@@ -2,6 +2,7 @@ import { Pool } from 'pg';
 import dotenv from 'dotenv';
 
 dotenv.config();
+const LOCAL_ONLY = process.env.LOCAL_ONLY === 'true';
 
 // PostgreSQL 연결 풀
 const pool = new Pool({
@@ -48,6 +49,11 @@ export async function initializeDatabase() {
     
     // 메뉴 초기화
     await initializeMenus(client);
+
+    // 에이전트 샘플 데이터 초기화 (로컬 전용)
+    if (LOCAL_ONLY) {
+      await seedAgentData(client);
+    }
     
     // 입력보안 설정 초기화
     await initializeInputSecurity(client);
@@ -754,6 +760,148 @@ async function initializeMenus(client: any) {
   }
   
   console.log('메뉴 초기화 완료');
+}
+
+// 에이전트 샘플 데이터 초기화 (로컬 개발용)
+async function seedAgentData(client: any) {
+  const existing = await client.query('SELECT COUNT(*)::int as count FROM agents');
+  if ((existing.rows?.[0]?.count || 0) > 0) {
+    return;
+  }
+
+  const agents = [
+    {
+      name: 'Agent Alpha',
+      description: '검색 기반 응답 에이전트',
+      type: 'LLM',
+      status: 'active',
+      env_config: { model: 'gpt-4o-mini', region: 'local' },
+      max_concurrency: 4,
+      tags: ['search', 'rag']
+    },
+    {
+      name: 'Agent Beta',
+      description: '백오피스 자동화 에이전트',
+      type: 'Automation',
+      status: 'running',
+      env_config: { runtime: 'node', retries: 2 },
+      max_concurrency: 2,
+      tags: ['automation']
+    },
+    {
+      name: 'Agent Gamma',
+      description: '오류 감지 테스트 에이전트',
+      type: 'Monitor',
+      status: 'error',
+      env_config: { threshold: 0.2 },
+      max_concurrency: 1,
+      tags: ['monitoring', 'ops']
+    }
+  ];
+
+  const agentIds: number[] = [];
+  for (const agent of agents) {
+    const result = await client.query(
+      `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+       RETURNING id`,
+      [
+        agent.name,
+        agent.description,
+        agent.type,
+        agent.status,
+        JSON.stringify(agent.env_config),
+        agent.max_concurrency,
+        JSON.stringify(agent.tags)
+      ]
+    );
+    agentIds.push(result.rows[0].id);
+  }
+
+  const roleMap = [
+    { agentId: agentIds[0], roles: ['retrieval', 'answering'] },
+    { agentId: agentIds[1], roles: ['workflow', 'scheduler'] },
+    { agentId: agentIds[2], roles: ['monitoring'] }
+  ];
+
+  for (const entry of roleMap) {
+    for (const role of entry.roles) {
+      await client.query(
+        'INSERT INTO agent_roles (agent_id, role_name) VALUES ($1, $2)',
+        [entry.agentId, role]
+      );
+    }
+  }
+
+  const now = new Date();
+  for (const agentId of agentIds) {
+    await client.query(
+      `INSERT INTO agent_metrics
+       (agent_id, timestamp, cpu_usage, memory_usage, requests_processed, avg_latency, error_rate, queue_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        agentId,
+        new Date(now.getTime() - 15 * 60 * 1000),
+        42.5,
+        61.2,
+        120,
+        210.4,
+        1.2,
+        12.5
+      ]
+    );
+    await client.query(
+      `INSERT INTO agent_metrics
+       (agent_id, timestamp, cpu_usage, memory_usage, requests_processed, avg_latency, error_rate, queue_time)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+      [
+        agentId,
+        new Date(now.getTime() - 5 * 60 * 1000),
+        55.1,
+        68.7,
+        140,
+        185.7,
+        0.8,
+        9.4
+      ]
+    );
+  }
+
+  const jobIds = [
+    { jobId: 'job-1001', status: 'queued', priority: 1, assignedAgentId: agentIds[1] },
+    { jobId: 'job-1002', status: 'running', priority: 2, assignedAgentId: agentIds[0] },
+    { jobId: 'job-1003', status: 'queued', priority: 0, assignedAgentId: null }
+  ];
+
+  for (const job of jobIds) {
+    await client.query(
+      `INSERT INTO job_queue (job_id, payload, priority, status, assigned_agent_id)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [
+        job.jobId,
+        JSON.stringify({ task: 'sample', jobId: job.jobId }),
+        job.priority,
+        job.status,
+        job.assignedAgentId
+      ]
+    );
+  }
+
+  await client.query(
+    `INSERT INTO agent_tasks (agent_id, job_id, status, received_at, started_at, finished_at, result)
+     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+    [
+      agentIds[0],
+      'job-1002',
+      'running',
+      new Date(now.getTime() - 30 * 60 * 1000),
+      new Date(now.getTime() - 10 * 60 * 1000),
+      null,
+      JSON.stringify({ note: 'processing' })
+    ]
+  );
+
+  console.log('✅ 에이전트 샘플 데이터 초기화 완료');
 }
 
 // 입력보안 설정 초기화
