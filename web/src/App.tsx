@@ -43,6 +43,11 @@ import MainPrototype3 from './pages/MainPrototype3';
 import MainPrototype4 from './pages/MainPrototype4';
 import MainPrototype5 from './pages/MainPrototype5';
 import MainPrototype6 from './pages/MainPrototype6';
+import PortalDashboardHome from './pages/portal/PortalDashboardHome';
+import PortalAgentListPage from './pages/portal/PortalAgentListPage';
+import PortalUsageImpactPage from './pages/portal/PortalUsageImpactPage';
+import PortalRoadmapPage from './pages/portal/PortalRoadmapPage';
+import PortalSettingsPage from './pages/portal/PortalSettingsPage';
 import { clearChatStorage } from './utils/clearChatStorage';
 import RouteGuard from './components/RouteGuard';
 import ErrorPage from './pages/ErrorPage';
@@ -647,6 +652,11 @@ function App() {
         <Route path="/agent-monitoring" element={<RouteGuard><AgentMonitoringPage /></RouteGuard>} />
         <Route path="/agents" element={<Navigate to="/agent-management" replace />} />
         <Route path="/agents/monitoring" element={<Navigate to="/agent-monitoring" replace />} />
+        <Route path="/portal-dashboard" element={<PortalDashboardHome />} />
+        <Route path="/portal-agents" element={<PortalAgentListPage />} />
+        <Route path="/portal-usage" element={<PortalUsageImpactPage />} />
+        <Route path="/portal-roadmap" element={<PortalRoadmapPage />} />
+        <Route path="/portal-settings" element={<PortalSettingsPage />} />
         <Route path="/main-prototype1" element={<RouteGuard><MainPrototype1 /></RouteGuard>} />
         <Route path="/main-prototype2" element={<RouteGuard><MainPrototype2 /></RouteGuard>} />
         <Route path="/main-prototype3" element={<RouteGuard><MainPrototype3 /></RouteGuard>} />
