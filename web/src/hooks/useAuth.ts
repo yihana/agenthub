@@ -89,6 +89,48 @@ export const useAuth = () => {
         if (window.location.pathname === '/error' || window.location.pathname === '/login') {
           navigate('/');
         }
+// local 실행 20260115        
+//         const existingToken = localStorage.getItem('token');
+//         if (existingToken) {
+//           const verifyResponse = await fetch('/api/auth/verify', {
+//             headers: {
+//               'Authorization': `Bearer ${existingToken}`
+//             }
+//           });
+//           if (verifyResponse.ok) {
+//             const data = await verifyResponse.json();
+//             setUser(data.user);
+//             setIsLoggedIn(true);
+//             if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+//               navigate('/');
+//             }
+//             return;
+//           }
+//           localStorage.removeItem('token');
+//         }
+
+//         const loginResponse = await fetch('/api/auth/login', {
+//           method: 'POST',
+//           headers: {
+//             'Content-Type': 'application/json'
+//           },
+//           body: JSON.stringify({ userid: 'local-admin', password: '' })
+//         });
+
+//         if (loginResponse.ok) {
+//           const loginData = await loginResponse.json();
+//           localStorage.setItem('token', loginData.token);
+//           setUser(loginData.user);
+//           setIsLoggedIn(true);
+//           if (window.location.pathname === '/error' || window.location.pathname === '/login') {
+//             navigate('/');
+//           }
+//           return;
+//         }
+
+//         console.error('로컬 자동 로그인 실패');
+//         navigate('/error');
+
         return;
       }
 

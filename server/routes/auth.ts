@@ -111,6 +111,30 @@ router.post('/login', async (req, res) => {
         );
         if (existingLocal.rows.length > 0) {
           userResult = existingLocal;
+        } else {
+          const defaultPassword = 'local-dev';
+          const passwordHash = await bcrypt.hash(defaultPassword, 10);
+          try {
+            await db.query(
+              `INSERT INTO users (userid, password_hash, full_name, is_admin, is_active)
+               VALUES ($1, $2, $3, $4, $5)`,
+              [userid, passwordHash, `${userid} (local)`, true, true]
+            );
+          } catch (error: any) {
+            if (error?.code !== '23505') {
+              throw error;
+            }
+          }
+          userResult = await db.query(
+            'SELECT * FROM users WHERE userid = $1 AND is_active = true',
+            [userid]
+          );
+          if (userResult.rows.length === 0) {
+            userResult = await db.query(
+              'SELECT * FROM users WHERE is_active = true ORDER BY id ASC LIMIT 1',
+              []
+            );
+          }
         }
       }
     } catch (dbError) {
