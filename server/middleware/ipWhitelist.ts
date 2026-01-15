@@ -146,6 +146,7 @@ export function invalidateIpWhitelistCache(): void {
  * 허용되지 않은 IP에서 접근할 경우 에러 페이지로 리다이렉트
  */
 export async function ipWhitelistMiddleware(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const localOnly = process.env.LOCAL_ONLY === 'true';
   // 헬스체크 경로는 IP 제한 완전 우회
   if (req.path === '/health') {
     return next();
@@ -158,6 +159,11 @@ export async function ipWhitelistMiddleware(req: express.Request, res: express.R
   }
   
   const clientIp = getClientIp(req);
+  const isLocalIp = clientIp === '127.0.0.1' || clientIp === '::1' || clientIp === '::ffff:127.0.0.1';
+
+  if (localOnly && isLocalIp) {
+    return next();
+  }
   
   // DB에서 허용된 IP 목록 가져오기
   const allowedIps = await getAllowedIpsFromDb();

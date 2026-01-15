@@ -29,7 +29,11 @@ export async function initializeDatabase() {
     await createTables(client);
     
     // 인덱스 생성
-    await createIndexes(client);
+    if (process.env.LOCAL_ONLY === 'true') {
+      console.log('LOCAL_ONLY=true: 인덱스 생성 생략');
+    } else {
+      await createIndexes(client);
+    }
     
     // 벡터 인덱스 생성
     await createVectorIndexes(client);

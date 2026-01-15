@@ -61,6 +61,7 @@ const AgentDashboardPage: React.FC = () => {
     fetchSummary();
   }, [getSummary, isLoggedIn, listAgents, listJobs]);
 
+
   return (
     <div className="agent-page">
       <AppHeader user={user} onLogin={handleLogin} onLogout={handleLogout} isLoggedIn={isLoggedIn} />

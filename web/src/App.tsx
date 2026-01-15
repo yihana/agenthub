@@ -339,6 +339,16 @@ function AppContent() {
           const configResponse = await fetch('/api/auth/config');
           if (configResponse.ok) {
             const config = await configResponse.json();
+            if (config.localOnly) {
+              setUser({
+                userid: 'local-admin',
+                fullName: 'Local Admin',
+                email: '',
+                isAdmin: true
+              });
+              setIsLoggedIn(true);
+              return;
+            }
             if (config.iasEnabled) {
               // IAS 로그인 URL 가져오기 (state에 원래 경로 저장)
               const currentPath = window.location.pathname + window.location.search;
