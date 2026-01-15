@@ -19,6 +19,12 @@ const AgentMonitoringPage: React.FC = () => {
   });
 
   const loadJobs = async () => {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      setError('인증 토큰이 필요합니다.');
+      return;
+    }
+
     setError('');
     try {
       const data = await listJobs();
@@ -29,14 +35,21 @@ const AgentMonitoringPage: React.FC = () => {
   };
 
   useEffect(() => {
+    if (!isLoggedIn) return;
     loadJobs();
-  }, []);
+  }, [isLoggedIn]);
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
 
     try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('인증 토큰이 필요합니다.');
+        return;
+      }
+
       const payloadObj = formData.payload ? JSON.parse(formData.payload) : null;
       await createJob({
         payload: payloadObj,

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 
 dotenv.config();
+const SEED_AGENT_DATA = process.env.SEED_AGENT_DATA === 'true' || process.env.LOCAL_ONLY === 'true';
 
 let hanaClient: any = null;
 let hanaConnection: any = null;
@@ -324,6 +325,11 @@ export async function initializeDatabase() {
     
     // 메뉴 초기화
     await initializeMenus();
+
+    // 에이전트 샘플 데이터 초기화 (옵션)
+    if (SEED_AGENT_DATA) {
+      await seedAgentData();
+    }
     
     // 입력보안 설정 초기화
     await initializeInputSecurity();
@@ -348,6 +354,9 @@ export async function resetDatabase() {
   await createDefaultAdmin();
   await initializeIpWhitelist();
   await initializeMenus();
+  if (SEED_AGENT_DATA) {
+    await seedAgentData();
+  }
   console.log('✅ 데이터베이스 리셋 완료');
 }
 
@@ -1172,6 +1181,111 @@ async function initializeMenus() {
   } catch (error: any) {
     console.error('메뉴 초기화 실패:', error.message);
   }
+}
+
+// 에이전트 샘플 데이터 초기화 (옵션)
+async function seedAgentData() {
+  const existing = await query('SELECT COUNT(*) as count FROM EAR.agents');
+  const count = Number(existing.rows?.[0]?.count || existing[0]?.count || 0);
+  if (count > 0) {
+    return;
+  }
+
+  const agents = [
+    {
+      name: 'Agent Alpha',
+      description: '검색 기반 응답 에이전트',
+      type: 'LLM',
+      status: 'active',
+      envConfig: JSON.stringify({ model: 'gpt-4o-mini', region: 'hana' }),
+      maxConcurrency: 4,
+      tags: JSON.stringify(['search', 'rag'])
+    },
+    {
+      name: 'Agent Beta',
+      description: '백오피스 자동화 에이전트',
+      type: 'Automation',
+      status: 'running',
+      envConfig: JSON.stringify({ runtime: 'node', retries: 2 }),
+      maxConcurrency: 2,
+      tags: JSON.stringify(['automation'])
+    },
+    {
+      name: 'Agent Gamma',
+      description: '오류 감지 테스트 에이전트',
+      type: 'Monitor',
+      status: 'error',
+      envConfig: JSON.stringify({ threshold: 0.2 }),
+      maxConcurrency: 1,
+      tags: JSON.stringify(['monitoring', 'ops'])
+    }
+  ];
+
+  for (const agent of agents) {
+    await query(
+      `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE)
+       VALUES (?, ?, ?, ?, ?, ?, ?, true)`,
+      [
+        agent.name,
+        agent.description,
+        agent.type,
+        agent.status,
+        agent.envConfig,
+        agent.maxConcurrency,
+        agent.tags
+      ]
+    );
+  }
+
+  const idResult = await query('SELECT TOP 3 ID FROM EAR.agents ORDER BY ID DESC');
+  const ids = (idResult.rows || idResult || []).map((row: any) => row.ID).reverse();
+
+  const roleMap = [
+    { agentId: ids[0], roles: ['retrieval', 'answering'] },
+    { agentId: ids[1], roles: ['workflow', 'scheduler'] },
+    { agentId: ids[2], roles: ['monitoring'] }
+  ];
+
+  for (const entry of roleMap) {
+    for (const role of entry.roles) {
+      await query('INSERT INTO EAR.agent_roles (AGENT_ID, ROLE_NAME) VALUES (?, ?)', [
+        entry.agentId,
+        role
+      ]);
+    }
+  }
+
+  await query(
+    `INSERT INTO EAR.agent_metrics
+     (AGENT_ID, TIMESTAMP, CPU_USAGE, MEMORY_USAGE, REQUESTS_PROCESSED, AVG_LATENCY, ERROR_RATE, QUEUE_TIME)
+     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)`,
+    [ids[0], 42.5, 61.2, 120, 210.4, 1.2, 12.5]
+  );
+  await query(
+    `INSERT INTO EAR.agent_metrics
+     (AGENT_ID, TIMESTAMP, CPU_USAGE, MEMORY_USAGE, REQUESTS_PROCESSED, AVG_LATENCY, ERROR_RATE, QUEUE_TIME)
+     VALUES (?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?)`,
+    [ids[1], 55.1, 68.7, 140, 185.7, 0.8, 9.4]
+  );
+
+  await query(
+    `INSERT INTO EAR.job_queue (JOB_ID, PAYLOAD, PRIORITY, STATUS, ASSIGNED_AGENT_ID)
+     VALUES (?, ?, ?, ?, ?)`,
+    ['job-1001', JSON.stringify({ task: 'sample', jobId: 'job-1001' }), 1, 'queued', ids[1]]
+  );
+  await query(
+    `INSERT INTO EAR.job_queue (JOB_ID, PAYLOAD, PRIORITY, STATUS, ASSIGNED_AGENT_ID)
+     VALUES (?, ?, ?, ?, ?)`,
+    ['job-1002', JSON.stringify({ task: 'sample', jobId: 'job-1002' }), 2, 'running', ids[0]]
+  );
+
+  await query(
+    `INSERT INTO EAR.agent_tasks (AGENT_ID, JOB_ID, STATUS, RECEIVED_AT, STARTED_AT, RESULT)
+     VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, ?)`,
+    [ids[0], 'job-1002', 'running', JSON.stringify({ note: 'processing' })]
+  );
+
+  console.log('✅ 에이전트 샘플 데이터 초기화 완료');
 }
 
 // 입력보안 설정 초기화

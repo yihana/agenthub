@@ -19,7 +19,13 @@ const AgentDetailPage: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!id) return;
+      if (!id || !isLoggedIn) return;
+      const token = localStorage.getItem('token');
+      if (!token) {
+        setError('인증 토큰이 필요합니다.');
+        return;
+      }
+
       setError('');
       try {
         const agentData = await getAgent(id);
@@ -34,7 +40,7 @@ const AgentDetailPage: React.FC = () => {
     };
 
     fetchData();
-  }, [id, getAgent, getMetrics, getTasks]);
+  }, [id, getAgent, getMetrics, getTasks, isLoggedIn]);
 
   if (!agent) {
     return (

@@ -454,6 +454,68 @@ CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned
 CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 
+-- 에이전트 샘플 데이터 (로컬/개발용)
+INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
+SELECT 'Agent Alpha', '검색 기반 응답 에이전트', 'LLM', 'active', '{"model":"gpt-4o-mini","region":"local"}', 4, '["search","rag"]', true
+WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = 'Agent Alpha');
+
+INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
+SELECT 'Agent Beta', '백오피스 자동화 에이전트', 'Automation', 'running', '{"runtime":"node","retries":2}', 2, '["automation"]', true
+WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = 'Agent Beta');
+
+INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
+SELECT 'Agent Gamma', '오류 감지 테스트 에이전트', 'Monitor', 'error', '{"threshold":0.2}', 1, '["monitoring","ops"]', true
+WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = 'Agent Gamma');
+
+INSERT INTO agent_roles (agent_id, role_name)
+SELECT a.id, r.role_name
+FROM agents a
+JOIN (VALUES
+  ('Agent Alpha', 'retrieval'),
+  ('Agent Alpha', 'answering'),
+  ('Agent Beta', 'workflow'),
+  ('Agent Beta', 'scheduler'),
+  ('Agent Gamma', 'monitoring')
+) AS r(agent_name, role_name)
+  ON a.name = r.agent_name
+WHERE NOT EXISTS (
+  SELECT 1 FROM agent_roles ar WHERE ar.agent_id = a.id AND ar.role_name = r.role_name
+);
+
+INSERT INTO agent_metrics (agent_id, timestamp, cpu_usage, memory_usage, requests_processed, avg_latency, error_rate, queue_time)
+SELECT a.id, NOW() - INTERVAL '15 minutes', 42.5, 61.2, 120, 210.4, 1.2, 12.5
+FROM agents a
+WHERE a.name = 'Agent Alpha'
+  AND NOT EXISTS (
+    SELECT 1 FROM agent_metrics m WHERE m.agent_id = a.id AND m.timestamp >= NOW() - INTERVAL '16 minutes'
+  );
+
+INSERT INTO agent_metrics (agent_id, timestamp, cpu_usage, memory_usage, requests_processed, avg_latency, error_rate, queue_time)
+SELECT a.id, NOW() - INTERVAL '5 minutes', 55.1, 68.7, 140, 185.7, 0.8, 9.4
+FROM agents a
+WHERE a.name = 'Agent Beta'
+  AND NOT EXISTS (
+    SELECT 1 FROM agent_metrics m WHERE m.agent_id = a.id AND m.timestamp >= NOW() - INTERVAL '6 minutes'
+  );
+
+INSERT INTO job_queue (job_id, payload, priority, status, assigned_agent_id)
+SELECT 'job-1001', '{"task":"sample","jobId":"job-1001"}'::jsonb, 1, 'queued', a.id
+FROM agents a
+WHERE a.name = 'Agent Beta'
+  AND NOT EXISTS (SELECT 1 FROM job_queue WHERE job_id = 'job-1001');
+
+INSERT INTO job_queue (job_id, payload, priority, status, assigned_agent_id)
+SELECT 'job-1002', '{"task":"sample","jobId":"job-1002"}'::jsonb, 2, 'running', a.id
+FROM agents a
+WHERE a.name = 'Agent Alpha'
+  AND NOT EXISTS (SELECT 1 FROM job_queue WHERE job_id = 'job-1002');
+
+INSERT INTO agent_tasks (agent_id, job_id, status, received_at, started_at, result)
+SELECT a.id, 'job-1002', 'running', NOW() - INTERVAL '30 minutes', NOW() - INTERVAL '10 minutes', '{"note":"processing"}'::jsonb
+FROM agents a
+WHERE a.name = 'Agent Alpha'
+  AND NOT EXISTS (SELECT 1 FROM agent_tasks WHERE job_id = 'job-1002');
+
 -- 기본 관리자 계정 생성 (비밀번호: admin123)
 -- 기존 관리자 계정이 있으면 비밀번호만 업데이트
 INSERT INTO users (userid, password_hash, full_name, is_admin, is_active) 
