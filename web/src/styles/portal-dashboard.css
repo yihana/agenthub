@@ -86,6 +86,13 @@
   font-size: 13px;
 }
 
+.ear-role {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+
 .ear-muted {
   color: var(--ear-muted);
   display: block;
@@ -136,6 +143,12 @@
 
 .ear-hero--compact {
   padding: 22px;
+}
+
+.ear-hero .ear-pill--info {
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  border-color: transparent;
 }
 
 .ear-hero h2 {
@@ -501,6 +514,26 @@
   border-radius: 10px;
   border: 1px solid var(--ear-border);
 }
+
+.ear-input {
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--ear-border);
+  font-size: 13px;
+}
+
+.ear-textarea {
+  resize: vertical;
+}
+
+.ear-input-group {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
 
 .ear-roadmap {
   display: flex;

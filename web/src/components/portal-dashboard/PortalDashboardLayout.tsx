@@ -8,6 +8,8 @@ import {
   Settings
 } from 'lucide-react';
 import '../../styles/portal-dashboard.css';
+import { usePortalRole } from '../../hooks/usePortalRole';
+
 
 interface PortalDashboardLayoutProps {
   title: string;
@@ -30,12 +32,15 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   actions,
   children
 }) => {
+
+  const { role, toggleRole } = usePortalRole();
+
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">
         <div className="ear-sidebar__brand">
           <span className="ear-badge">Agent Portal</span>
-          <strong>Agent Management system</strong>
+          <strong>Agent 관리 시스템</strong>
           <p>사용자화 가능한 운영 허브</p>
         </div>
         <nav className="ear-nav">
@@ -60,6 +65,19 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
             <span className="ear-muted">버전</span>
             <strong>Mockup v1.0</strong>
           </div>
+
+          <div className="ear-role">
+            <span className="ear-muted">권한</span>
+            <strong>{role === 'admin' ? '관리자' : '사용자'}</strong>
+          </div>
+          <button
+            type="button"
+            className="ear-ghost"
+            onClick={toggleRole}
+          >
+            권한 전환
+          </button>
+
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>
       </aside>

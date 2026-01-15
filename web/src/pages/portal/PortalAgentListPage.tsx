@@ -99,11 +99,14 @@ const PortalAgentListPage: React.FC = () => {
     risk: '낮음' as AgentRecord['risk']
   });
 
-  const persistAgents = (nextAgents: AgentRecord[]) => {
-    setAgents(nextAgents);
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAgents));
-    }
+  const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
+    setAgents((prev) => {
+      const nextAgents = updater(prev);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAgents));
+      }
+      return nextAgents;
+    });
   };
 
   const filteredAgents = useMemo(() => {
@@ -141,7 +144,8 @@ const PortalAgentListPage: React.FC = () => {
       lastUpdated: new Date().toISOString().slice(0, 10)
     };
 
-    persistAgents([nextAgent, ...agents]);
+
+    persistAgents((prev) => [nextAgent, ...prev]);
     setFormValues((prev) => ({
       ...prev,
       name: '',
