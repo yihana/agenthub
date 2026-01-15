@@ -1,30 +1,12 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
-import WidgetCard from '../../components/portal-dashboard/WidgetCard';
-import StatTile from '../../components/portal-dashboard/StatTile';
-import TagPill from '../../components/portal-dashboard/TagPill';
-import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
-import ProgressRow from '../../components/portal-dashboard/ProgressRow';
-import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
-import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
-
-  
-interface PortalMetrics {
-  total_requests: number;
-  completed_requests: number;
-  pending_requests: number;
-  avg_latency_ms: number;
-  error_rate_pct: number;
-  quality_score: number;
-  stability_score: number;
-  requests_processed: number;
-  savings: {
-    baseline_minutes_per_request: number;
-    avg_response_minutes: number;
-    time_savings_minutes: number;
-    cost_savings: number;
-  };
-}
+import React from 'react';
+import EARDashboardLayout from '../../components/ear-dashboard/EARDashboardLayout';
+import WidgetCard from '../../components/ear-dashboard/WidgetCard';
+import StatTile from '../../components/ear-dashboard/StatTile';
+import TagPill from '../../components/ear-dashboard/TagPill';
+import ChartPlaceholder from '../../components/ear-dashboard/ChartPlaceholder';
+import ProgressRow from '../../components/ear-dashboard/ProgressRow';
+import { useEARDashboardConfig } from '../../hooks/useEARDashboardConfig';
+import { DashboardWidgetConfig } from '../../data/earDashboardConfig';
 
 const agentUpdates: Array<{
   name: string;
@@ -43,47 +25,9 @@ const alerts = [
   { title: '데이터 소스 동기화', detail: 'CRM 데이터 동기화 지연 12분' }
 ];
 
-const PortalDashboardHome: React.FC = () => {
-  const { widgets } = usePortalDashboardConfig();
+const EARDashboardHome: React.FC = () => {
+  const { widgets } = useEARDashboardConfig();
   const enabledWidgets = widgets.filter((widget) => widget.enabled);
-  const [metrics, setMetrics] = useState<PortalMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch('/api/portal-dashboard/metrics?period=week');
-        if (!response.ok) {
-          throw new Error('Failed to load metrics');
-        }
-        const data = await response.json();
-        setMetrics(data);
-      } catch (error) {
-        console.error('Portal metrics error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMetrics();
-  }, []);
-
-  const heroStats = useMemo(() => {
-    if (!metrics) {
-      return [
-        { label: '주간 요청', value: '12.4K', delta: '+9%' },
-        { label: '품질 점수', value: '4.8/5', delta: '+0.2', highlight: true },
-        { label: '평균 응답', value: '1.3s', delta: '-0.4s' }
-      ];
-    }
-
-    return [
-      { label: '주간 요청', value: `${metrics.total_requests.toLocaleString()}`, delta: '+9%' },
-      { label: '품질 점수', value: `${metrics.quality_score.toFixed(1)}/5`, delta: `-${metrics.error_rate_pct.toFixed(1)}%`, highlight: true },
-      { label: '평균 응답', value: `${(metrics.avg_latency_ms / 1000).toFixed(1)}s`, delta: `${metrics.pending_requests}건 대기` }
-    ];
-  }, [metrics]);
 
   const renderWidget = (widget: DashboardWidgetConfig) => {
     switch (widget.type) {
@@ -96,10 +40,10 @@ const PortalDashboardHome: React.FC = () => {
             size={widget.size}
           >
             <div className="ear-stat-grid">
-              <StatTile label="완료 요청" value={`${metrics?.completed_requests ?? 18}`} delta="+2" highlight />
-              <StatTile label="대기 요청" value={`${metrics?.pending_requests ?? 3}`} delta="-1" />
-              <StatTile label="운영 안정성" value={`${(metrics?.stability_score ?? 98.7).toFixed(1)}%`} delta="0" />
-              <StatTile label="품질 점수" value={`${metrics?.quality_score?.toFixed(1) ?? '4.8'}/5`} delta="+0.2" />
+              <StatTile label="정상 운영" value="18" delta="+2" highlight />
+              <StatTile label="점검 필요" value="3" delta="-1" />
+              <StatTile label="보류" value="2" delta="0" />
+              <StatTile label="업데이트" value="6" delta="+3" />
             </div>
           </WidgetCard>
         );
@@ -151,16 +95,16 @@ const PortalDashboardHome: React.FC = () => {
           >
             <div className="ear-insight">
               <div>
-                <strong>예상 절감 시간</strong>
-                <span>{metrics ? `${Math.round(metrics.savings.time_savings_minutes / 60)}h` : '312h'}</span>
+                <strong>월간 절감 시간</strong>
+                <span>312h</span>
               </div>
               <div>
-                <strong>비용 절감 추정</strong>
-                <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
+                <strong>CS 처리 개선</strong>
+                <span>+28%</span>
               </div>
               <div>
-                <strong>평균 오류율</strong>
-                <span>{metrics ? `${metrics.error_rate_pct.toFixed(1)}%` : '0.2%'}</span>
+                <strong>리스크 감소</strong>
+                <span>정책 위반 0건</span>
               </div>
             </div>
           </WidgetCard>
@@ -222,8 +166,8 @@ const PortalDashboardHome: React.FC = () => {
   };
 
   return (
-    <PortalDashboardLayout
-      title="Agent Portal 관리 대시보드"
+    <EARDashboardLayout
+      title="EAR Agent 관리 대시보드"
       subtitle="실시간 운영 현황과 효과 지표를 한 화면에서 확인합니다."
       actions={
         <>
@@ -235,26 +179,20 @@ const PortalDashboardHome: React.FC = () => {
       <section className="ear-hero">
         <div>
           <span className="ear-pill ear-pill--info">이번 주 핵심 지표</span>
-          <h2>운영 안정성 {metrics ? metrics.stability_score.toFixed(1) : '98.7'}% 유지</h2>
-          <p>{loading ? '지표를 집계 중입니다.' : '자동화 처리량과 품질 관리 지표가 모두 상승하고 있습니다.'}</p>
+          <h2>운영 안정성 98.7% 유지</h2>
+          <p>자동화 처리량과 품질 관리 지표가 모두 상승하고 있습니다.</p>
         </div>
         <div className="ear-hero__stats">
-          {heroStats.map((item) => (
-            <StatTile
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              delta={item.delta}
-              highlight={item.highlight}
-            />
-          ))}
+          <StatTile label="주간 요청" value="12.4K" delta="+9%" />
+          <StatTile label="품질 점수" value="4.8/5" delta="+0.2" highlight />
+          <StatTile label="평균 응답" value="1.3s" delta="-0.4s" />
         </div>
       </section>
       <div className="ear-grid">
         {enabledWidgets.map((widget) => renderWidget(widget))}
       </div>
-    </PortalDashboardLayout>
+    </EARDashboardLayout>
   );
 };
 
-export default PortalDashboardHome;
+export default EARDashboardHome;

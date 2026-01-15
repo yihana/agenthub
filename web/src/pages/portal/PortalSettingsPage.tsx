@@ -32,7 +32,6 @@ const PortalSettingsPage: React.FC = () => {
     cost_per_hour: '45000'
   });
   const [baselineStatus, setBaselineStatus] = useState('');
-
   const filteredWidgets = useMemo(() => {
     return widgets.filter((widget) =>
       widget.title.toLowerCase().includes(query.toLowerCase())
