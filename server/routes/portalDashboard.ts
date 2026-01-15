@@ -59,6 +59,7 @@ router.get('/metrics', async (req, res) => {
           SELECT CURRENT_DATE - ($1 || ' days')::interval * 2 AS date_from,
                  CURRENT_DATE - ($1 || ' days')::interval AS date_to
         ),
+
         req AS (
           SELECT
             COUNT(*) AS total_requests,
