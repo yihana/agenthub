@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import TagPill from '../../components/portal-dashboard/TagPill';
@@ -27,12 +27,39 @@ const typeLabels: Record<WidgetType, string> = {
 const PortalSettingsPage: React.FC = () => {
   const { widgets, setWidgets, resetWidgets } = usePortalDashboardConfig();
   const [query, setQuery] = useState('');
-
+  const [baselineValues, setBaselineValues] = useState({
+    baseline_minutes_per_request: '12',
+    cost_per_hour: '45000'
+  });
+  const [baselineStatus, setBaselineStatus] = useState('');
   const filteredWidgets = useMemo(() => {
     return widgets.filter((widget) =>
       widget.title.toLowerCase().includes(query.toLowerCase())
     );
   }, [query, widgets]);
+
+  useEffect(() => {
+    const fetchBaselines = async () => {
+      try {
+        const response = await fetch('/api/portal-dashboard/baselines');
+        if (!response.ok) {
+          throw new Error('Failed to load baselines');
+        }
+        const data = await response.json();
+        const baselineMap = new Map(
+          (data.baselines || []).map((item: any) => [item.metric_key, item.value])
+        );
+        setBaselineValues({
+          baseline_minutes_per_request: String(baselineMap.get('baseline_minutes_per_request') ?? '12'),
+          cost_per_hour: String(baselineMap.get('cost_per_hour') ?? '45000')
+        });
+      } catch (error) {
+        console.error('Baseline fetch error:', error);
+      }
+    };
+
+    fetchBaselines();
+  }, []);
 
   const toggleWidget = (widget: DashboardWidgetConfig) => {
     const updated = widgets.map((item) =>
@@ -48,6 +75,50 @@ const PortalSettingsPage: React.FC = () => {
     setWidgets(updated);
   };
 
+  const handleBaselineChange = (field: string, value: string) => {
+    setBaselineValues((prev) => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const saveBaseline = async (metricKey: string, value: string, unit: string, description: string) => {
+    const response = await fetch('/api/portal-dashboard/baselines', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ metric_key: metricKey, value: Number(value), unit, description })
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save baseline');
+    }
+  };
+
+  const handleBaselineSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setBaselineStatus('저장 중...');
+    try {
+      await Promise.all([
+        saveBaseline(
+          'baseline_minutes_per_request',
+          baselineValues.baseline_minutes_per_request,
+          'minute',
+          '요청 1건당 기준 처리 시간 (분)'
+        ),
+        saveBaseline(
+          'cost_per_hour',
+          baselineValues.cost_per_hour,
+          'KRW',
+          '시간당 인건비 단가'
+        )
+      ]);
+      setBaselineStatus('저장 완료');
+    } catch (error) {
+      console.error('Baseline save error:', error);
+      setBaselineStatus('저장 실패');
+    }
+  };
+
   return (
     <PortalDashboardLayout
       title="화면 구성"
@@ -60,6 +131,30 @@ const PortalSettingsPage: React.FC = () => {
       }
     >
       <section className="ear-settings">
+        <WidgetCard title="Baseline/단가 입력" description="회사 내부 기준값을 입력하면 지표 계산에 반영됩니다.">
+          <form className="ear-form" onSubmit={handleBaselineSubmit}>
+            <label>
+              기준 처리 시간 (분/요청)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.baseline_minutes_per_request}
+                onChange={(event) => handleBaselineChange('baseline_minutes_per_request', event.target.value)}
+              />
+            </label>
+            <label>
+              시간당 인건비 단가 (KRW)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.cost_per_hour}
+                onChange={(event) => handleBaselineChange('cost_per_hour', event.target.value)}
+              />
+            </label>
+            <button type="submit" className="ear-primary">Baseline 저장</button>
+            {baselineStatus && <span className="ear-muted">{baselineStatus}</span>}
+          </form>
+        </WidgetCard>
         <WidgetCard title="위젯 탐색" description="표시 여부와 크기를 선택할 수 있습니다.">
           <div className="ear-settings__search">
             <input

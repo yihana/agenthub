@@ -1,11 +1,39 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import StatTile from '../../components/portal-dashboard/StatTile';
 import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
 import ProgressRow from '../../components/portal-dashboard/ProgressRow';
 
+interface UsageMetrics {
+  total_requests: number;
+  quality_score: number;
+  savings: {
+    cost_savings: number;
+    time_savings_minutes: number;
+  };
+}
+
 const PortalUsageImpactPage: React.FC = () => {
+  const [metrics, setMetrics] = useState<UsageMetrics | null>(null);
+
+  useEffect(() => {
+    const fetchMetrics = async () => {
+      try {
+        const response = await fetch('/api/portal-dashboard/metrics?period=month');
+        if (!response.ok) {
+          throw new Error('Failed to load metrics');
+        }
+        const data = await response.json();
+        setMetrics(data);
+      } catch (error) {
+        console.error('Usage impact metrics error:', error);
+      }
+    };
+
+    fetchMetrics();
+  }, []);
+
   return (
     <PortalDashboardLayout
       title="사용 현황/효과"
@@ -18,9 +46,22 @@ const PortalUsageImpactPage: React.FC = () => {
           <p>운영 부서가 평균 62%의 자동화를 달성했습니다.</p>
         </div>
         <div className="ear-hero__stats">
-          <StatTile label="총 호출" value="48.2K" delta="+14%" />
-          <StatTile label="업무 절감" value="612h" delta="+8%" highlight />
-          <StatTile label="CS 만족도" value="4.7/5" delta="+0.1" />
+          <StatTile
+            label="총 호출"
+            value={metrics ? metrics.total_requests.toLocaleString() : '48.2K'}
+            delta="+14%"
+          />
+          <StatTile
+            label="업무 절감"
+            value={metrics ? `${Math.round(metrics.savings.time_savings_minutes / 60)}h` : '612h'}
+            delta="+8%"
+            highlight
+          />
+          <StatTile
+            label="품질 점수"
+            value={metrics ? `${metrics.quality_score.toFixed(1)}/5` : '4.7/5'}
+            delta="+0.1"
+          />
         </div>
       </section>
 
@@ -37,7 +78,7 @@ const PortalUsageImpactPage: React.FC = () => {
           <div className="ear-insight">
             <div>
               <strong>월간 비용 절감</strong>
-              <span>₩84M</span>
+              <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
             </div>
             <div>
               <strong>리스크 대응</strong>

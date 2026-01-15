@@ -10,7 +10,6 @@ import {
 import '../../styles/portal-dashboard.css';
 import { usePortalRole } from '../../hooks/usePortalRole';
 
-
 interface PortalDashboardLayoutProps {
   title: string;
   subtitle?: string;
@@ -65,7 +64,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
             <span className="ear-muted">버전</span>
             <strong>Mockup v1.0</strong>
           </div>
-
           <div className="ear-role">
             <span className="ear-muted">권한</span>
             <strong>{role === 'admin' ? '관리자' : '사용자'}</strong>
@@ -77,7 +75,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
           >
             권한 전환
           </button>
-
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>
       </aside>

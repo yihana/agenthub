@@ -144,7 +144,6 @@ const PortalAgentListPage: React.FC = () => {
       lastUpdated: new Date().toISOString().slice(0, 10)
     };
 
-
     persistAgents((prev) => [nextAgent, ...prev]);
     setFormValues((prev) => ({
       ...prev,

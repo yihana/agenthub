@@ -29,6 +29,7 @@ import destinationTestRoutes from './routes/destinationTest';
 import ragAgentsRoutes from './routes/ragAgents';
 import agentManagementRoutes from './routes/agents';
 import jobRoutes from './routes/jobs';
+import portalDashboardRoutes from './routes/portalDashboard';
 import { initializeDatabase } from './db';
 import { ipWhitelistMiddleware } from './middleware/ipWhitelist';
 
@@ -110,6 +111,7 @@ app.use('/api/rag-agents', ragAgentsRoutes);
 app.use('/api/destination-test', destinationTestRoutes);
 app.use('/api/agents', agentManagementRoutes);
 app.use('/api/jobs', jobRoutes);
+app.use('/api/portal-dashboard', portalDashboardRoutes);
 
 // 프로덕션 환경에서 정적 파일 제공
 if (process.env.NODE_ENV === 'production') {
