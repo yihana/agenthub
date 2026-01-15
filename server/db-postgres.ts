@@ -196,6 +196,83 @@ async function createTables(client: any) {
   `);
 
   await client.query(`
+    CREATE TABLE IF NOT EXISTS user_job_role (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(100) NOT NULL,
+      role_name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS user_business_domain (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(100) NOT NULL,
+      business_type VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, business_type)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS business_task_baseline (
+      id SERIAL PRIMARY KEY,
+      task_code VARCHAR(100) NOT NULL,
+      domain VARCHAR(100),
+      before_time_min NUMERIC(10,2) NOT NULL,
+      before_cost NUMERIC(14,2),
+      description TEXT,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(task_code, domain)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS labor_cost (
+      id SERIAL PRIMARY KEY,
+      role VARCHAR(100) NOT NULL,
+      hourly_cost NUMERIC(14,2) NOT NULL,
+      currency VARCHAR(50) DEFAULT 'KRW',
+      business_type VARCHAR(100),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(role, business_type)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS roi_metrics (
+      id SERIAL PRIMARY KEY,
+      period_start DATE NOT NULL,
+      period_end DATE NOT NULL,
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      saved_hours NUMERIC(12,2) DEFAULT 0,
+      saved_cost NUMERIC(14,2) DEFAULT 0,
+      roi_ratio_pct NUMERIC(8,2) DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(period_start, period_end, business_type, agent_type)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS adoption_funnel_events (
+      id SERIAL PRIMARY KEY,
+      user_id VARCHAR(100) NOT NULL,
+      stage VARCHAR(50) NOT NULL,
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      metadata JSONB,
+      event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.query(`
     CREATE TABLE IF NOT EXISTS agent_system_mappings (
       id SERIAL PRIMARY KEY,
       agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
@@ -552,7 +629,8 @@ async function seedPortalBaselines(client: any) {
     `INSERT INTO portal_metric_inputs (metric_key, value, unit, description)
      VALUES
        ('baseline_minutes_per_request', 12, 'minute', '요청 1건당 기준 처리 시간 (분)'),
-       ('cost_per_hour', 45000, 'KRW', '시간당 인건비 단가')
+       ('cost_per_hour', 45000, 'KRW', '시간당 인건비 단가'),
+       ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)')
      ON CONFLICT (metric_key, business_type, agent_type) DO NOTHING;`
   );
 }
@@ -623,6 +701,13 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned_agent_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_user_business_domain_user_id ON user_business_domain(user_id);
+    CREATE INDEX IF NOT EXISTS idx_user_business_domain_business_type ON user_business_domain(business_type);
+    CREATE INDEX IF NOT EXISTS idx_business_task_baseline_domain ON business_task_baseline(domain);
+    CREATE INDEX IF NOT EXISTS idx_labor_cost_role ON labor_cost(role);
+    CREATE INDEX IF NOT EXISTS idx_roi_metrics_period ON roi_metrics(period_start, period_end);
+    CREATE INDEX IF NOT EXISTS idx_adoption_funnel_stage ON adoption_funnel_events(stage);
+    CREATE INDEX IF NOT EXISTS idx_adoption_funnel_time ON adoption_funnel_events(event_time);
   `);
 }
 

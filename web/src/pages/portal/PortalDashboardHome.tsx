@@ -8,21 +8,28 @@ import ProgressRow from '../../components/portal-dashboard/ProgressRow';
 import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
 import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
 
-  
+
 interface PortalMetrics {
   total_requests: number;
+  prev_total_requests: number;
+  growth_rate_pct: number;
   completed_requests: number;
   pending_requests: number;
   avg_latency_ms: number;
+  avg_queue_time_ms: number;
   error_rate_pct: number;
   quality_score: number;
   stability_score: number;
+  task_success_rate_pct: number;
+  sla_compliance_pct: number;
+  user_coverage_pct: number;
   requests_processed: number;
   savings: {
     baseline_minutes_per_request: number;
     avg_response_minutes: number;
     time_savings_minutes: number;
     cost_savings: number;
+    roi_ratio_pct: number;
   };
 }
 
@@ -79,9 +86,9 @@ const PortalDashboardHome: React.FC = () => {
     }
 
     return [
-      { label: '주간 요청', value: `${metrics.total_requests.toLocaleString()}`, delta: '+9%' },
+      { label: '주간 요청', value: `${metrics.total_requests.toLocaleString()}`, delta: `${metrics.growth_rate_pct.toFixed(1)}%` },
       { label: '품질 점수', value: `${metrics.quality_score.toFixed(1)}/5`, delta: `-${metrics.error_rate_pct.toFixed(1)}%`, highlight: true },
-      { label: '평균 응답', value: `${(metrics.avg_latency_ms / 1000).toFixed(1)}s`, delta: `${metrics.pending_requests}건 대기` }
+      { label: '평균 응답', value: `${((metrics.avg_latency_ms + metrics.avg_queue_time_ms) / 1000).toFixed(1)}s`, delta: `${metrics.pending_requests}건 대기` }
     ];
   }, [metrics]);
 
@@ -97,9 +104,9 @@ const PortalDashboardHome: React.FC = () => {
           >
             <div className="ear-stat-grid">
               <StatTile label="완료 요청" value={`${metrics?.completed_requests ?? 18}`} delta="+2" highlight />
-              <StatTile label="대기 요청" value={`${metrics?.pending_requests ?? 3}`} delta="-1" />
-              <StatTile label="운영 안정성" value={`${(metrics?.stability_score ?? 98.7).toFixed(1)}%`} delta="0" />
-              <StatTile label="품질 점수" value={`${metrics?.quality_score?.toFixed(1) ?? '4.8'}/5`} delta="+0.2" />
+              <StatTile label="성공률" value={`${(metrics?.task_success_rate_pct ?? 98.4).toFixed(1)}%`} delta="+0.4%" />
+              <StatTile label="SLA 준수율" value={`${(metrics?.sla_compliance_pct ?? 96.2).toFixed(1)}%`} delta="+0.8%" />
+              <StatTile label="사용자 커버리지" value={`${(metrics?.user_coverage_pct ?? 62).toFixed(1)}%`} delta="+1.2%" />
             </div>
           </WidgetCard>
         );
@@ -159,8 +166,8 @@ const PortalDashboardHome: React.FC = () => {
                 <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
               </div>
               <div>
-                <strong>평균 오류율</strong>
-                <span>{metrics ? `${metrics.error_rate_pct.toFixed(1)}%` : '0.2%'}</span>
+                <strong>ROI</strong>
+                <span>{metrics ? `${metrics.savings.roi_ratio_pct.toFixed(1)}%` : '18%'}</span>
               </div>
             </div>
           </WidgetCard>

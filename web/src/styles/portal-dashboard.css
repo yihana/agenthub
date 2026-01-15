@@ -150,6 +150,19 @@
   border-color: transparent;
 }
 
+.ear-hero .ear-stat {
+  background: rgba(255, 255, 255, 0.18);
+  color: #f8fafc;
+}
+
+.ear-hero .ear-stat span {
+  color: rgba(248, 250, 252, 0.7);
+}
+
+.ear-hero .ear-stat em {
+  color: #fef3c7;
+}
+
 .ear-hero h2 {
   font-size: 24px;
   margin-bottom: 10px;

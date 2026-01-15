@@ -431,6 +431,71 @@ CREATE TABLE IF NOT EXISTS portal_metric_inputs (
     UNIQUE(metric_key, business_type, agent_type)
 );
 
+CREATE TABLE IF NOT EXISTS user_job_role (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(100) NOT NULL,
+    role_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, role_name)
+);
+
+CREATE TABLE IF NOT EXISTS user_business_domain (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(100) NOT NULL,
+    business_type VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, business_type)
+);
+
+CREATE TABLE IF NOT EXISTS business_task_baseline (
+    id SERIAL PRIMARY KEY,
+    task_code VARCHAR(100) NOT NULL,
+    domain VARCHAR(100),
+    before_time_min NUMERIC(10,2) NOT NULL,
+    before_cost NUMERIC(14,2),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(task_code, domain)
+);
+
+CREATE TABLE IF NOT EXISTS labor_cost (
+    id SERIAL PRIMARY KEY,
+    role VARCHAR(100) NOT NULL,
+    hourly_cost NUMERIC(14,2) NOT NULL,
+    currency VARCHAR(50) DEFAULT 'KRW',
+    business_type VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(role, business_type)
+);
+
+CREATE TABLE IF NOT EXISTS roi_metrics (
+    id SERIAL PRIMARY KEY,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    saved_hours NUMERIC(12,2) DEFAULT 0,
+    saved_cost NUMERIC(14,2) DEFAULT 0,
+    roi_ratio_pct NUMERIC(8,2) DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(period_start, period_end, business_type, agent_type)
+);
+
+CREATE TABLE IF NOT EXISTS adoption_funnel_events (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(100) NOT NULL,
+    stage VARCHAR(50) NOT NULL,
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    metadata JSONB,
+    event_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS agent_roles (
     id SERIAL PRIMARY KEY,
     agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,

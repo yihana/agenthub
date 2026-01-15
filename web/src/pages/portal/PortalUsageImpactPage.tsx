@@ -11,6 +11,7 @@ interface UsageMetrics {
   savings: {
     cost_savings: number;
     time_savings_minutes: number;
+    roi_ratio_pct: number;
   };
 }
 
@@ -79,6 +80,10 @@ const PortalUsageImpactPage: React.FC = () => {
             <div>
               <strong>월간 비용 절감</strong>
               <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
+            </div>
+            <div>
+              <strong>ROI</strong>
+              <span>{metrics ? `${metrics.savings.roi_ratio_pct.toFixed(1)}%` : '18%'}</span>
             </div>
             <div>
               <strong>리스크 대응</strong>
