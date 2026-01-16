@@ -963,7 +963,6 @@ async function seedPortalBaselines() {
       value: 2000,
       unit: 'ms',
       description: 'SLA 기준 응답 시간 (ms)'
-
     }
   ];
 

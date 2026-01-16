@@ -31,9 +31,7 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   actions,
   children
 }) => {
-
   const { role, toggleRole } = usePortalRole();
-
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">

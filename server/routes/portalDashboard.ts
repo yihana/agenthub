@@ -59,12 +59,11 @@ router.get('/metrics', async (req, res) => {
           SELECT CURRENT_DATE - ($1 || ' days')::interval * 2 AS date_from,
                  CURRENT_DATE - ($1 || ' days')::interval AS date_to
         ),
-
         req AS (
           SELECT
             COUNT(*) AS total_requests,
-            COUNT(*) FILTER (WHERE status = 'completed') AS completed_requests,
-            COUNT(*) FILTER (WHERE status IN ('pending', 'in_progress')) AS pending_requests
+            COUNT(*) FILTER (WHERE r.status = 'completed') AS completed_requests,
+            COUNT(*) FILTER (WHERE r.status IN ('pending', 'in_progress')) AS pending_requests
           FROM ear_requests r
           LEFT JOIN agents a ON a.id = r.agent_id
           JOIN bounds b ON r.created_at >= b.date_from AND r.created_at < b.date_to
@@ -109,8 +108,8 @@ router.get('/metrics', async (req, res) => {
         task_stats AS (
           SELECT
             COUNT(*) AS total_tasks,
-            COUNT(*) FILTER (WHERE status IN ('completed', 'success')) AS success_tasks,
-            COUNT(*) FILTER (WHERE status IN ('failed', 'error')) AS error_tasks
+            COUNT(*) FILTER (WHERE t.status IN ('completed', 'success')) AS success_tasks,
+            COUNT(*) FILTER (WHERE t.status IN ('failed', 'error')) AS error_tasks
           FROM agent_tasks t
           JOIN agents a ON a.id = t.agent_id
           JOIN bounds b ON t.received_at >= b.date_from AND t.received_at < b.date_to
