@@ -45,7 +45,6 @@ const PortalSettingsPage: React.FC = () => {
     business_type: ''
   });
   const [catalogStatus, setCatalogStatus] = useState('');
-
   const filteredWidgets = useMemo(() => {
     return widgets.filter((widget) =>
       widget.title.toLowerCase().includes(query.toLowerCase())
