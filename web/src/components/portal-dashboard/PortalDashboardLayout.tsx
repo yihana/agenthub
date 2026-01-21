@@ -1,5 +1,7 @@
-import React, { useEffect } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import React from 'react';
+import { NavLink } from 'react-router-dom';
+<!-- import React, { useEffect } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'; -->
 import {
   BarChart3,
   Flag,
@@ -8,7 +10,8 @@ import {
   Settings
 } from 'lucide-react';
 import '../../styles/portal-dashboard.css';
-import { usePortalAuth } from '../../hooks/usePortalAuth';
+import { companyOptions, roleLabels, usePortalRole } from '../../hooks/usePortalRole';
+<!-- import { usePortalAuth } from '../../hooks/usePortalAuth'; -->
 
 interface PortalDashboardLayoutProps {
   title: string;
@@ -22,7 +25,8 @@ const navItems = [
   { to: '/portal-agents', label: '에이전트 목록', icon: ListChecks },
   { to: '/portal-usage', label: '사용 현황/효과', icon: BarChart3 },
   { to: '/portal-roadmap', label: '로드맵', icon: Flag },
-  { to: '/portal-settings', label: '화면 구성', icon: Settings }
+  { to: '/portal-settings', label: '화면 구성', icon: Settings, systemOnly: true }
+<!--   { to: '/portal-settings', label: '화면 구성', icon: Settings } -->
 ];
 
 const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
@@ -31,7 +35,9 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   actions,
   children
 }) => {
-  const { user, isLoggedIn, isLoading, logout } = usePortalAuth();
+  const { role, company, updateRole, updateCompany } = usePortalRole();
+  const filteredNavItems = navItems.filter((item) => !item.systemOnly || role === 'system_admin');
+<!--   const { user, isLoggedIn, isLoading, logout } = usePortalAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -49,7 +55,7 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
     return null;
   }
 
-  const displayRole = user?.roles?.includes('admin') ? '관리자' : '사용자';
+  const displayRole = user?.roles?.includes('admin') ? '관리자' : '사용자'; -->
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">
@@ -59,7 +65,8 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
           <p>사용자화 가능한 운영 허브</p>
         </div>
         <nav className="ear-nav">
-          {navItems.map((item) => {
+          {filteredNavItems.map((item) => {
+//           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -82,12 +89,40 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
           </div>
           <div className="ear-role">
             <span className="ear-muted">권한</span>
-            <strong>{displayRole}</strong>
+            <strong>{roleLabels[role]}</strong>
+          </div>
+          <label className="ear-select">
+            <span className="ear-muted">회사</span>
+            <select
+              value={company}
+              onChange={(event) => updateCompany(event.target.value as typeof company)}
+            >
+              {companyOptions.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="ear-select">
+            <span className="ear-muted">권한 선택</span>
+            <select
+              value={role}
+              onChange={(event) => updateRole(event.target.value as typeof role)}
+            >
+              {Object.entries(roleLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+<!--             <strong>{displayRole}</strong>
             <span className="ear-muted">{user?.companyCode ?? 'SKN'}</span>
           </div>
           <button type="button" className="ear-ghost" onClick={logout}>
             로그아웃
-          </button>
+          </button> -->
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>
       </aside>

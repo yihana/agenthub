@@ -8,7 +8,6 @@ import ProgressRow from '../../components/portal-dashboard/ProgressRow';
 import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
 import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
 
-
 interface PortalMetrics {
   total_requests: number;
   prev_total_requests: number;

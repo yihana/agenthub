@@ -8,6 +8,8 @@ import {
   WidgetType
 } from '../../data/portalDashboardConfig';
 import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
+import { roleLabels, usePortalRole } from '../../hooks/usePortalRole';
+
 
 const sizeLabels: Record<WidgetSize, string> = {
   small: '작게',
@@ -26,7 +28,9 @@ const typeLabels: Record<WidgetType, string> = {
 
 const PortalSettingsPage: React.FC = () => {
   const { widgets, setWidgets, resetWidgets } = usePortalDashboardConfig();
+  const { role } = usePortalRole();
   const [query, setQuery] = useState('');
+<!--   const [query, setQuery] = useState(''); -->
   const filteredWidgets = useMemo(() => {
     return widgets.filter((widget) =>
       widget.title.toLowerCase().includes(query.toLowerCase())
@@ -53,12 +57,30 @@ const PortalSettingsPage: React.FC = () => {
       subtitle="대시보드 위젯을 사용자화해서 저장합니다."
       actions={
         <>
-          <button className="ear-secondary" onClick={resetWidgets}>기본값 복원</button>
-          <button className="ear-primary">저장</button>
+          <button
+            className="ear-secondary"
+            onClick={resetWidgets}
+            disabled={role !== 'system_admin'}
+          >
+            기본값 복원
+          </button>
+          <button className="ear-primary" disabled={role !== 'system_admin'}>저장</button>
+<!--      <button className="ear-secondary" onClick={resetWidgets}>기본값 복원</button>
+          <button className="ear-primary">저장</button> -->
         </>
       }
     >
       <section className="ear-settings">
+        {role !== 'system_admin' && (
+          <WidgetCard
+            title="접근 제한"
+            description={`현재 권한(${roleLabels[role]})은 화면 구성을 변경할 수 없습니다.`}
+          >
+            <p className="ear-muted">
+              시스템 관리자 권한만 위젯 구성과 레이아웃을 편집할 수 있습니다.
+            </p>
+          </WidgetCard>
+        )}
         <WidgetCard title="위젯 탐색" description="표시 여부와 크기를 선택할 수 있습니다.">
           <div className="ear-settings__search">
             <input
@@ -66,6 +88,7 @@ const PortalSettingsPage: React.FC = () => {
               placeholder="위젯 검색"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              disabled={role !== 'system_admin'}
             />
             <TagPill label={`${widgets.filter((widget) => widget.enabled).length}개 활성`} tone="info" />
           </div>
@@ -85,6 +108,7 @@ const PortalSettingsPage: React.FC = () => {
                     type="button"
                     className={widget.enabled ? 'ear-primary' : 'ear-secondary'}
                     onClick={() => toggleWidget(widget)}
+                    disabled={role !== 'system_admin'}
                   >
                     {widget.enabled ? '표시 중' : '숨김'}
                   </button>
@@ -95,6 +119,7 @@ const PortalSettingsPage: React.FC = () => {
                         type="button"
                         className={widget.size === size ? 'ear-pill ear-pill--info' : 'ear-pill'}
                         onClick={() => updateSize(widget, size)}
+                        disabled={role !== 'system_admin'}
                       >
                         {sizeLabels[size]}
                       </button>

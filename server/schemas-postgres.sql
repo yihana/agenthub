@@ -124,6 +124,15 @@ CREATE INDEX IF NOT EXISTS idx_improvement_requests_created_at ON improvement_re
 CREATE INDEX IF NOT EXISTS idx_improvement_responses_request_id ON improvement_responses(request_id);
 
 -- 사용자 관리 테이블
+CREATE TABLE IF NOT EXISTS companies (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(200) NOT NULL UNIQUE,
+    description TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS users (
     id SERIAL PRIMARY KEY,
     userid VARCHAR(100) NOT NULL UNIQUE,
@@ -134,6 +143,8 @@ CREATE TABLE IF NOT EXISTS users (
     position VARCHAR(100),
     phone VARCHAR(50),
     employee_id VARCHAR(50),
+    company_id INTEGER REFERENCES companies(id) ON DELETE SET NULL,
+    role_type VARCHAR(50) DEFAULT 'user',
     is_active BOOLEAN DEFAULT true,
     is_admin BOOLEAN DEFAULT false,
     failed_login_attempts INTEGER DEFAULT 0,
@@ -214,6 +225,8 @@ CREATE TABLE IF NOT EXISTS portal_login_history (
 CREATE INDEX IF NOT EXISTS idx_users_userid ON users(userid);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_employee_id ON users(employee_id);
+CREATE INDEX IF NOT EXISTS idx_users_company_id ON users(company_id);
+CREATE INDEX IF NOT EXISTS idx_users_role_type ON users(role_type);
 CREATE INDEX IF NOT EXISTS idx_users_is_active ON users(is_active);
 CREATE INDEX IF NOT EXISTS idx_users_is_admin ON users(is_admin);
 CREATE INDEX IF NOT EXISTS idx_users_locked_until ON users(locked_until);
@@ -672,6 +685,18 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
 
 -- 에이전트 샘플 데이터 (로컬/개발용)
+INSERT INTO companies (name, description)
+SELECT 'Hana Tech', 'HANA 기반 운영 본부'
+WHERE NOT EXISTS (SELECT 1 FROM companies WHERE name = 'Hana Tech');
+
+INSERT INTO companies (name, description)
+SELECT 'Nova Systems', '운영 자동화 센터'
+WHERE NOT EXISTS (SELECT 1 FROM companies WHERE name = 'Nova Systems');
+
+INSERT INTO companies (name, description)
+SELECT 'Zen Finance', '금융 서비스 운영팀'
+WHERE NOT EXISTS (SELECT 1 FROM companies WHERE name = 'Zen Finance');
+
 INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
 SELECT 'Agent Alpha', '검색 기반 응답 에이전트', 'LLM', 'active', '{"model":"gpt-4o-mini","region":"local"}', 4, '["search","rag"]', true
 WHERE NOT EXISTS (SELECT 1 FROM agents WHERE name = 'Agent Alpha');
@@ -735,35 +760,207 @@ WHERE a.name = 'Agent Alpha'
 
 -- 기본 관리자 계정 생성 (비밀번호: admin123)
 -- 기존 관리자 계정이 있으면 비밀번호만 업데이트
-INSERT INTO users (userid, password_hash, full_name, is_admin, is_active) 
-VALUES ('admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '시스템 관리자', true, true)
+INSERT INTO users (userid, password_hash, full_name, company_id, role_type, is_admin, is_active)
+VALUES (
+  'admin',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '시스템 관리자',
+  (SELECT id FROM companies WHERE name = 'Hana Tech'),
+  'system_admin',
+  true,
+  true
+)
 ON CONFLICT (userid) 
 DO UPDATE SET 
   password_hash = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
   is_admin = true,
-  is_active = true;
+  is_active = true,
+  company_id = (SELECT id FROM companies WHERE name = 'Hana Tech'),
+  role_type = 'system_admin';
 
--- 포털 기본 계정 생성 (비밀번호: admin123)
-INSERT INTO portal_users (userid, password_hash, full_name, is_admin, is_active, company_code)
-VALUES
-  ('portal-admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 관리자', true, true, 'SKN'),
-  ('portal-user', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 사용자', false, true, 'SKN')
-ON CONFLICT (userid)
-DO UPDATE SET
-  password_hash = EXCLUDED.password_hash,
-  is_active = true;
+INSERT INTO users (userid, password_hash, full_name, company_id, role_type, is_admin, is_active)
+SELECT
+  'operator_admin',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '운영 관리자',
+  (SELECT id FROM companies WHERE name = 'Nova Systems'),
+  'operator_admin',
+  false,
+  true
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE userid = 'operator_admin');
 
-INSERT INTO portal_user_roles (user_id, role_name)
-SELECT id, 'admin' FROM portal_users WHERE userid = 'portal-admin'
-ON CONFLICT (user_id, role_name) DO NOTHING;
+INSERT INTO users (userid, password_hash, full_name, company_id, role_type, is_admin, is_active)
+SELECT
+  'operator',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '운영자',
+  (SELECT id FROM companies WHERE name = 'Nova Systems'),
+  'operator',
+  false,
+  true
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE userid = 'operator');
 
-INSERT INTO portal_user_roles (user_id, role_name)
-SELECT id, 'user' FROM portal_users WHERE userid = 'portal-user'
-ON CONFLICT (user_id, role_name) DO NOTHING;
+INSERT INTO users (userid, password_hash, full_name, company_id, role_type, is_admin, is_active)
+SELECT
+  'user',
+  '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
+  '일반 사용자',
+  (SELECT id FROM companies WHERE name = 'Zen Finance'),
+  'user',
+  false,
+  true
+WHERE NOT EXISTS (SELECT 1 FROM users WHERE userid = 'user');
 
-INSERT INTO portal_role_matrix (company_code, role_name, permissions)
-VALUES
-  ('SKN', 'admin', '["portal:read","portal:write","metrics:write","roadmap:edit","settings:edit"]'::jsonb),
-  ('SKN', 'user', '["portal:read"]'::jsonb)
-ON CONFLICT (company_code, role_name)
-DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP;
+INSERT INTO portal_metric_inputs (metric_key, value, unit, description, business_type, agent_type)
+SELECT 'baseline_minutes_per_request', 12, 'minute', '요청 1건당 기준 처리 시간 (분)', NULL, NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM portal_metric_inputs
+  WHERE metric_key = 'baseline_minutes_per_request' AND business_type IS NULL AND agent_type IS NULL
+);
+
+INSERT INTO portal_metric_inputs (metric_key, value, unit, description, business_type, agent_type)
+SELECT 'cost_per_hour', 45000, 'KRW', '시간당 인건비 단가', NULL, NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM portal_metric_inputs
+  WHERE metric_key = 'cost_per_hour' AND business_type IS NULL AND agent_type IS NULL
+);
+
+INSERT INTO portal_metric_inputs (metric_key, value, unit, description, business_type, agent_type)
+SELECT 'sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)', NULL, NULL
+WHERE NOT EXISTS (
+  SELECT 1 FROM portal_metric_inputs
+  WHERE metric_key = 'sla_latency_ms' AND business_type IS NULL AND agent_type IS NULL
+);
+
+INSERT INTO business_task_baseline (task_code, domain, before_time_min, before_cost, description)
+SELECT 'FIN-REPORT', 'Finance', 18, 120000, '재무 보고서 자동화 기준'
+WHERE NOT EXISTS (SELECT 1 FROM business_task_baseline WHERE task_code = 'FIN-REPORT' AND domain = 'Finance');
+
+INSERT INTO business_task_baseline (task_code, domain, before_time_min, before_cost, description)
+SELECT 'HR-ONBOARD', 'HR', 25, 150000, '온보딩 업무 기준'
+WHERE NOT EXISTS (SELECT 1 FROM business_task_baseline WHERE task_code = 'HR-ONBOARD' AND domain = 'HR');
+
+INSERT INTO labor_cost (role, hourly_cost, currency, business_type)
+SELECT '재무 분석가', 52000, 'KRW', 'Finance'
+WHERE NOT EXISTS (SELECT 1 FROM labor_cost WHERE role = '재무 분석가' AND business_type = 'Finance');
+
+INSERT INTO labor_cost (role, hourly_cost, currency, business_type)
+SELECT 'HR 매니저', 48000, 'KRW', 'HR'
+WHERE NOT EXISTS (SELECT 1 FROM labor_cost WHERE role = 'HR 매니저' AND business_type = 'HR');
+
+INSERT INTO ear_requests (request_title, request_content, template_id, form_data, attachments, agent_id, business_type, status, created_by, created_at, updated_at)
+SELECT
+  '예산 리포트 생성',
+  '주간 예산 분석 요청',
+  NULL,
+  NULL,
+  NULL,
+  a.id,
+  'Finance',
+  'completed',
+  'operator_admin',
+  NOW() - INTERVAL '2 days',
+  NOW() - INTERVAL '2 days'
+FROM agents a
+WHERE a.name = 'Agent Alpha'
+  AND NOT EXISTS (SELECT 1 FROM ear_requests WHERE request_title = '예산 리포트 생성');
+
+INSERT INTO ear_requests (request_title, request_content, template_id, form_data, attachments, agent_id, business_type, status, created_by, created_at, updated_at)
+SELECT
+  '인사 정책 FAQ',
+  '신규 정책 Q&A 요청',
+  NULL,
+  NULL,
+  NULL,
+  a.id,
+  'HR',
+  'pending',
+  'operator',
+  NOW() - INTERVAL '1 day',
+  NOW() - INTERVAL '1 day'
+FROM agents a
+WHERE a.name = 'Agent Beta'
+  AND NOT EXISTS (SELECT 1 FROM ear_requests WHERE request_title = '인사 정책 FAQ');
+
+INSERT INTO ear_requests (request_title, request_content, template_id, form_data, attachments, agent_id, business_type, status, created_by, created_at, updated_at)
+SELECT
+  '고객 응대 요약',
+  '이번 주 고객 이슈 요약 요청',
+  NULL,
+  NULL,
+  NULL,
+  a.id,
+  'Customer',
+  'in_progress',
+  'operator',
+  NOW() - INTERVAL '6 hours',
+  NOW() - INTERVAL '6 hours'
+FROM agents a
+WHERE a.name = 'Agent Beta'
+  AND NOT EXISTS (SELECT 1 FROM ear_requests WHERE request_title = '고객 응대 요약');
+
+INSERT INTO agent_tasks (agent_id, job_id, status, received_at, started_at, finished_at, result)
+SELECT a.id, 'job-1003', 'completed', NOW() - INTERVAL '1 day', NOW() - INTERVAL '23 hours', NOW() - INTERVAL '22 hours', '{"note":"done"}'::jsonb
+FROM agents a
+WHERE a.name = 'Agent Beta'
+  AND NOT EXISTS (SELECT 1 FROM agent_tasks WHERE job_id = 'job-1003');
+
+INSERT INTO agent_tasks (agent_id, job_id, status, received_at, started_at, finished_at, result)
+SELECT a.id, 'job-1004', 'failed', NOW() - INTERVAL '8 hours', NOW() - INTERVAL '7 hours', NOW() - INTERVAL '6 hours', '{"error":"timeout"}'::jsonb
+FROM agents a
+WHERE a.name = 'Agent Gamma'
+  AND NOT EXISTS (SELECT 1 FROM agent_tasks WHERE job_id = 'job-1004');
+
+INSERT INTO adoption_funnel_events (user_id, stage, business_type, agent_type, metadata, event_time)
+SELECT 'operator_admin', 'visit', 'Finance', 'LLM', '{"channel":"portal"}'::jsonb, NOW() - INTERVAL '5 days'
+WHERE NOT EXISTS (SELECT 1 FROM adoption_funnel_events WHERE user_id = 'operator_admin' AND stage = 'visit');
+
+INSERT INTO adoption_funnel_events (user_id, stage, business_type, agent_type, metadata, event_time)
+SELECT 'operator_admin', 'activate', 'Finance', 'LLM', '{"channel":"portal"}'::jsonb, NOW() - INTERVAL '4 days'
+WHERE NOT EXISTS (SELECT 1 FROM adoption_funnel_events WHERE user_id = 'operator_admin' AND stage = 'activate');
+
+INSERT INTO adoption_funnel_events (user_id, stage, business_type, agent_type, metadata, event_time)
+SELECT 'operator', 'trial', 'HR', 'Automation', '{"channel":"portal"}'::jsonb, NOW() - INTERVAL '3 days'
+WHERE NOT EXISTS (SELECT 1 FROM adoption_funnel_events WHERE user_id = 'operator' AND stage = 'trial');
+
+INSERT INTO adoption_funnel_events (user_id, stage, business_type, agent_type, metadata, event_time)
+SELECT 'user', 'retain', 'Customer', 'Automation', '{"channel":"portal"}'::jsonb, NOW() - INTERVAL '2 days'
+WHERE NOT EXISTS (SELECT 1 FROM adoption_funnel_events WHERE user_id = 'user' AND stage = 'retain');
+
+INSERT INTO user_business_domain (user_id, business_type)
+SELECT 'operator_admin', 'Finance'
+WHERE NOT EXISTS (SELECT 1 FROM user_business_domain WHERE user_id = 'operator_admin' AND business_type = 'Finance');
+
+INSERT INTO user_business_domain (user_id, business_type)
+SELECT 'operator', 'HR'
+WHERE NOT EXISTS (SELECT 1 FROM user_business_domain WHERE user_id = 'operator' AND business_type = 'HR');
+
+INSERT INTO user_business_domain (user_id, business_type)
+SELECT 'user', 'Customer'
+WHERE NOT EXISTS (SELECT 1 FROM user_business_domain WHERE user_id = 'user' AND business_type = 'Customer');
+--   is_active = true;
+
+-- -- 포털 기본 계정 생성 (비밀번호: admin123)
+-- INSERT INTO portal_users (userid, password_hash, full_name, is_admin, is_active, company_code)
+-- VALUES
+--   ('portal-admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 관리자', true, true, 'SKN'),
+--   ('portal-user', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 사용자', false, true, 'SKN')
+-- ON CONFLICT (userid)
+-- DO UPDATE SET
+--   password_hash = EXCLUDED.password_hash,
+--   is_active = true;
+
+-- INSERT INTO portal_user_roles (user_id, role_name)
+-- SELECT id, 'admin' FROM portal_users WHERE userid = 'portal-admin'
+-- ON CONFLICT (user_id, role_name) DO NOTHING;
+
+-- INSERT INTO portal_user_roles (user_id, role_name)
+-- SELECT id, 'user' FROM portal_users WHERE userid = 'portal-user'
+-- ON CONFLICT (user_id, role_name) DO NOTHING;
+
+-- INSERT INTO portal_role_matrix (company_code, role_name, permissions)
+-- VALUES
+--   ('SKN', 'admin', '["portal:read","portal:write","metrics:write","roadmap:edit","settings:edit"]'::jsonb),
+--   ('SKN', 'user', '["portal:read"]'::jsonb)
+-- ON CONFLICT (company_code, role_name)
+-- DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP;
