@@ -47,7 +47,6 @@ const PortalSettingsPage: React.FC = () => {
     setWidgets(updated);
   };
 
-
   return (
     <PortalDashboardLayout
       title="화면 구성"
