@@ -30,7 +30,13 @@ const PortalSettingsPage: React.FC = () => {
   const [baselineValues, setBaselineValues] = useState({
     baseline_minutes_per_request: '12',
     cost_per_hour: '45000',
-    sla_latency_ms: '2000'
+    sla_latency_ms: '2000',
+    investment_cost: '0',
+    total_roles: '0',
+    roles_redefined: '0',
+    customer_nps_delta: '0',
+    error_reduction_pct: '0',
+    decision_speed_improvement_pct: '0'
   });
   const [baselineStatus, setBaselineStatus] = useState('');
   const [taskBaselineValues, setTaskBaselineValues] = useState({
@@ -65,7 +71,13 @@ const PortalSettingsPage: React.FC = () => {
         setBaselineValues({
           baseline_minutes_per_request: String(baselineMap.get('baseline_minutes_per_request') ?? '12'),
           cost_per_hour: String(baselineMap.get('cost_per_hour') ?? '45000'),
-          sla_latency_ms: String(baselineMap.get('sla_latency_ms') ?? '2000')
+          sla_latency_ms: String(baselineMap.get('sla_latency_ms') ?? '2000'),
+          investment_cost: String(baselineMap.get('investment_cost') ?? '0'),
+          total_roles: String(baselineMap.get('total_roles') ?? '0'),
+          roles_redefined: String(baselineMap.get('roles_redefined') ?? '0'),
+          customer_nps_delta: String(baselineMap.get('customer_nps_delta') ?? '0'),
+          error_reduction_pct: String(baselineMap.get('error_reduction_pct') ?? '0'),
+          decision_speed_improvement_pct: String(baselineMap.get('decision_speed_improvement_pct') ?? '0')
         });
       } catch (error) {
         console.error('Baseline fetch error:', error);
@@ -130,6 +142,42 @@ const PortalSettingsPage: React.FC = () => {
           baselineValues.sla_latency_ms,
           'ms',
           'SLA 기준 응답 시간 (ms)'
+        ),
+        saveBaseline(
+          'investment_cost',
+          baselineValues.investment_cost,
+          'KRW',
+          '에이전트 개발/운영 투자 비용'
+        ),
+        saveBaseline(
+          'total_roles',
+          baselineValues.total_roles,
+          'count',
+          '전체 역할 수'
+        ),
+        saveBaseline(
+          'roles_redefined',
+          baselineValues.roles_redefined,
+          'count',
+          'AI 협업으로 재설계된 역할 수'
+        ),
+        saveBaseline(
+          'customer_nps_delta',
+          baselineValues.customer_nps_delta,
+          'point',
+          'AI 도입 이후 고객 만족도/NPS 변화'
+        ),
+        saveBaseline(
+          'error_reduction_pct',
+          baselineValues.error_reduction_pct,
+          'pct',
+          '오류율 감소율'
+        ),
+        saveBaseline(
+          'decision_speed_improvement_pct',
+          baselineValues.decision_speed_improvement_pct,
+          'pct',
+          '의사결정 속도 개선율'
         )
       ]);
       setBaselineStatus('저장 완료');
@@ -231,6 +279,66 @@ const PortalSettingsPage: React.FC = () => {
               />
             </label>
             <button type="submit" className="ear-primary">Baseline 저장</button>
+            {baselineStatus && <span className="ear-muted">{baselineStatus}</span>}
+          </form>
+        </WidgetCard>
+        <WidgetCard title="협업/가치 지표 입력" description="투자 비용, 협업 성과, 가치 지표를 등록합니다.">
+          <form className="ear-form" onSubmit={handleBaselineSubmit}>
+            <label>
+              투자 비용 (KRW)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.investment_cost}
+                onChange={(event) => handleBaselineChange('investment_cost', event.target.value)}
+              />
+            </label>
+            <label>
+              전체 역할 수
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.total_roles}
+                onChange={(event) => handleBaselineChange('total_roles', event.target.value)}
+              />
+            </label>
+            <label>
+              재설계 역할 수
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.roles_redefined}
+                onChange={(event) => handleBaselineChange('roles_redefined', event.target.value)}
+              />
+            </label>
+            <label>
+              고객 만족도/NPS 변화 (point)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.customer_nps_delta}
+                onChange={(event) => handleBaselineChange('customer_nps_delta', event.target.value)}
+              />
+            </label>
+            <label>
+              오류율 감소율 (%)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.error_reduction_pct}
+                onChange={(event) => handleBaselineChange('error_reduction_pct', event.target.value)}
+              />
+            </label>
+            <label>
+              의사결정 속도 개선율 (%)
+              <input
+                className="ear-input"
+                type="number"
+                value={baselineValues.decision_speed_improvement_pct}
+                onChange={(event) => handleBaselineChange('decision_speed_improvement_pct', event.target.value)}
+              />
+            </label>
+            <button type="submit" className="ear-primary">협업 지표 저장</button>
             {baselineStatus && <span className="ear-muted">{baselineStatus}</span>}
           </form>
         </WidgetCard>
