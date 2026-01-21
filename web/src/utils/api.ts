@@ -33,6 +33,23 @@ export const getAuthHeadersForFormData = (): HeadersInit => {
   return headers;
 };
 
+export const getPortalAuthToken = (): string | null => {
+  return localStorage.getItem('portal-token');
+};
+
+export const getPortalAuthHeaders = (): HeadersInit => {
+  const token = getPortalAuthToken();
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json'
+  };
+
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
+
 // API 호출을 위한 fetch 래퍼 함수
 export const apiCall = async (url: string, options: RequestInit = {}) => {
   const token = getAuthToken();

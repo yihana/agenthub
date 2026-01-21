@@ -44,6 +44,9 @@ export async function initializeDatabase() {
     
     // 기본 관리자 계정
     await createDefaultAdmin(client);
+
+    // 포털 기본 계정/권한 매트릭스
+    await createDefaultPortalUsers(client);
     
     // IP 화이트리스트 초기화
     await initializeIpWhitelist(client);
@@ -488,6 +491,66 @@ async function createTables(client: any) {
       failure_reason VARCHAR(100) NULL
     );
   `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_users (
+      id SERIAL PRIMARY KEY,
+      userid VARCHAR(100) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      full_name VARCHAR(200),
+      department VARCHAR(100),
+      position VARCHAR(100),
+      phone VARCHAR(50),
+      employee_id VARCHAR(50),
+      is_active BOOLEAN DEFAULT true,
+      is_admin BOOLEAN DEFAULT false,
+      company_code VARCHAR(10) DEFAULT 'SKN',
+      failed_login_attempts INTEGER DEFAULT 0,
+      locked_until TIMESTAMP NULL,
+      last_login TIMESTAMP NULL,
+      password_reset_token VARCHAR(255) NULL,
+      password_reset_expires TIMESTAMP NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_user_roles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+      role_name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_role_matrix (
+      id SERIAL PRIMARY KEY,
+      company_code VARCHAR(10) NOT NULL,
+      role_name VARCHAR(100) NOT NULL,
+      permissions JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(company_code, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_login_history (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+      userid VARCHAR(100) NOT NULL,
+      login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      login_status VARCHAR(20) NOT NULL,
+      failure_reason VARCHAR(100) NULL
+    );
+  `);
   
   await client.query(`
     CREATE TABLE IF NOT EXISTS esm_requests (
@@ -732,6 +795,13 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_login_history_userid ON login_history(userid);
     CREATE INDEX IF NOT EXISTS idx_login_history_login_time ON login_history(login_time);
     CREATE INDEX IF NOT EXISTS idx_login_history_login_status ON login_history(login_status);
+    CREATE INDEX IF NOT EXISTS idx_portal_users_userid ON portal_users(userid);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_user_id ON portal_login_history(user_id);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_userid ON portal_login_history(userid);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_time ON portal_login_history(login_time);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_status ON portal_login_history(login_status);
+    CREATE INDEX IF NOT EXISTS idx_portal_user_roles_user_id ON portal_user_roles(user_id);
+    CREATE INDEX IF NOT EXISTS idx_portal_role_matrix_company_role ON portal_role_matrix(company_code, role_name);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_status ON esm_requests(status);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_created_at ON esm_requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_sales_cloud_case_id ON esm_requests(sales_cloud_case_id);
@@ -835,6 +905,42 @@ async function createDefaultAdmin(client: any) {
       is_active = true;
   `);
   console.log('기본 관리자 계정 설정 완료');
+}
+
+async function createDefaultPortalUsers(client: any) {
+  await client.query(`
+    INSERT INTO portal_users (userid, password_hash, full_name, is_admin, is_active, company_code)
+    VALUES
+      ('portal-admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 관리자', true, true, 'SKN'),
+      ('portal-user', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 사용자', false, true, 'SKN')
+    ON CONFLICT (userid)
+    DO UPDATE SET
+      password_hash = EXCLUDED.password_hash,
+      is_active = true;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_user_roles (user_id, role_name)
+    SELECT id, 'admin' FROM portal_users WHERE userid = 'portal-admin'
+    ON CONFLICT (user_id, role_name) DO NOTHING;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_user_roles (user_id, role_name)
+    SELECT id, 'user' FROM portal_users WHERE userid = 'portal-user'
+    ON CONFLICT (user_id, role_name) DO NOTHING;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_role_matrix (company_code, role_name, permissions)
+    VALUES
+      ('SKN', 'admin', '["portal:read","portal:write","metrics:write","roadmap:edit","settings:edit"]'::jsonb),
+      ('SKN', 'user', '["portal:read"]'::jsonb)
+    ON CONFLICT (company_code, role_name)
+    DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP;
+  `);
+
+  console.log('포털 기본 계정/권한 매트릭스 설정 완료');
 }
 
 // IP 화이트리스트 초기화

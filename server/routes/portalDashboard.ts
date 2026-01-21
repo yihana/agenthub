@@ -1,5 +1,6 @@
 import express from 'express';
 import { DB_TYPE, query } from '../db';
+import { authenticatePortalToken, requirePortalAdmin } from '../middleware/portalAuth';
 
 const router = express.Router();
 
@@ -904,7 +905,7 @@ router.get('/metrics', async (req, res) => {
   }
 });
 
-router.get('/baselines', async (req, res) => {
+router.get('/baselines', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const result = await query(
@@ -923,7 +924,7 @@ router.get('/baselines', async (req, res) => {
   }
 });
 
-router.post('/baselines', async (req, res) => {
+router.post('/baselines', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     const { metric_key, value, unit, description, business_type, agent_type } = req.body || {};
 
@@ -964,7 +965,7 @@ router.post('/baselines', async (req, res) => {
   }
 });
 
-router.get('/task-baselines', async (req, res) => {
+router.get('/task-baselines', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const result = await query(
@@ -983,7 +984,7 @@ router.get('/task-baselines', async (req, res) => {
   }
 });
 
-router.post('/task-baselines', async (req, res) => {
+router.post('/task-baselines', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     const { task_code, domain, before_time_min, before_cost, description } = req.body || {};
     if (!task_code || before_time_min === undefined) {
@@ -1021,7 +1022,7 @@ router.post('/task-baselines', async (req, res) => {
   }
 });
 
-router.get('/labor-costs', async (req, res) => {
+router.get('/labor-costs', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const result = await query(
@@ -1040,7 +1041,7 @@ router.get('/labor-costs', async (req, res) => {
   }
 });
 
-router.post('/labor-costs', async (req, res) => {
+router.post('/labor-costs', authenticatePortalToken, requirePortalAdmin, async (req, res) => {
   try {
     const { role, hourly_cost, currency, business_type } = req.body || {};
     if (!role || hourly_cost === undefined) {
