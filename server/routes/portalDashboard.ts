@@ -21,6 +21,42 @@ const DEFAULT_BASELINES = [
     value: 2000,
     unit: 'ms',
     description: 'SLA 기준 응답 시간 (ms)'
+  },
+  {
+    metric_key: 'investment_cost',
+    value: 0,
+    unit: 'KRW',
+    description: '에이전트 개발/운영 투자 비용'
+  },
+  {
+    metric_key: 'total_roles',
+    value: 0,
+    unit: 'count',
+    description: '전체 역할 수'
+  },
+  {
+    metric_key: 'roles_redefined',
+    value: 0,
+    unit: 'count',
+    description: 'AI 협업으로 재설계된 역할 수'
+  },
+  {
+    metric_key: 'customer_nps_delta',
+    value: 0,
+    unit: 'point',
+    description: 'AI 도입 이후 고객 만족도/NPS 변화'
+  },
+  {
+    metric_key: 'error_reduction_pct',
+    value: 0,
+    unit: 'pct',
+    description: '오류율 감소율'
+  },
+  {
+    metric_key: 'decision_speed_improvement_pct',
+    value: 0,
+    unit: 'pct',
+    description: '의사결정 속도 개선율'
   }
 ];
 
@@ -84,7 +120,16 @@ router.get('/metrics', async (req, res) => {
             AVG(am.avg_latency) AS avg_latency,
             AVG(am.error_rate) AS avg_error_rate,
             AVG(am.queue_time) AS avg_queue_time,
-            SUM(am.requests_processed) AS requests_processed
+            SUM(am.requests_processed) AS requests_processed,
+            SUM(am.ai_assisted_decisions) AS ai_assisted_decisions,
+            SUM(am.ai_assisted_decisions_validated) AS ai_validated_decisions,
+            SUM(am.ai_recommendations) AS ai_recommendations,
+            SUM(am.decisions_overridden) AS decisions_overridden,
+            AVG(am.cognitive_load_before_score) AS avg_cognitive_load_before,
+            AVG(am.cognitive_load_after_score) AS avg_cognitive_load_after,
+            AVG(am.handoff_time_seconds) AS avg_handoff_time_seconds,
+            AVG(am.team_satisfaction_score) AS avg_team_satisfaction_score,
+            SUM(am.innovation_count) AS innovation_count
           FROM agent_metrics am
           JOIN agents a ON a.id = am.agent_id
           JOIN bounds b ON am.timestamp >= b.date_from AND am.timestamp < b.date_to
@@ -139,6 +184,33 @@ router.get('/metrics', async (req, res) => {
           FROM adoption_funnel_events e
           JOIN bounds b ON e.event_time >= b.date_from AND e.event_time < b.date_to
           GROUP BY stage
+        ),
+        collaboration_metrics AS (
+          SELECT
+            AVG(cm.decision_accuracy_pct) AS decision_accuracy_pct,
+            AVG(cm.override_rate_pct) AS override_rate_pct,
+            AVG(cm.cognitive_load_reduction_pct) AS cognitive_load_reduction_pct,
+            AVG(cm.handoff_time_seconds) AS handoff_time_seconds,
+            AVG(cm.team_satisfaction_score) AS team_satisfaction_score,
+            SUM(cm.innovation_count) AS innovation_count
+          FROM human_ai_collaboration_metrics cm
+          JOIN bounds b ON cm.period_start >= b.date_from AND cm.period_end < b.date_to
+          WHERE 1=1
+            AND ($4::text IS NULL OR cm.agent_type = $4)
+            AND ($5::text IS NULL OR cm.business_type = $5)
+        ),
+        risk_stats AS (
+          SELECT
+            COUNT(*) AS total_risks,
+            AVG((COALESCE(rm.risk_ethics_score, 0) + COALESCE(rm.risk_reputation_score, 0) + COALESCE(rm.risk_operational_score, 0) + COALESCE(rm.risk_legal_score, 0))) AS avg_risk_score,
+            COUNT(*) FILTER (WHERE rm.audit_required) AS audit_required_count,
+            COUNT(*) FILTER (WHERE rm.audit_completed) AS audit_completed_count,
+            COUNT(*) FILTER (WHERE rm.human_reviewed) AS human_reviewed_count
+          FROM risk_management rm
+          JOIN bounds b ON rm.created_at >= b.date_from AND rm.created_at < b.date_to
+          WHERE 1=1
+            AND ($4::text IS NULL OR rm.agent_type = $4)
+            AND ($5::text IS NULL OR rm.business_type = $5)
         )
         SELECT
           (SELECT date_from FROM bounds) AS date_from,
@@ -151,6 +223,26 @@ router.get('/metrics', async (req, res) => {
           agent_base.avg_error_rate,
           agent_base.avg_queue_time,
           agent_base.requests_processed,
+          agent_base.ai_assisted_decisions,
+          agent_base.ai_validated_decisions,
+          agent_base.ai_recommendations,
+          agent_base.decisions_overridden,
+          agent_base.avg_cognitive_load_before,
+          agent_base.avg_cognitive_load_after,
+          agent_base.avg_handoff_time_seconds,
+          agent_base.avg_team_satisfaction_score,
+          agent_base.innovation_count,
+          collaboration_metrics.decision_accuracy_pct,
+          collaboration_metrics.override_rate_pct,
+          collaboration_metrics.cognitive_load_reduction_pct,
+          collaboration_metrics.handoff_time_seconds AS collaboration_handoff_time_seconds,
+          collaboration_metrics.team_satisfaction_score AS collaboration_team_satisfaction_score,
+          collaboration_metrics.innovation_count AS collaboration_innovation_count,
+          risk_stats.total_risks,
+          risk_stats.avg_risk_score,
+          risk_stats.audit_required_count,
+          risk_stats.audit_completed_count,
+          risk_stats.human_reviewed_count,
           task_stats.total_tasks,
           task_stats.success_tasks,
           task_stats.error_tasks,
@@ -159,7 +251,7 @@ router.get('/metrics', async (req, res) => {
           COALESCE((SELECT JSONB_AGG(agent_breakdown) FROM agent_breakdown), '[]'::jsonb) AS breakdown,
           COALESCE((SELECT JSONB_AGG(domain_stats) FROM domain_stats), '[]'::jsonb) AS domain_stats,
           COALESCE((SELECT JSONB_AGG(funnel_stats) FROM funnel_stats), '[]'::jsonb) AS funnel_stats
-        FROM req, req_prev, agent_base, task_stats, user_stats, mapped_users;
+        FROM req, req_prev, agent_base, task_stats, user_stats, mapped_users, collaboration_metrics, risk_stats;
       `;
 
       const result = await query(metricsSql, params);
@@ -194,6 +286,12 @@ router.get('/metrics', async (req, res) => {
       let baselineMinutes = baselineMap.get('baseline_minutes_per_request')?.value ?? 12;
       let costPerHour = baselineMap.get('cost_per_hour')?.value ?? 45000;
       const slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? 2000;
+      const investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
+      const totalRoles = baselineMap.get('total_roles')?.value ?? 0;
+      const rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
+      const customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
+      const errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
+      const decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
       const avgResponseMinutes = (avgLatency + avgQueueTime) / 1000 / 60;
       const completedRequests = Number(row.completed_requests || 0);
       let baselineCostOverride: number | null = null;
@@ -228,7 +326,8 @@ router.get('/metrics', async (req, res) => {
       const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
       const costSavings = (timeSavingsMinutes / 60) * costPerHour;
       const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
-      const roiRatio = baselineCost > 0 ? (costSavings / baselineCost) * 100 : 0;
+      const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
+      const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
 
       const totalTasks = Number(row.total_tasks || 0);
       const successTasks = Number(row.success_tasks || 0);
@@ -247,6 +346,53 @@ router.get('/metrics', async (req, res) => {
       const totalUsers = Number(row.total_users || 0);
       const mappedUsers = Number(row.mapped_users || 0);
       const userCoverage = totalUsers > 0 ? (mappedUsers / totalUsers) * 100 : 0;
+
+      const assistedDecisions = Number(row.ai_assisted_decisions || 0);
+      const validatedDecisions = Number(row.ai_validated_decisions || 0);
+      const aiRecommendations = Number(row.ai_recommendations || 0);
+      const overriddenDecisions = Number(row.decisions_overridden || 0);
+      const avgCognitiveLoadBefore = Number(row.avg_cognitive_load_before || 0);
+      const avgCognitiveLoadAfter = Number(row.avg_cognitive_load_after || 0);
+      const avgHandoffTime = Number(row.avg_handoff_time_seconds || 0);
+      const avgTeamSatisfaction = Number(row.avg_team_satisfaction_score || 0);
+      const innovationCount = Number(row.innovation_count || 0);
+
+      const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
+      const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
+      const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
+        ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
+        : 0;
+
+      const collaborationDecisionAccuracy = row.decision_accuracy_pct !== null && row.decision_accuracy_pct !== undefined
+        ? Number(row.decision_accuracy_pct)
+        : null;
+      const collaborationOverrideRate = row.override_rate_pct !== null && row.override_rate_pct !== undefined
+        ? Number(row.override_rate_pct)
+        : null;
+      const collaborationCognitiveReduction = row.cognitive_load_reduction_pct !== null && row.cognitive_load_reduction_pct !== undefined
+        ? Number(row.cognitive_load_reduction_pct)
+        : null;
+      const collaborationHandoff = row.collaboration_handoff_time_seconds !== null && row.collaboration_handoff_time_seconds !== undefined
+        ? Number(row.collaboration_handoff_time_seconds)
+        : null;
+      const collaborationSatisfaction = row.collaboration_team_satisfaction_score !== null && row.collaboration_team_satisfaction_score !== undefined
+        ? Number(row.collaboration_team_satisfaction_score)
+        : null;
+      const collaborationInnovation = row.collaboration_innovation_count !== null && row.collaboration_innovation_count !== undefined
+        ? Number(row.collaboration_innovation_count)
+        : null;
+
+      const totalRisks = Number(row.total_risks || 0);
+      const avgRiskScore = Number(row.avg_risk_score || 0);
+      const auditRequiredCount = Number(row.audit_required_count || 0);
+      const auditCompletedCount = Number(row.audit_completed_count || 0);
+      const humanReviewedCount = Number(row.human_reviewed_count || 0);
+
+      const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
+      const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
+      const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
+
+      const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
 
       try {
         await query(
@@ -306,12 +452,42 @@ router.get('/metrics', async (req, res) => {
           unit: value.unit || null,
           description: value.description || null
         })),
+        collaboration: {
+          decision_accuracy_pct: Number(
+            ((collaborationDecisionAccuracy ?? decisionAccuracyFallback) as number).toFixed(2)
+          ),
+          override_rate_pct: Number(((collaborationOverrideRate ?? overrideRateFallback) as number).toFixed(2)),
+          cognitive_load_reduction_pct: Number(
+            ((collaborationCognitiveReduction ?? cognitiveLoadReductionFallback) as number).toFixed(2)
+          ),
+          handoff_time_seconds: Number(
+            ((collaborationHandoff ?? avgHandoffTime) as number).toFixed(2)
+          ),
+          team_satisfaction_score: Number(
+            ((collaborationSatisfaction ?? avgTeamSatisfaction) as number).toFixed(2)
+          ),
+          innovation_count: Number((collaborationInnovation ?? innovationCount).toFixed(0))
+        },
+        risk: {
+          risk_exposure_score: Number(avgRiskScore.toFixed(2)),
+          audit_required_rate_pct: Number(auditRequiredRate.toFixed(2)),
+          audit_completed_rate_pct: Number(auditCompletedRate.toFixed(2)),
+          human_review_rate_pct: Number(humanReviewRate.toFixed(2)),
+          total_risk_items: totalRisks
+        },
+        value: {
+          role_redesign_ratio_pct: Number(roleRedesignRatio.toFixed(2)),
+          customer_nps_delta: Number(customerNpsDelta.toFixed(2)),
+          error_reduction_pct: Number(errorReductionPct.toFixed(2)),
+          decision_speed_improvement_pct: Number(decisionSpeedImprovementPct.toFixed(2))
+        },
         savings: {
           baseline_minutes_per_request: baselineMinutes,
           avg_response_minutes: Number(avgResponseMinutes.toFixed(4)),
           time_savings_minutes: Number(timeSavingsMinutes.toFixed(2)),
           cost_savings: Number(costSavings.toFixed(2)),
           baseline_cost: Number(baselineCost.toFixed(2)),
+          investment_cost: Number(normalizedInvestmentCost.toFixed(2)),
           roi_ratio_pct: Number(roiRatio.toFixed(2)),
           sla_latency_ms: slaLatencyMs
         }
@@ -322,22 +498,29 @@ router.get('/metrics', async (req, res) => {
     const hanaRequestFilter: string[] = [];
     const hanaRequestParams: any[] = [];
     const hanaAgentParams: any[] = [];
+    const hanaMetricFilter: string[] = [];
+    const hanaMetricParams: any[] = [];
 
     if (agentType) {
       hanaAgentFilter.push('A.TYPE = ?');
       hanaRequestFilter.push('A.TYPE = ?');
       hanaRequestParams.push(agentType);
       hanaAgentParams.push(agentType);
+      hanaMetricFilter.push('AGENT_TYPE = ?');
+      hanaMetricParams.push(agentType);
     }
     if (businessType) {
       hanaAgentFilter.push('A.BUSINESS_TYPE = ?');
       hanaRequestFilter.push('COALESCE(R.BUSINESS_TYPE, A.BUSINESS_TYPE) = ?');
       hanaRequestParams.push(businessType);
       hanaAgentParams.push(businessType);
+      hanaMetricFilter.push('BUSINESS_TYPE = ?');
+      hanaMetricParams.push(businessType);
     }
 
     const hanaAgentFilterSql = hanaAgentFilter.length ? `AND ${hanaAgentFilter.join(' AND ')}` : '';
     const hanaRequestFilterSql = hanaRequestFilter.length ? `AND ${hanaRequestFilter.join(' AND ')}` : '';
+    const hanaMetricFilterSql = hanaMetricFilter.length ? `AND ${hanaMetricFilter.join(' AND ')}` : '';
 
     const hanaMetricsSql = `
       SELECT
@@ -382,6 +565,51 @@ router.get('/metrics', async (req, res) => {
          JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
          WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
          ${hanaAgentFilterSql}) AS REQUESTS_PROCESSED,
+        (SELECT SUM(AI_ASSISTED_DECISIONS)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AI_ASSISTED_DECISIONS,
+        (SELECT SUM(AI_ASSISTED_DECISIONS_VALIDATED)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AI_ASSISTED_DECISIONS_VALIDATED,
+        (SELECT SUM(AI_RECOMMENDATIONS)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AI_RECOMMENDATIONS,
+        (SELECT SUM(DECISIONS_OVERRIDDEN)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS DECISIONS_OVERRIDDEN,
+        (SELECT AVG(COGNITIVE_LOAD_BEFORE_SCORE)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AVG_COGNITIVE_LOAD_BEFORE,
+        (SELECT AVG(COGNITIVE_LOAD_AFTER_SCORE)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AVG_COGNITIVE_LOAD_AFTER,
+        (SELECT AVG(HANDOFF_TIME_SECONDS)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AVG_HANDOFF_TIME_SECONDS,
+        (SELECT AVG(TEAM_SATISFACTION_SCORE)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS AVG_TEAM_SATISFACTION_SCORE,
+        (SELECT SUM(INNOVATION_COUNT)
+         FROM EAR.AGENT_METRICS AM
+         JOIN EAR.AGENTS A ON A.ID = AM.AGENT_ID
+         WHERE AM.TIMESTAMP >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaAgentFilterSql}) AS INNOVATION_COUNT,
         (SELECT COUNT(*)
          FROM EAR.AGENT_TASKS T
          JOIN EAR.AGENTS A ON A.ID = T.AGENT_ID
@@ -398,13 +626,58 @@ router.get('/metrics', async (req, res) => {
          WHERE T.STATUS IN ('failed', 'error') AND T.RECEIVED_AT >= ADD_DAYS(CURRENT_DATE, -${days})
          ${hanaAgentFilterSql}) AS ERROR_TASKS,
         (SELECT COUNT(*) FROM EAR.USERS) AS TOTAL_USERS,
-        (SELECT COUNT(DISTINCT USER_ID) FROM EAR.USER_BUSINESS_DOMAIN) AS MAPPED_USERS
+        (SELECT COUNT(DISTINCT USER_ID) FROM EAR.USER_BUSINESS_DOMAIN) AS MAPPED_USERS,
+        (SELECT AVG(DECISION_ACCURACY_PCT)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS DECISION_ACCURACY_PCT,
+        (SELECT AVG(OVERRIDE_RATE_PCT)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS OVERRIDE_RATE_PCT,
+        (SELECT AVG(COGNITIVE_LOAD_REDUCTION_PCT)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS COGNITIVE_LOAD_REDUCTION_PCT,
+        (SELECT AVG(HANDOFF_TIME_SECONDS)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS COLLAB_HANDOFF_TIME_SECONDS,
+        (SELECT AVG(TEAM_SATISFACTION_SCORE)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS COLLAB_TEAM_SATISFACTION_SCORE,
+        (SELECT SUM(INNOVATION_COUNT)
+         FROM EAR.HUMAN_AI_COLLABORATION_METRICS
+         WHERE PERIOD_START >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS COLLAB_INNOVATION_COUNT,
+        (SELECT COUNT(*)
+         FROM EAR.RISK_MANAGEMENT
+         WHERE CREATED_AT >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS TOTAL_RISKS,
+        (SELECT AVG(COALESCE(RISK_ETHICS_SCORE, 0) + COALESCE(RISK_REPUTATION_SCORE, 0) + COALESCE(RISK_OPERATIONAL_SCORE, 0) + COALESCE(RISK_LEGAL_SCORE, 0))
+         FROM EAR.RISK_MANAGEMENT
+         WHERE CREATED_AT >= ADD_DAYS(CURRENT_DATE, -${days})
+         ${hanaMetricFilterSql}) AS AVG_RISK_SCORE,
+        (SELECT COUNT(*)
+         FROM EAR.RISK_MANAGEMENT
+         WHERE CREATED_AT >= ADD_DAYS(CURRENT_DATE, -${days}) AND AUDIT_REQUIRED = TRUE
+         ${hanaMetricFilterSql}) AS AUDIT_REQUIRED_COUNT,
+        (SELECT COUNT(*)
+         FROM EAR.RISK_MANAGEMENT
+         WHERE CREATED_AT >= ADD_DAYS(CURRENT_DATE, -${days}) AND AUDIT_COMPLETED = TRUE
+         ${hanaMetricFilterSql}) AS AUDIT_COMPLETED_COUNT,
+        (SELECT COUNT(*)
+         FROM EAR.RISK_MANAGEMENT
+         WHERE CREATED_AT >= ADD_DAYS(CURRENT_DATE, -${days}) AND HUMAN_REVIEWED = TRUE
+         ${hanaMetricFilterSql}) AS HUMAN_REVIEWED_COUNT
       FROM DUMMY;
     `;
 
     const hanaParams = [
       ...Array(4).fill(hanaRequestParams).flat(),
-      ...Array(7).fill(hanaAgentParams).flat()
+      ...Array(16).fill(hanaAgentParams).flat(),
+      ...Array(11).fill(hanaMetricParams).flat()
     ];
     const hanaResult = await query(hanaMetricsSql, hanaParams);
     const row = hanaResult.rows?.[0] || hanaResult[0] || {};
@@ -441,6 +714,12 @@ router.get('/metrics', async (req, res) => {
     let baselineMinutes = baselineMap.get('baseline_minutes_per_request')?.value ?? 12;
     let costPerHour = baselineMap.get('cost_per_hour')?.value ?? 45000;
     const slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? DEFAULT_BASELINES[2].value;
+    const investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
+    const totalRoles = baselineMap.get('total_roles')?.value ?? 0;
+    const rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
+    const customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
+    const errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
+    const decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
     const slaCompliance = avgLatencyTotal <= slaLatencyMs
       ? 100
       : Math.max(0, 100 - ((avgLatencyTotal - slaLatencyMs) / slaLatencyMs) * 100);
@@ -479,7 +758,55 @@ router.get('/metrics', async (req, res) => {
     const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
     const costSavings = (timeSavingsMinutes / 60) * costPerHour;
     const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
-    const roiRatio = baselineCost > 0 ? (costSavings / baselineCost) * 100 : 0;
+    const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
+    const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
+
+    const assistedDecisions = Number(row.AI_ASSISTED_DECISIONS || 0);
+    const validatedDecisions = Number(row.AI_ASSISTED_DECISIONS_VALIDATED || 0);
+    const aiRecommendations = Number(row.AI_RECOMMENDATIONS || 0);
+    const overriddenDecisions = Number(row.DECISIONS_OVERRIDDEN || 0);
+    const avgCognitiveLoadBefore = Number(row.AVG_COGNITIVE_LOAD_BEFORE || 0);
+    const avgCognitiveLoadAfter = Number(row.AVG_COGNITIVE_LOAD_AFTER || 0);
+    const avgHandoffTime = Number(row.AVG_HANDOFF_TIME_SECONDS || 0);
+    const avgTeamSatisfaction = Number(row.AVG_TEAM_SATISFACTION_SCORE || 0);
+    const innovationCount = Number(row.INNOVATION_COUNT || 0);
+
+    const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
+    const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
+    const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
+      ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
+      : 0;
+
+    const collaborationDecisionAccuracy = row.DECISION_ACCURACY_PCT !== null && row.DECISION_ACCURACY_PCT !== undefined
+      ? Number(row.DECISION_ACCURACY_PCT)
+      : null;
+    const collaborationOverrideRate = row.OVERRIDE_RATE_PCT !== null && row.OVERRIDE_RATE_PCT !== undefined
+      ? Number(row.OVERRIDE_RATE_PCT)
+      : null;
+    const collaborationCognitiveReduction = row.COGNITIVE_LOAD_REDUCTION_PCT !== null && row.COGNITIVE_LOAD_REDUCTION_PCT !== undefined
+      ? Number(row.COGNITIVE_LOAD_REDUCTION_PCT)
+      : null;
+    const collaborationHandoff = row.COLLAB_HANDOFF_TIME_SECONDS !== null && row.COLLAB_HANDOFF_TIME_SECONDS !== undefined
+      ? Number(row.COLLAB_HANDOFF_TIME_SECONDS)
+      : null;
+    const collaborationSatisfaction = row.COLLAB_TEAM_SATISFACTION_SCORE !== null && row.COLLAB_TEAM_SATISFACTION_SCORE !== undefined
+      ? Number(row.COLLAB_TEAM_SATISFACTION_SCORE)
+      : null;
+    const collaborationInnovation = row.COLLAB_INNOVATION_COUNT !== null && row.COLLAB_INNOVATION_COUNT !== undefined
+      ? Number(row.COLLAB_INNOVATION_COUNT)
+      : null;
+
+    const totalRisks = Number(row.TOTAL_RISKS || 0);
+    const avgRiskScore = Number(row.AVG_RISK_SCORE || 0);
+    const auditRequiredCount = Number(row.AUDIT_REQUIRED_COUNT || 0);
+    const auditCompletedCount = Number(row.AUDIT_COMPLETED_COUNT || 0);
+    const humanReviewedCount = Number(row.HUMAN_REVIEWED_COUNT || 0);
+
+    const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
+    const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
+    const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
+
+    const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
 
     try {
       await query(
@@ -535,12 +862,38 @@ router.get('/metrics', async (req, res) => {
         unit: value.unit || null,
         description: value.description || null
       })),
+      collaboration: {
+        decision_accuracy_pct: Number(
+          ((collaborationDecisionAccuracy ?? decisionAccuracyFallback) as number).toFixed(2)
+        ),
+        override_rate_pct: Number(((collaborationOverrideRate ?? overrideRateFallback) as number).toFixed(2)),
+        cognitive_load_reduction_pct: Number(
+          ((collaborationCognitiveReduction ?? cognitiveLoadReductionFallback) as number).toFixed(2)
+        ),
+        handoff_time_seconds: Number(((collaborationHandoff ?? avgHandoffTime) as number).toFixed(2)),
+        team_satisfaction_score: Number(((collaborationSatisfaction ?? avgTeamSatisfaction) as number).toFixed(2)),
+        innovation_count: Number((collaborationInnovation ?? innovationCount).toFixed(0))
+      },
+      risk: {
+        risk_exposure_score: Number(avgRiskScore.toFixed(2)),
+        audit_required_rate_pct: Number(auditRequiredRate.toFixed(2)),
+        audit_completed_rate_pct: Number(auditCompletedRate.toFixed(2)),
+        human_review_rate_pct: Number(humanReviewRate.toFixed(2)),
+        total_risk_items: totalRisks
+      },
+      value: {
+        role_redesign_ratio_pct: Number(roleRedesignRatio.toFixed(2)),
+        customer_nps_delta: Number(customerNpsDelta.toFixed(2)),
+        error_reduction_pct: Number(errorReductionPct.toFixed(2)),
+        decision_speed_improvement_pct: Number(decisionSpeedImprovementPct.toFixed(2))
+      },
       savings: {
         baseline_minutes_per_request: baselineMinutes,
         avg_response_minutes: Number(avgResponseMinutes.toFixed(4)),
         time_savings_minutes: Number(timeSavingsMinutes.toFixed(2)),
         cost_savings: Number(costSavings.toFixed(2)),
         baseline_cost: Number(baselineCost.toFixed(2)),
+        investment_cost: Number(normalizedInvestmentCost.toFixed(2)),
         roi_ratio_pct: Number(roiRatio.toFixed(2)),
         sla_latency_ms: slaLatencyMs
       }

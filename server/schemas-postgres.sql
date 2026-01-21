@@ -512,7 +512,51 @@ CREATE TABLE IF NOT EXISTS agent_metrics (
     requests_processed INTEGER DEFAULT 0,
     avg_latency NUMERIC(10,2),
     error_rate NUMERIC(5,2),
-    queue_time NUMERIC(10,2)
+    queue_time NUMERIC(10,2),
+    ai_assisted_decisions INTEGER DEFAULT 0,
+    ai_assisted_decisions_validated INTEGER DEFAULT 0,
+    ai_recommendations INTEGER DEFAULT 0,
+    decisions_overridden INTEGER DEFAULT 0,
+    cognitive_load_before_score NUMERIC(6,2),
+    cognitive_load_after_score NUMERIC(6,2),
+    handoff_time_seconds NUMERIC(10,2),
+    team_satisfaction_score NUMERIC(6,2),
+    innovation_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS human_ai_collaboration_metrics (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    decision_accuracy_pct NUMERIC(6,2),
+    override_rate_pct NUMERIC(6,2),
+    cognitive_load_reduction_pct NUMERIC(6,2),
+    handoff_time_seconds NUMERIC(10,2),
+    team_satisfaction_score NUMERIC(6,2),
+    innovation_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(period_start, period_end, business_type, agent_type)
+);
+
+CREATE TABLE IF NOT EXISTS risk_management (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    use_case VARCHAR(200),
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    risk_ethics_score INTEGER,
+    risk_reputation_score INTEGER,
+    risk_operational_score INTEGER,
+    risk_legal_score INTEGER,
+    audit_required BOOLEAN DEFAULT false,
+    audit_completed BOOLEAN DEFAULT false,
+    human_reviewed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS agent_tasks (
@@ -554,6 +598,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_roles_agent_id ON agent_roles(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_roles_role_name ON agent_roles(role_name);
 CREATE INDEX IF NOT EXISTS idx_agent_metrics_agent_id ON agent_metrics(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_metrics_timestamp ON agent_metrics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_period ON human_ai_collaboration_metrics(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_agent_type ON human_ai_collaboration_metrics(agent_type);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_business_type ON human_ai_collaboration_metrics(business_type);
+CREATE INDEX IF NOT EXISTS idx_risk_management_created_at ON risk_management(created_at);
+CREATE INDEX IF NOT EXISTS idx_risk_management_agent_type ON risk_management(agent_type);
+CREATE INDEX IF NOT EXISTS idx_risk_management_business_type ON risk_management(business_type);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent_id ON agent_tasks(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
