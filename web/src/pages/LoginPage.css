@@ -3,7 +3,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #b91c1c 0%, #f59e0b 55%, #fff7ed 100%);
   padding: 20px;
 }
 
@@ -26,7 +26,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
-  color: #667eea;
+  color: #b91c1c;
 }
 
 .login-header h1 {
@@ -92,8 +92,8 @@
 
 .input-group input:focus {
   outline: none;
-  border-color: #667eea;
-  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.2);
 }
 
 .input-group input:disabled {
@@ -114,7 +114,7 @@
 }
 
 .password-toggle:hover {
-  color: #667eea;
+  color: #b91c1c;
 }
 
 .password-toggle:disabled {
@@ -146,13 +146,13 @@
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #b91c1c 0%, #f59e0b 100%);
   color: white;
 }
 
 .btn-primary:hover:not(:disabled) {
   transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 8px 20px rgba(185, 28, 28, 0.3);
 }
 
 .btn-primary:disabled {
@@ -197,7 +197,7 @@
   display: flex;
   justify-content: center;
   margin-bottom: 16px;
-  color: #667eea;
+  color: #b91c1c;
 }
 
 .user-details h2 {
@@ -214,7 +214,7 @@
 
 .admin-badge {
   display: inline-block;
-  background: #667eea;
+  background: #b91c1c;
   color: white;
   padding: 4px 12px;
   border-radius: 12px;
@@ -247,12 +247,12 @@
 
 /* 접근성 개선 */
 .input-group input:focus-visible {
-  outline: 2px solid #667eea;
+  outline: 2px solid #f59e0b;
   outline-offset: 2px;
 }
 
 .btn:focus-visible {
-  outline: 2px solid #667eea;
+  outline: 2px solid #f59e0b;
   outline-offset: 2px;
 }
 
