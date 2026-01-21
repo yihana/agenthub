@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import TagPill from '../../components/portal-dashboard/TagPill';
-import { usePortalRole } from '../../hooks/usePortalRole';
+import PortalMetricInputs from '../../components/portal-dashboard/PortalMetricInputs';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 const initialRoadmapStages = [
   {
@@ -47,16 +48,21 @@ const initialMilestones = [
 ];
 
 const PortalRoadmapPage: React.FC = () => {
-  const { role } = usePortalRole();
+  const { user } = usePortalAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [roadmapStages, setRoadmapStages] = useState(initialRoadmapStages);
   const [milestones, setMilestones] = useState(initialMilestones);
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'metrics'>('roadmap');
   const [newMilestone, setNewMilestone] = useState({
     title: '',
     owner: '',
     due: '',
     status: '준비'
   });
+  const permissions = user?.permissions ?? [];
+  const isAdmin = user?.isAdmin ?? false;
+  const canManageMetrics = isAdmin || permissions.includes('metrics:write');
+  const canEditRoadmap = isAdmin || permissions.includes('roadmap:edit');
 
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {
     setRoadmapStages((prev) =>
@@ -103,7 +109,7 @@ const PortalRoadmapPage: React.FC = () => {
       subtitle="에이전트 운영 계획과 주요 마일스톤을 공유합니다."
       actions={
         <>
-          {role === 'admin' && (
+          {canEditRoadmap && activeTab === 'roadmap' && (
             <button className="ear-secondary" onClick={() => setIsEditing((prev) => !prev)}>
               {isEditing ? '편집 완료' : '로드맵 편집'}
             </button>
@@ -112,156 +118,180 @@ const PortalRoadmapPage: React.FC = () => {
         </>
       }
     >
-      <div className="ear-grid">
-        <WidgetCard title="분기별 로드맵" description="전사 계획과 연계된 주요 과제">
-          <div className="ear-roadmap">
-            {roadmapStages.map((stage, index) => (
-              <div key={stage.quarter} className="ear-roadmap__stage">
-                <div>
-                  <span className="ear-muted">{stage.quarter}</span>
-                  {isEditing ? (
-                    <input
-                      className="ear-input"
-                      value={stage.title}
-                      onChange={(event) => handleStageChange(index, 'title', event.target.value)}
-                    />
-                  ) : (
-                    <h3>{stage.title}</h3>
-                  )}
-                </div>
-                {isEditing ? (
-                  <select
-                    className="ear-input"
-                    value={stage.status}
-                    onChange={(event) => handleStageChange(index, 'status', event.target.value)}
-                  >
-                    <option value="진행 중">진행 중</option>
-                    <option value="예정">예정</option>
-                    <option value="계획">계획</option>
-                  </select>
-                ) : (
-                  <TagPill
-                    label={stage.status}
-                    tone={stage.status === '진행 중' ? 'info' : 'neutral'}
-                  />
-                )}
-                {isEditing ? (
-                  <textarea
-                    className="ear-input ear-textarea"
-                    value={stage.items.join('\n')}
-                    onChange={(event) => handleStageChange(index, 'items', event.target.value)}
-                    rows={4}
-                  />
-                ) : (
-                  <ul>
-                    {stage.items.map((item) => (
-                      <li key={item}>{item}</li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ))}
-          </div>
-        </WidgetCard>
-        <WidgetCard title="주요 마일스톤" description="이번 달 핵심 작업과 담당 조직">
-          <div className="ear-list">
-            {milestones.map((milestone, index) => (
-              <div key={milestone.title} className="ear-list__row">
-                <div>
-                  {isEditing ? (
-                    <>
+      <div className="ear-tabs">
+        <div className="ear-tab-list">
+          <button
+            type="button"
+            className={`ear-tab${activeTab === 'roadmap' ? ' ear-tab--active' : ''}`}
+            onClick={() => setActiveTab('roadmap')}
+          >
+            로드맵
+          </button>
+          {canManageMetrics && (
+            <button
+              type="button"
+              className={`ear-tab${activeTab === 'metrics' ? ' ear-tab--active' : ''}`}
+              onClick={() => setActiveTab('metrics')}
+            >
+              지표 입력
+            </button>
+          )}
+        </div>
+      </div>
+      {activeTab === 'metrics' && canManageMetrics ? (
+        <PortalMetricInputs />
+      ) : (
+        <div className="ear-grid">
+          <WidgetCard title="분기별 로드맵" description="전사 계획과 연계된 주요 과제">
+            <div className="ear-roadmap">
+              {roadmapStages.map((stage, index) => (
+                <div key={stage.quarter} className="ear-roadmap__stage">
+                  <div>
+                    <span className="ear-muted">{stage.quarter}</span>
+                    {isEditing ? (
                       <input
                         className="ear-input"
-                        value={milestone.title}
-                        onChange={(event) => handleMilestoneChange(index, 'title', event.target.value)}
+                        value={stage.title}
+                        onChange={(event) => handleStageChange(index, 'title', event.target.value)}
                       />
-                      <div className="ear-input-group">
-                        <input
-                          className="ear-input"
-                          value={milestone.owner}
-                          onChange={(event) => handleMilestoneChange(index, 'owner', event.target.value)}
-                          placeholder="담당 조직"
-                        />
-                        <input
-                          className="ear-input"
-                          value={milestone.due}
-                          onChange={(event) => handleMilestoneChange(index, 'due', event.target.value)}
-                          placeholder="기한"
-                        />
-                      </div>
-                    </>
+                    ) : (
+                      <h3>{stage.title}</h3>
+                    )}
+                  </div>
+                  {isEditing ? (
+                    <select
+                      className="ear-input"
+                      value={stage.status}
+                      onChange={(event) => handleStageChange(index, 'status', event.target.value)}
+                    >
+                      <option value="진행 중">진행 중</option>
+                      <option value="예정">예정</option>
+                      <option value="계획">계획</option>
+                    </select>
                   ) : (
-                    <>
-                      <strong>{milestone.title}</strong>
-                      <span>{milestone.owner} · {milestone.due}</span>
-                    </>
+                    <TagPill
+                      label={stage.status}
+                      tone={stage.status === '진행 중' ? 'info' : 'neutral'}
+                    />
+                  )}
+                  {isEditing ? (
+                    <textarea
+                      className="ear-input ear-textarea"
+                      value={stage.items.join('\n')}
+                      onChange={(event) => handleStageChange(index, 'items', event.target.value)}
+                      rows={4}
+                    />
+                  ) : (
+                    <ul>
+                      {stage.items.map((item) => (
+                        <li key={item}>{item}</li>
+                      ))}
+                    </ul>
                   )}
                 </div>
-                {isEditing ? (
+              ))}
+            </div>
+          </WidgetCard>
+          <WidgetCard title="주요 마일스톤" description="이번 달 핵심 작업과 담당 조직">
+            <div className="ear-list">
+              {milestones.map((milestone, index) => (
+                <div key={milestone.title} className="ear-list__row">
+                  <div>
+                    {isEditing ? (
+                      <>
+                        <input
+                          className="ear-input"
+                          value={milestone.title}
+                          onChange={(event) => handleMilestoneChange(index, 'title', event.target.value)}
+                        />
+                        <div className="ear-input-group">
+                          <input
+                            className="ear-input"
+                            value={milestone.owner}
+                            onChange={(event) => handleMilestoneChange(index, 'owner', event.target.value)}
+                            placeholder="담당 조직"
+                          />
+                          <input
+                            className="ear-input"
+                            value={milestone.due}
+                            onChange={(event) => handleMilestoneChange(index, 'due', event.target.value)}
+                            placeholder="기한"
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <strong>{milestone.title}</strong>
+                        <span>{milestone.owner} · {milestone.due}</span>
+                      </>
+                    )}
+                  </div>
+                  {isEditing ? (
+                    <select
+                      className="ear-input"
+                      value={milestone.status}
+                      onChange={(event) => handleMilestoneChange(index, 'status', event.target.value)}
+                    >
+                      <option value="완료">완료</option>
+                      <option value="진행 중">진행 중</option>
+                      <option value="준비">준비</option>
+                    </select>
+                  ) : (
+                    <TagPill
+                      label={milestone.status}
+                      tone={milestone.status === '완료' ? 'success' : 'warning'}
+                    />
+                  )}
+                </div>
+              ))}
+            </div>
+            {canEditRoadmap ? (
+              <form className="ear-form" onSubmit={handleAddMilestone}>
+                <h3>마일스톤 추가</h3>
+                <label>
+                  제목
+                  <input
+                    className="ear-input"
+                    value={newMilestone.title}
+                    onChange={(event) => setNewMilestone((prev) => ({ ...prev, title: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  담당 조직
+                  <input
+                    className="ear-input"
+                    value={newMilestone.owner}
+                    onChange={(event) => setNewMilestone((prev) => ({ ...prev, owner: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  기한
+                  <input
+                    className="ear-input"
+                    value={newMilestone.due}
+                    onChange={(event) => setNewMilestone((prev) => ({ ...prev, due: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  상태
                   <select
                     className="ear-input"
-                    value={milestone.status}
-                    onChange={(event) => handleMilestoneChange(index, 'status', event.target.value)}
+                    value={newMilestone.status}
+                    onChange={(event) => setNewMilestone((prev) => ({ ...prev, status: event.target.value }))}
                   >
-                    <option value="완료">완료</option>
-                    <option value="진행 중">진행 중</option>
                     <option value="준비">준비</option>
+                    <option value="진행 중">진행 중</option>
+                    <option value="완료">완료</option>
                   </select>
-                ) : (
-                  <TagPill
-                    label={milestone.status}
-                    tone={milestone.status === '완료' ? 'success' : 'warning'}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
-          {role === 'admin' ? (
-            <form className="ear-form" onSubmit={handleAddMilestone}>
-              <h3>마일스톤 추가</h3>
-              <label>
-                제목
-                <input
-                  className="ear-input"
-                  value={newMilestone.title}
-                  onChange={(event) => setNewMilestone((prev) => ({ ...prev, title: event.target.value }))}
-                />
-              </label>
-              <label>
-                담당 조직
-                <input
-                  className="ear-input"
-                  value={newMilestone.owner}
-                  onChange={(event) => setNewMilestone((prev) => ({ ...prev, owner: event.target.value }))}
-                />
-              </label>
-              <label>
-                기한
-                <input
-                  className="ear-input"
-                  value={newMilestone.due}
-                  onChange={(event) => setNewMilestone((prev) => ({ ...prev, due: event.target.value }))}
-                />
-              </label>
-              <label>
-                상태
-                <select
-                  className="ear-input"
-                  value={newMilestone.status}
-                  onChange={(event) => setNewMilestone((prev) => ({ ...prev, status: event.target.value }))}
-                >
-                  <option value="준비">준비</option>
-                  <option value="진행 중">진행 중</option>
-                  <option value="완료">완료</option>
-                </select>
-              </label>
-              <button type="submit" className="ear-primary ear-full">추가</button>
-            </form>
-          ) : (
-            <button className="ear-primary ear-full">마일스톤 추가</button>
-          )}
-        </WidgetCard>
-      </div>
+                </label>
+                <button type="submit" className="ear-primary ear-full">추가</button>
+              </form>
+            ) : (
+              <button className="ear-primary ear-full">마일스톤 추가</button>
+            )}
+          </WidgetCard>
+        </div>
+      )}
     </PortalDashboardLayout>
   );
 };

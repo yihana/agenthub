@@ -1,5 +1,5 @@
-import React from 'react';
-import { NavLink } from 'react-router-dom';
+import React, { useEffect } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   BarChart3,
   Flag,
@@ -8,7 +8,7 @@ import {
   Settings
 } from 'lucide-react';
 import '../../styles/portal-dashboard.css';
-import { usePortalRole } from '../../hooks/usePortalRole';
+import { usePortalAuth } from '../../hooks/usePortalAuth';
 
 interface PortalDashboardLayoutProps {
   title: string;
@@ -31,7 +31,25 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   actions,
   children
 }) => {
-  const { role, toggleRole } = usePortalRole();
+  const { user, isLoggedIn, isLoading, logout } = usePortalAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!isLoading && !isLoggedIn) {
+      navigate('/portal-login', { state: { from: location.pathname } });
+    }
+  }, [isLoading, isLoggedIn, location.pathname, navigate]);
+
+  if (isLoading) {
+    return null;
+  }
+
+  if (!isLoggedIn) {
+    return null;
+  }
+
+  const displayRole = user?.roles?.includes('admin') ? '관리자' : '사용자';
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">
@@ -64,14 +82,11 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
           </div>
           <div className="ear-role">
             <span className="ear-muted">권한</span>
-            <strong>{role === 'admin' ? '관리자' : '사용자'}</strong>
+            <strong>{displayRole}</strong>
+            <span className="ear-muted">{user?.companyCode ?? 'SKN'}</span>
           </div>
-          <button
-            type="button"
-            className="ear-ghost"
-            onClick={toggleRole}
-          >
-            권한 전환
+          <button type="button" className="ear-ghost" onClick={logout}>
+            로그아웃
           </button>
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>

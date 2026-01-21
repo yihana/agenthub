@@ -44,6 +44,9 @@ export async function initializeDatabase() {
     
     // 기본 관리자 계정
     await createDefaultAdmin(client);
+
+    // 포털 기본 계정/권한 매트릭스
+    await createDefaultPortalUsers(client);
     
     // IP 화이트리스트 초기화
     await initializeIpWhitelist(client);
@@ -155,7 +158,16 @@ async function createTables(client: any) {
       requests_processed INTEGER DEFAULT 0,
       avg_latency NUMERIC(10,2),
       error_rate NUMERIC(5,2),
-      queue_time NUMERIC(10,2)
+      queue_time NUMERIC(10,2),
+      ai_assisted_decisions INTEGER DEFAULT 0,
+      ai_assisted_decisions_validated INTEGER DEFAULT 0,
+      ai_recommendations INTEGER DEFAULT 0,
+      decisions_overridden INTEGER DEFAULT 0,
+      cognitive_load_before_score NUMERIC(6,2),
+      cognitive_load_after_score NUMERIC(6,2),
+      handoff_time_seconds NUMERIC(10,2),
+      team_satisfaction_score NUMERIC(6,2),
+      innovation_count INTEGER DEFAULT 0
     );
   `);
 
@@ -257,6 +269,45 @@ async function createTables(client: any) {
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       UNIQUE(period_start, period_end, business_type, agent_type)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS human_ai_collaboration_metrics (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      period_start DATE NOT NULL,
+      period_end DATE NOT NULL,
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      decision_accuracy_pct NUMERIC(6,2),
+      override_rate_pct NUMERIC(6,2),
+      cognitive_load_reduction_pct NUMERIC(6,2),
+      handoff_time_seconds NUMERIC(10,2),
+      team_satisfaction_score NUMERIC(6,2),
+      innovation_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(period_start, period_end, business_type, agent_type)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS risk_management (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      use_case VARCHAR(200),
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      risk_ethics_score INTEGER,
+      risk_reputation_score INTEGER,
+      risk_operational_score INTEGER,
+      risk_legal_score INTEGER,
+      audit_required BOOLEAN DEFAULT false,
+      audit_completed BOOLEAN DEFAULT false,
+      human_reviewed BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
 
@@ -440,6 +491,66 @@ async function createTables(client: any) {
       failure_reason VARCHAR(100) NULL
     );
   `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_users (
+      id SERIAL PRIMARY KEY,
+      userid VARCHAR(100) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      email VARCHAR(255),
+      full_name VARCHAR(200),
+      department VARCHAR(100),
+      position VARCHAR(100),
+      phone VARCHAR(50),
+      employee_id VARCHAR(50),
+      is_active BOOLEAN DEFAULT true,
+      is_admin BOOLEAN DEFAULT false,
+      company_code VARCHAR(10) DEFAULT 'SKN',
+      failed_login_attempts INTEGER DEFAULT 0,
+      locked_until TIMESTAMP NULL,
+      last_login TIMESTAMP NULL,
+      password_reset_token VARCHAR(255) NULL,
+      password_reset_expires TIMESTAMP NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_user_roles (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+      role_name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(user_id, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_role_matrix (
+      id SERIAL PRIMARY KEY,
+      company_code VARCHAR(10) NOT NULL,
+      role_name VARCHAR(100) NOT NULL,
+      permissions JSONB,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(company_code, role_name)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS portal_login_history (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+      userid VARCHAR(100) NOT NULL,
+      login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      ip_address VARCHAR(45),
+      user_agent TEXT,
+      login_status VARCHAR(20) NOT NULL,
+      failure_reason VARCHAR(100) NULL
+    );
+  `);
   
   await client.query(`
     CREATE TABLE IF NOT EXISTS esm_requests (
@@ -614,7 +725,16 @@ async function applyPortalDashboardMigrations(client: any) {
     { table: 'agents', name: 'endpoint_url', type: 'VARCHAR(255)' },
     { table: 'agents', name: 'exec_mode', type: 'VARCHAR(50)' },
     { table: 'ear_requests', name: 'agent_id', type: 'INTEGER' },
-    { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' }
+    { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' },
+    { table: 'agent_metrics', name: 'ai_assisted_decisions', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'ai_assisted_decisions_validated', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'ai_recommendations', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'decisions_overridden', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'cognitive_load_before_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'cognitive_load_after_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'handoff_time_seconds', type: 'NUMERIC(10,2)' },
+    { table: 'agent_metrics', name: 'team_satisfaction_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'innovation_count', type: 'INTEGER DEFAULT 0' }
   ];
 
   for (const column of columns) {
@@ -630,7 +750,13 @@ async function seedPortalBaselines(client: any) {
      VALUES
        ('baseline_minutes_per_request', 12, 'minute', '요청 1건당 기준 처리 시간 (분)'),
        ('cost_per_hour', 45000, 'KRW', '시간당 인건비 단가'),
-       ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)')
+       ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)'),
+       ('investment_cost', 0, 'KRW', '에이전트 개발/운영 투자 비용'),
+       ('total_roles', 0, 'count', '전체 역할 수'),
+       ('roles_redefined', 0, 'count', 'AI 협업으로 재설계된 역할 수'),
+       ('customer_nps_delta', 0, 'point', 'AI 도입 이후 고객 만족도/NPS 변화'),
+       ('error_reduction_pct', 0, 'pct', '오류율 감소율'),
+       ('decision_speed_improvement_pct', 0, 'pct', '의사결정 속도 개선율')
      ON CONFLICT (metric_key, business_type, agent_type) DO NOTHING;`
   );
 }
@@ -669,6 +795,13 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_login_history_userid ON login_history(userid);
     CREATE INDEX IF NOT EXISTS idx_login_history_login_time ON login_history(login_time);
     CREATE INDEX IF NOT EXISTS idx_login_history_login_status ON login_history(login_status);
+    CREATE INDEX IF NOT EXISTS idx_portal_users_userid ON portal_users(userid);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_user_id ON portal_login_history(user_id);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_userid ON portal_login_history(userid);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_time ON portal_login_history(login_time);
+    CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_status ON portal_login_history(login_status);
+    CREATE INDEX IF NOT EXISTS idx_portal_user_roles_user_id ON portal_user_roles(user_id);
+    CREATE INDEX IF NOT EXISTS idx_portal_role_matrix_company_role ON portal_role_matrix(company_code, role_name);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_status ON esm_requests(status);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_created_at ON esm_requests(created_at);
     CREATE INDEX IF NOT EXISTS idx_esm_requests_sales_cloud_case_id ON esm_requests(sales_cloud_case_id);
@@ -701,6 +834,12 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned_agent_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_period ON human_ai_collaboration_metrics(period_start, period_end);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_agent_type ON human_ai_collaboration_metrics(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_business_type ON human_ai_collaboration_metrics(business_type);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_created_at ON risk_management(created_at);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_agent_type ON risk_management(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_business_type ON risk_management(business_type);
     CREATE INDEX IF NOT EXISTS idx_user_business_domain_user_id ON user_business_domain(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_business_domain_business_type ON user_business_domain(business_type);
     CREATE INDEX IF NOT EXISTS idx_business_task_baseline_domain ON business_task_baseline(domain);
@@ -766,6 +905,42 @@ async function createDefaultAdmin(client: any) {
       is_active = true;
   `);
   console.log('기본 관리자 계정 설정 완료');
+}
+
+async function createDefaultPortalUsers(client: any) {
+  await client.query(`
+    INSERT INTO portal_users (userid, password_hash, full_name, is_admin, is_active, company_code)
+    VALUES
+      ('portal-admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 관리자', true, true, 'SKN'),
+      ('portal-user', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 사용자', false, true, 'SKN')
+    ON CONFLICT (userid)
+    DO UPDATE SET
+      password_hash = EXCLUDED.password_hash,
+      is_active = true;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_user_roles (user_id, role_name)
+    SELECT id, 'admin' FROM portal_users WHERE userid = 'portal-admin'
+    ON CONFLICT (user_id, role_name) DO NOTHING;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_user_roles (user_id, role_name)
+    SELECT id, 'user' FROM portal_users WHERE userid = 'portal-user'
+    ON CONFLICT (user_id, role_name) DO NOTHING;
+  `);
+
+  await client.query(`
+    INSERT INTO portal_role_matrix (company_code, role_name, permissions)
+    VALUES
+      ('SKN', 'admin', '["portal:read","portal:write","metrics:write","roadmap:edit","settings:edit"]'::jsonb),
+      ('SKN', 'user', '["portal:read"]'::jsonb)
+    ON CONFLICT (company_code, role_name)
+    DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP;
+  `);
+
+  console.log('포털 기본 계정/권한 매트릭스 설정 완료');
 }
 
 // IP 화이트리스트 초기화

@@ -157,6 +157,59 @@ CREATE TABLE IF NOT EXISTS login_history (
     failure_reason VARCHAR(100) NULL
 );
 
+-- 포털 사용자 관리 테이블
+CREATE TABLE IF NOT EXISTS portal_users (
+    id SERIAL PRIMARY KEY,
+    userid VARCHAR(100) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    email VARCHAR(255),
+    full_name VARCHAR(200),
+    department VARCHAR(100),
+    position VARCHAR(100),
+    phone VARCHAR(50),
+    employee_id VARCHAR(50),
+    is_active BOOLEAN DEFAULT true,
+    is_admin BOOLEAN DEFAULT false,
+    company_code VARCHAR(10) DEFAULT 'SKN',
+    failed_login_attempts INTEGER DEFAULT 0,
+    locked_until TIMESTAMP NULL,
+    last_login TIMESTAMP NULL,
+    password_reset_token VARCHAR(255) NULL,
+    password_reset_expires TIMESTAMP NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS portal_user_roles (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+    role_name VARCHAR(100) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, role_name)
+);
+
+CREATE TABLE IF NOT EXISTS portal_role_matrix (
+    id SERIAL PRIMARY KEY,
+    company_code VARCHAR(10) NOT NULL,
+    role_name VARCHAR(100) NOT NULL,
+    permissions JSONB,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(company_code, role_name)
+);
+
+CREATE TABLE IF NOT EXISTS portal_login_history (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER REFERENCES portal_users(id) ON DELETE CASCADE,
+    userid VARCHAR(100) NOT NULL,
+    login_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ip_address VARCHAR(45),
+    user_agent TEXT,
+    login_status VARCHAR(20) NOT NULL,
+    failure_reason VARCHAR(100) NULL
+);
+
 -- 사용자 테이블 인덱스
 CREATE INDEX IF NOT EXISTS idx_users_userid ON users(userid);
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
@@ -170,6 +223,13 @@ CREATE INDEX IF NOT EXISTS idx_login_history_user_id ON login_history(user_id);
 CREATE INDEX IF NOT EXISTS idx_login_history_userid ON login_history(userid);
 CREATE INDEX IF NOT EXISTS idx_login_history_login_time ON login_history(login_time);
 CREATE INDEX IF NOT EXISTS idx_login_history_login_status ON login_history(login_status);
+CREATE INDEX IF NOT EXISTS idx_portal_users_userid ON portal_users(userid);
+CREATE INDEX IF NOT EXISTS idx_portal_login_history_user_id ON portal_login_history(user_id);
+CREATE INDEX IF NOT EXISTS idx_portal_login_history_userid ON portal_login_history(userid);
+CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_time ON portal_login_history(login_time);
+CREATE INDEX IF NOT EXISTS idx_portal_login_history_login_status ON portal_login_history(login_status);
+CREATE INDEX IF NOT EXISTS idx_portal_user_roles_user_id ON portal_user_roles(user_id);
+CREATE INDEX IF NOT EXISTS idx_portal_role_matrix_company_role ON portal_role_matrix(company_code, role_name);
 
 -- 인터페이스 자동화 관련 테이블
 CREATE TABLE IF NOT EXISTS company_interfaces (
@@ -512,7 +572,51 @@ CREATE TABLE IF NOT EXISTS agent_metrics (
     requests_processed INTEGER DEFAULT 0,
     avg_latency NUMERIC(10,2),
     error_rate NUMERIC(5,2),
-    queue_time NUMERIC(10,2)
+    queue_time NUMERIC(10,2),
+    ai_assisted_decisions INTEGER DEFAULT 0,
+    ai_assisted_decisions_validated INTEGER DEFAULT 0,
+    ai_recommendations INTEGER DEFAULT 0,
+    decisions_overridden INTEGER DEFAULT 0,
+    cognitive_load_before_score NUMERIC(6,2),
+    cognitive_load_after_score NUMERIC(6,2),
+    handoff_time_seconds NUMERIC(10,2),
+    team_satisfaction_score NUMERIC(6,2),
+    innovation_count INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS human_ai_collaboration_metrics (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    period_start DATE NOT NULL,
+    period_end DATE NOT NULL,
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    decision_accuracy_pct NUMERIC(6,2),
+    override_rate_pct NUMERIC(6,2),
+    cognitive_load_reduction_pct NUMERIC(6,2),
+    handoff_time_seconds NUMERIC(10,2),
+    team_satisfaction_score NUMERIC(6,2),
+    innovation_count INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(period_start, period_end, business_type, agent_type)
+);
+
+CREATE TABLE IF NOT EXISTS risk_management (
+    id SERIAL PRIMARY KEY,
+    agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+    use_case VARCHAR(200),
+    business_type VARCHAR(100),
+    agent_type VARCHAR(100),
+    risk_ethics_score INTEGER,
+    risk_reputation_score INTEGER,
+    risk_operational_score INTEGER,
+    risk_legal_score INTEGER,
+    audit_required BOOLEAN DEFAULT false,
+    audit_completed BOOLEAN DEFAULT false,
+    human_reviewed BOOLEAN DEFAULT false,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS agent_tasks (
@@ -554,6 +658,12 @@ CREATE INDEX IF NOT EXISTS idx_agent_roles_agent_id ON agent_roles(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_roles_role_name ON agent_roles(role_name);
 CREATE INDEX IF NOT EXISTS idx_agent_metrics_agent_id ON agent_metrics(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_metrics_timestamp ON agent_metrics(timestamp);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_period ON human_ai_collaboration_metrics(period_start, period_end);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_agent_type ON human_ai_collaboration_metrics(agent_type);
+CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_business_type ON human_ai_collaboration_metrics(business_type);
+CREATE INDEX IF NOT EXISTS idx_risk_management_created_at ON risk_management(created_at);
+CREATE INDEX IF NOT EXISTS idx_risk_management_agent_type ON risk_management(agent_type);
+CREATE INDEX IF NOT EXISTS idx_risk_management_business_type ON risk_management(business_type);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_agent_id ON agent_tasks(agent_id);
 CREATE INDEX IF NOT EXISTS idx_agent_tasks_status ON agent_tasks(status);
 CREATE INDEX IF NOT EXISTS idx_job_queue_status ON job_queue(status);
@@ -632,3 +742,28 @@ DO UPDATE SET
   password_hash = '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi',
   is_admin = true,
   is_active = true;
+
+-- 포털 기본 계정 생성 (비밀번호: admin123)
+INSERT INTO portal_users (userid, password_hash, full_name, is_admin, is_active, company_code)
+VALUES
+  ('portal-admin', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 관리자', true, true, 'SKN'),
+  ('portal-user', '$2b$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi', '포털 사용자', false, true, 'SKN')
+ON CONFLICT (userid)
+DO UPDATE SET
+  password_hash = EXCLUDED.password_hash,
+  is_active = true;
+
+INSERT INTO portal_user_roles (user_id, role_name)
+SELECT id, 'admin' FROM portal_users WHERE userid = 'portal-admin'
+ON CONFLICT (user_id, role_name) DO NOTHING;
+
+INSERT INTO portal_user_roles (user_id, role_name)
+SELECT id, 'user' FROM portal_users WHERE userid = 'portal-user'
+ON CONFLICT (user_id, role_name) DO NOTHING;
+
+INSERT INTO portal_role_matrix (company_code, role_name, permissions)
+VALUES
+  ('SKN', 'admin', '["portal:read","portal:write","metrics:write","roadmap:edit","settings:edit"]'::jsonb),
+  ('SKN', 'user', '["portal:read"]'::jsonb)
+ON CONFLICT (company_code, role_name)
+DO UPDATE SET permissions = EXCLUDED.permissions, updated_at = CURRENT_TIMESTAMP;
