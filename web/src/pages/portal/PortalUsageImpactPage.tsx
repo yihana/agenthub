@@ -12,7 +12,7 @@ interface UsageMetrics {
     cost_savings: number;
     time_savings_minutes: number;
     roi_ratio_pct: number;
-<!--     investment_cost?: number;
+    investment_cost?: number;
   };
   collaboration?: {
     decision_accuracy_pct: number;
@@ -33,13 +33,13 @@ interface UsageMetrics {
     role_redesign_ratio_pct: number;
     customer_nps_delta: number;
     error_reduction_pct: number;
-    decision_speed_improvement_pct: number; -->
+    decision_speed_improvement_pct: number;
   };
 }
 
 const PortalUsageImpactPage: React.FC = () => {
   const [metrics, setMetrics] = useState<UsageMetrics | null>(null);
-<!--   const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value))); -->
+  const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
   useEffect(() => {
     const fetchMetrics = async () => {
