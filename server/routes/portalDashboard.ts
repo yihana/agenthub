@@ -74,7 +74,11 @@ const toNumberSafe = (value: unknown, fallback = 0): number => {
     return Number.isFinite(value) ? value : fallback;
   }
   if (typeof value === 'string') {
-    const parsed = Number(value);
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return fallback;
+    }
+    const parsed = Number(trimmed.replace(/,/g, ''));
     return Number.isFinite(parsed) ? parsed : fallback;
   }
   if (typeof value === 'bigint') {
@@ -85,9 +89,19 @@ const toNumberSafe = (value: unknown, fallback = 0): number => {
     return fallback;
   }
   if (typeof value === 'object') {
-    const objectValue = value as { value?: unknown; toString?: () => string };
+    const objectValue = value as {
+      value?: unknown;
+      valueOf?: () => unknown;
+      toString?: () => string;
+    };
     if (Object.prototype.hasOwnProperty.call(objectValue, 'value')) {
       return toNumberSafe(objectValue.value, fallback);
+    }
+    if (typeof objectValue.valueOf === 'function') {
+      const valueOfResult = objectValue.valueOf();
+      if (valueOfResult !== value) {
+        return toNumberSafe(valueOfResult, fallback);
+      }
     }
     if (typeof objectValue.toString === 'function') {
       const parsed = Number(objectValue.toString());
