@@ -30,7 +30,6 @@ const PortalSettingsPage: React.FC = () => {
   const { widgets, setWidgets, resetWidgets } = usePortalDashboardConfig();
   const { role } = usePortalRole();
   const [query, setQuery] = useState('');
-<!--   const [query, setQuery] = useState(''); -->
   const filteredWidgets = useMemo(() => {
     return widgets.filter((widget) =>
       widget.title.toLowerCase().includes(query.toLowerCase())
@@ -65,8 +64,6 @@ const PortalSettingsPage: React.FC = () => {
             기본값 복원
           </button>
           <button className="ear-primary" disabled={role !== 'system_admin'}>저장</button>
-<!--      <button className="ear-secondary" onClick={resetWidgets}>기본값 복원</button>
-          <button className="ear-primary">저장</button> -->
         </>
       }
     >

@@ -47,7 +47,7 @@ import PortalDashboardHome from './pages/portal/PortalDashboardHome';
 import PortalAgentListPage from './pages/portal/PortalAgentListPage';
 import PortalUsageImpactPage from './pages/portal/PortalUsageImpactPage';
 import PortalRoadmapPage from './pages/portal/PortalRoadmapPage';
-<!-- import PortalLoginPage from './pages/portal/PortalLoginPage'; -->
+// import PortalLoginPage from './pages/portal/PortalLoginPage';
 import PortalSettingsPage from './pages/portal/PortalSettingsPage';
 import { clearChatStorage } from './utils/clearChatStorage';
 import RouteGuard from './components/RouteGuard';
@@ -658,7 +658,7 @@ function App() {
         <Route path="/portal-usage" element={<PortalUsageImpactPage />} />
         <Route path="/portal-roadmap" element={<PortalRoadmapPage />} />
         <Route path="/portal-settings" element={<PortalSettingsPage />} />
-<!--         <Route path="/portal-login" element={<PortalLoginPage />} /> -->
+        {/* <Route path="/portal-login" element={<PortalLoginPage />} /> */}
         <Route path="/main-prototype1" element={<RouteGuard><MainPrototype1 /></RouteGuard>} />
         <Route path="/main-prototype2" element={<RouteGuard><MainPrototype2 /></RouteGuard>} />
         <Route path="/main-prototype3" element={<RouteGuard><MainPrototype3 /></RouteGuard>} />
