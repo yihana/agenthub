@@ -272,44 +272,44 @@ async function createTables(client: any) {
     );
   `);
 
-//  await client.query(`
-//     CREATE TABLE IF NOT EXISTS human_ai_collaboration_metrics (
-//       id SERIAL PRIMARY KEY,
-//       agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
-//       period_start DATE NOT NULL,
-//       period_end DATE NOT NULL,
-//       business_type VARCHAR(100),
-//       agent_type VARCHAR(100),
-//       decision_accuracy_pct NUMERIC(6,2),
-//       override_rate_pct NUMERIC(6,2),
-//       cognitive_load_reduction_pct NUMERIC(6,2),
-//       handoff_time_seconds NUMERIC(10,2),
-//       team_satisfaction_score NUMERIC(6,2),
-//       innovation_count INTEGER DEFAULT 0,
-//       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//       UNIQUE(period_start, period_end, business_type, agent_type)
-//     );
-//   `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS human_ai_collaboration_metrics (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      period_start DATE NOT NULL,
+      period_end DATE NOT NULL,
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      decision_accuracy_pct NUMERIC(6,2),
+      override_rate_pct NUMERIC(6,2),
+      cognitive_load_reduction_pct NUMERIC(6,2),
+      handoff_time_seconds NUMERIC(10,2),
+      team_satisfaction_score NUMERIC(6,2),
+      innovation_count INTEGER DEFAULT 0,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(period_start, period_end, business_type, agent_type)
+    );
+  `);
 
-//   await client.query(`
-//     CREATE TABLE IF NOT EXISTS risk_management (
-//       id SERIAL PRIMARY KEY,
-//       agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
-//       use_case VARCHAR(200),
-//       business_type VARCHAR(100),
-//       agent_type VARCHAR(100),
-//       risk_ethics_score INTEGER,
-//       risk_reputation_score INTEGER,
-//       risk_operational_score INTEGER,
-//       risk_legal_score INTEGER,
-//       audit_required BOOLEAN DEFAULT false,
-//       audit_completed BOOLEAN DEFAULT false,
-//       human_reviewed BOOLEAN DEFAULT false,
-//       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-//       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-//     );
-//   `);
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS risk_management (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES agents(id) ON DELETE CASCADE,
+      use_case VARCHAR(200),
+      business_type VARCHAR(100),
+      agent_type VARCHAR(100),
+      risk_ethics_score INTEGER,
+      risk_reputation_score INTEGER,
+      risk_operational_score INTEGER,
+      risk_legal_score INTEGER,
+      audit_required BOOLEAN DEFAULT false,
+      audit_completed BOOLEAN DEFAULT false,
+      human_reviewed BOOLEAN DEFAULT false,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 
    await client.query(`
     CREATE TABLE IF NOT EXISTS adoption_funnel_events (
@@ -725,17 +725,16 @@ async function applyPortalDashboardMigrations(client: any) {
     { table: 'agents', name: 'endpoint_url', type: 'VARCHAR(255)' },
     { table: 'agents', name: 'exec_mode', type: 'VARCHAR(50)' },
     { table: 'ear_requests', name: 'agent_id', type: 'INTEGER' },
-    { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' }
-//     { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' },
-//     { table: 'agent_metrics', name: 'ai_assisted_decisions', type: 'INTEGER DEFAULT 0' },
-//     { table: 'agent_metrics', name: 'ai_assisted_decisions_validated', type: 'INTEGER DEFAULT 0' },
-//     { table: 'agent_metrics', name: 'ai_recommendations', type: 'INTEGER DEFAULT 0' },
-//     { table: 'agent_metrics', name: 'decisions_overridden', type: 'INTEGER DEFAULT 0' },
-//     { table: 'agent_metrics', name: 'cognitive_load_before_score', type: 'NUMERIC(6,2)' },
-//     { table: 'agent_metrics', name: 'cognitive_load_after_score', type: 'NUMERIC(6,2)' },
-//     { table: 'agent_metrics', name: 'handoff_time_seconds', type: 'NUMERIC(10,2)' },
-//     { table: 'agent_metrics', name: 'team_satisfaction_score', type: 'NUMERIC(6,2)' },
-//     { table: 'agent_metrics', name: 'innovation_count', type: 'INTEGER DEFAULT 0' }
+    { table: 'ear_requests', name: 'business_type', type: 'VARCHAR(100)' },
+    { table: 'agent_metrics', name: 'ai_assisted_decisions', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'ai_assisted_decisions_validated', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'ai_recommendations', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'decisions_overridden', type: 'INTEGER DEFAULT 0' },
+    { table: 'agent_metrics', name: 'cognitive_load_before_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'cognitive_load_after_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'handoff_time_seconds', type: 'NUMERIC(10,2)' },
+    { table: 'agent_metrics', name: 'team_satisfaction_score', type: 'NUMERIC(6,2)' },
+    { table: 'agent_metrics', name: 'innovation_count', type: 'INTEGER DEFAULT 0' }
   ];
 
   for (const column of columns) {
@@ -751,14 +750,13 @@ async function seedPortalBaselines(client: any) {
      VALUES
        ('baseline_minutes_per_request', 12, 'minute', '요청 1건당 기준 처리 시간 (분)'),
        ('cost_per_hour', 45000, 'KRW', '시간당 인건비 단가'),
-       ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)')
-//        ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)'),
-//        ('investment_cost', 0, 'KRW', '에이전트 개발/운영 투자 비용'),
-//        ('total_roles', 0, 'count', '전체 역할 수'),
-//        ('roles_redefined', 0, 'count', 'AI 협업으로 재설계된 역할 수'),
-//        ('customer_nps_delta', 0, 'point', 'AI 도입 이후 고객 만족도/NPS 변화'),
-//        ('error_reduction_pct', 0, 'pct', '오류율 감소율'),
-//        ('decision_speed_improvement_pct', 0, 'pct', '의사결정 속도 개선율')
+       ('sla_latency_ms', 2000, 'ms', 'SLA 기준 응답 시간 (ms)'),
+       ('investment_cost', 0, 'KRW', '에이전트 개발/운영 투자 비용'),
+       ('total_roles', 0, 'count', '전체 역할 수'),
+       ('roles_redefined', 0, 'count', 'AI 협업으로 재설계된 역할 수'),
+       ('customer_nps_delta', 0, 'point', 'AI 도입 이후 고객 만족도/NPS 변화'),
+       ('error_reduction_pct', 0, 'pct', '오류율 감소율'),
+       ('decision_speed_improvement_pct', 0, 'pct', '의사결정 속도 개선율')
      ON CONFLICT (metric_key, business_type, agent_type) DO NOTHING;`
   );
 }
@@ -836,12 +834,12 @@ async function createIndexes(client: any) {
     CREATE INDEX IF NOT EXISTS idx_job_queue_assigned_agent_id ON job_queue(assigned_agent_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_user_id ON audit_logs(user_id);
     CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp);
-//     CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_period ON human_ai_collaboration_metrics(period_start, period_end);
-//     CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_agent_type ON human_ai_collaboration_metrics(agent_type);
-//     CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_business_type ON human_ai_collaboration_metrics(business_type);
-//     CREATE INDEX IF NOT EXISTS idx_risk_management_created_at ON risk_management(created_at);
-//     CREATE INDEX IF NOT EXISTS idx_risk_management_agent_type ON risk_management(agent_type);
-//     CREATE INDEX IF NOT EXISTS idx_risk_management_business_type ON risk_management(business_type);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_period ON human_ai_collaboration_metrics(period_start, period_end);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_agent_type ON human_ai_collaboration_metrics(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_human_ai_collaboration_business_type ON human_ai_collaboration_metrics(business_type);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_created_at ON risk_management(created_at);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_agent_type ON risk_management(agent_type);
+    CREATE INDEX IF NOT EXISTS idx_risk_management_business_type ON risk_management(business_type);
     CREATE INDEX IF NOT EXISTS idx_user_business_domain_user_id ON user_business_domain(user_id);
     CREATE INDEX IF NOT EXISTS idx_user_business_domain_business_type ON user_business_domain(business_type);
     CREATE INDEX IF NOT EXISTS idx_business_task_baseline_domain ON business_task_baseline(domain);

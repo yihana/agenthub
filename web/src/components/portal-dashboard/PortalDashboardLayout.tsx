@@ -1,7 +1,5 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-<!-- import React, { useEffect } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom'; -->
 import {
   BarChart3,
   Flag,
@@ -11,7 +9,6 @@ import {
 } from 'lucide-react';
 import '../../styles/portal-dashboard.css';
 import { companyOptions, roleLabels, usePortalRole } from '../../hooks/usePortalRole';
-<!-- import { usePortalAuth } from '../../hooks/usePortalAuth'; -->
 
 interface PortalDashboardLayoutProps {
   title: string;
@@ -26,7 +23,6 @@ const navItems = [
   { to: '/portal-usage', label: '사용 현황/효과', icon: BarChart3 },
   { to: '/portal-roadmap', label: '로드맵', icon: Flag },
   { to: '/portal-settings', label: '화면 구성', icon: Settings, systemOnly: true }
-<!--   { to: '/portal-settings', label: '화면 구성', icon: Settings } -->
 ];
 
 const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
@@ -37,25 +33,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
 }) => {
   const { role, company, updateRole, updateCompany } = usePortalRole();
   const filteredNavItems = navItems.filter((item) => !item.systemOnly || role === 'system_admin');
-<!--   const { user, isLoggedIn, isLoading, logout } = usePortalAuth();
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  useEffect(() => {
-    if (!isLoading && !isLoggedIn) {
-      navigate('/portal-login', { state: { from: location.pathname } });
-    }
-  }, [isLoading, isLoggedIn, location.pathname, navigate]);
-
-  if (isLoading) {
-    return null;
-  }
-
-  if (!isLoggedIn) {
-    return null;
-  }
-
-  const displayRole = user?.roles?.includes('admin') ? '관리자' : '사용자'; -->
   return (
     <div className="ear-shell">
       <aside className="ear-sidebar">
@@ -66,7 +43,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
         </div>
         <nav className="ear-nav">
           {filteredNavItems.map((item) => {
-//           {navItems.map((item) => {
             const Icon = item.icon;
             return (
               <NavLink
@@ -117,12 +93,6 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
               ))}
             </select>
           </label>
-<!--             <strong>{displayRole}</strong>
-            <span className="ear-muted">{user?.companyCode ?? 'SKN'}</span>
-          </div>
-          <button type="button" className="ear-ghost" onClick={logout}>
-            로그아웃
-          </button> -->
           <button type="button" className="ear-ghost">공유 링크</button>
         </div>
       </aside>
