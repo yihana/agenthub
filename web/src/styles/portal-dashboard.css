@@ -563,6 +563,14 @@
   color: var(--ear-muted);
 }
 
+.ear-table__row {
+  cursor: pointer;
+}
+
+.ear-table__row--active {
+  background: #fff6e6;
+}
+
 .ear-filter {
   background: var(--ear-surface);
   border-radius: 16px;
