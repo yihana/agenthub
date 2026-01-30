@@ -93,6 +93,11 @@ interface AgentPerformanceSummary {
 }
 
 const STORAGE_KEY = 'portal-agent-list';
+const ANALYSIS_RANGE = {
+  start: '2026-01-15 00:00:00',
+  end: '2026-01-21 23:59:59'
+};
+const PRORATION_DAYS = 35.5;
 
 const sampleAgentDetails: AgentDetailRecord[] = [
   {
@@ -425,38 +430,47 @@ const sampleAgentDetails: AgentDetailRecord[] = [
   }
 ];
 
-const performanceSummary: AgentPerformanceSummary[] = [
-  {
-    agentId: 1,
-    agentName: 'OrderBot',
-    tasksTotal: 3,
-    successfulTasks: 2,
-    successRatePct: 66.67,
-    tokenCost: 0.395,
-    infraCostProrated: 23.66,
-    totalCost: 24.055
-  },
-  {
-    agentId: 2,
-    agentName: 'SupportGPT',
-    tasksTotal: 3,
-    successfulTasks: 2,
-    successRatePct: 66.67,
-    tokenCost: 0.57,
-    infraCostProrated: 39.44,
-    totalCost: 40.01
-  },
-  {
-    agentId: 3,
-    agentName: 'PricingAI',
-    tasksTotal: 1,
-    successfulTasks: 1,
-    successRatePct: 100,
-    tokenCost: 0.105,
-    infraCostProrated: 15.78,
-    totalCost: 15.885
-  }
-];
+const parseDate = (value: string) => new Date(value.replace(' ', 'T'));
+const isWithinRange = (value: string, start: string, end: string) => {
+  const target = parseDate(value).getTime();
+  return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
+};
+
+const calculatePerformanceSummary = (
+  agentDetails: AgentDetailRecord[],
+  range: { start: string; end: string }
+): AgentPerformanceSummary[] => {
+  const rangeDays = Math.max(
+    1,
+    Math.round(
+      (parseDate(range.end).getTime() - parseDate(range.start).getTime()) / (1000 * 60 * 60 * 24)
+    ) + 1
+  );
+
+  return agentDetails.map((agent) => {
+    const tasksInRange = agent.tasks.filter((task) => isWithinRange(task.receivedAt, range.start, range.end));
+    const successfulTasks = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
+    const metricsInRange = agent.metrics.filter((metric) => isWithinRange(metric.startTime, range.start, range.end));
+    const tokenCost = metricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
+    const infraCost = agent.infraCosts[0]?.monthlyCost ?? 0;
+    const infraCostProrated = infraCost > 0 ? (infraCost / PRORATION_DAYS) * rangeDays : 0;
+    const totalCost = tokenCost + infraCostProrated;
+    const successRatePct = tasksInRange.length > 0 ? (successfulTasks / tasksInRange.length) * 100 : 0;
+
+    return {
+      agentId: agent.id,
+      agentName: agent.agentName,
+      tasksTotal: tasksInRange.length,
+      successfulTasks,
+      successRatePct,
+      tokenCost,
+      infraCostProrated,
+      totalCost
+    };
+  });
+};
+
+const performanceSummary = calculatePerformanceSummary(sampleAgentDetails, ANALYSIS_RANGE);
 
 const defaultAgents: AgentRecord[] = sampleAgentDetails.map((agent, index) => ({
   id: String(agent.id),
@@ -577,6 +591,45 @@ const PortalAgentListPage: React.FC = () => {
 
   const selectedAgent = sampleAgentDetails.find((agent) => String(agent.id) === selectedAgentId);
   const selectedSummary = performanceSummary.find((summary) => String(summary.agentId) === selectedAgentId);
+  const tasksInRange = selectedAgent
+    ? selectedAgent.tasks.filter((task) => isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
+    : [];
+  const metricsInRange = selectedAgent
+    ? selectedAgent.metrics.filter((metric) => isWithinRange(metric.startTime, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
+    : [];
+  const totalTokenCost = metricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
+  const totalTokenUsage = metricsInRange.reduce((sum, metric) => sum + metric.totalTokenUsage, 0);
+  const avgLatency = metricsInRange.length
+    ? metricsInRange.reduce((sum, metric) => sum + metric.avgLatency, 0) / metricsInRange.length
+    : 0;
+  const avgTimeToFirstToken = metricsInRange.length
+    ? metricsInRange.reduce((sum, metric) => sum + metric.avgTimeToFirstToken, 0) / metricsInRange.length
+    : 0;
+  const avgErrorRate = metricsInRange.length
+    ? metricsInRange.reduce((sum, metric) => sum + metric.errorRate, 0) / metricsInRange.length
+    : 0;
+
+  const taskMetricById = new Map(
+    tasksInRange.map((task) => {
+      const durationSeconds = task.startedAt && task.finishedAt
+        ? Math.max(0, (parseDate(task.finishedAt).getTime() - parseDate(task.startedAt).getTime()) / 1000)
+        : 0;
+      const perTaskTokenCost = tasksInRange.length > 0 ? totalTokenCost / tasksInRange.length : 0;
+      const perTaskTokenUsage = tasksInRange.length > 0 ? totalTokenUsage / tasksInRange.length : 0;
+
+      return [
+        task.id,
+        {
+          durationSeconds,
+          perTaskTokenCost,
+          perTaskTokenUsage,
+          avgLatency,
+          avgTimeToFirstToken,
+          avgErrorRate
+        }
+      ];
+    })
+  );
 
   return (
     <PortalDashboardLayout
@@ -746,7 +799,7 @@ const PortalAgentListPage: React.FC = () => {
               <div className="ear-card__header">
                 <div>
                   <h3>{selectedAgent.agentName} 상세</h3>
-                  <p>샘플 데이터 (2026-01-15 ~ 2026-01-21) 기준 요약</p>
+                  <p>샘플 데이터 ({ANALYSIS_RANGE.start} ~ {ANALYSIS_RANGE.end}) 기준 요약</p>
                 </div>
               </div>
 
@@ -828,6 +881,25 @@ const PortalAgentListPage: React.FC = () => {
                       </tbody>
                     </table>
                   )}
+                  <h4>사용자 관점 흐름</h4>
+                  <div className="ear-list">
+                    <div className="ear-list__row">
+                      <strong>요청 접수</strong>
+                      <span>사용자 요청 → EAR_REQUEST 생성</span>
+                    </div>
+                    <div className="ear-list__row">
+                      <strong>대화 시작</strong>
+                      <span>AGENT_CONVERSATIONS 생성 후 채팅 이력 기록</span>
+                    </div>
+                    <div className="ear-list__row">
+                      <strong>작업 실행</strong>
+                      <span>AGENT_TASKS/AGENT_METRICS에 Task·Metric 집계</span>
+                    </div>
+                    <div className="ear-list__row">
+                      <strong>성과 확인</strong>
+                      <span>Token/Infra 비용과 성공률을 성과 지표로 반영</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -842,19 +914,34 @@ const PortalAgentListPage: React.FC = () => {
                         <th>Received</th>
                         <th>Started</th>
                         <th>Finished</th>
+                        <th>Duration (s)</th>
+                        <th>Avg Latency</th>
+                        <th>TTFT</th>
+                        <th>Error Rate</th>
+                        <th>Token Usage</th>
+                        <th>Token Cost</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedAgent.tasks.map((task) => (
-                        <tr key={task.id}>
+                      {tasksInRange.map((task) => {
+                        const metrics = taskMetricById.get(task.id);
+                        return (
+                          <tr key={task.id}>
                           <td>{task.id}</td>
                           <td>{task.jobId}</td>
                           <td>{task.status}</td>
                           <td>{task.receivedAt}</td>
                           <td>{task.startedAt}</td>
                           <td>{task.finishedAt}</td>
+                          <td>{metrics ? formatNumber(metrics.durationSeconds) : '-'}</td>
+                          <td>{metrics ? formatNumber(metrics.avgLatency) : '-'}</td>
+                          <td>{metrics ? formatNumber(metrics.avgTimeToFirstToken) : '-'}</td>
+                          <td>{metrics ? formatPercent(metrics.avgErrorRate * 100) : '-'}</td>
+                          <td>{metrics ? formatNumber(metrics.perTaskTokenUsage) : '-'}</td>
+                          <td>{metrics ? formatCost(metrics.perTaskTokenCost) : '-'}</td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -876,7 +963,7 @@ const PortalAgentListPage: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedAgent.metrics.map((metric) => (
+                      {metricsInRange.map((metric) => (
                         <tr key={metric.id}>
                           <td>{metric.id}</td>
                           <td>{metric.startTime} ~ {metric.endTime}</td>
