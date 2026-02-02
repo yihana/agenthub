@@ -10,6 +10,94 @@ interface AgentRecord {
   category: string;
   risk: '낮음' | '중간' | '높음';
   lastUpdated: string;
+  runtimeState: 'RUNNING' | 'DEGRADED' | 'IDLE' | 'ERROR';
+  runtimeErrors: number;
+}
+
+interface AgentTaskRecord {
+  id: number;
+  agentId: number;
+  jobId: string;
+  status: string;
+  receivedAt: string;
+  startedAt: string;
+  finishedAt: string;
+}
+
+interface AgentMetricRecord {
+  id: number;
+  agentId: number;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  requestsProcessed: number;
+  avgLatency: number;
+  errorRate: number;
+  queueTime: number;
+  inputTokenUsage: number;
+  outputTokenUsage: number;
+  totalTokenUsage: number;
+  tokenCost: number;
+  activeUsers: number;
+  totalUsers: number;
+  positiveFeedback: number;
+  totalFeedback: number;
+  retriesPerRequest: number;
+  avgTimeToFirstToken: number;
+  refusalRate: number;
+  avgResponseTime: number;
+  humanIntervention: number;
+}
+
+interface AgentInfraCostRecord {
+  id: number;
+  agentId: number;
+  monthlyCost: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+interface AgentLifecycleEvent {
+  id: number;
+  agentId: number;
+  eventType: string;
+  eventTime: string;
+  previousState: string;
+  newState: string;
+  description: string;
+}
+
+interface AgentDetailRecord {
+  id: number;
+  agentName: string;
+  type: string;
+  businessType: string;
+  status: string;
+  registeredAt: string;
+  updatedAt: string;
+  runtimeState: string;
+  lastHeartbeat: string;
+  activeTaskCount: number;
+  errorStreak: number;
+  tasks: AgentTaskRecord[];
+  metrics: AgentMetricRecord[];
+  infraCosts: AgentInfraCostRecord[];
+  lifecycleEvents: AgentLifecycleEvent[];
+  resultSummary: string;
+  resultArtifacts: string[];
+}
+
+interface AgentPerformanceSummary {
+  agentId: number;
+  agentName: string;
+  tasksTotal: number;
+  successfulTasks: number;
+  successRatePct: number;
+  tokenCost: number;
+  infraCostProrated: number;
+  totalCost: number;
 }
 
 interface AgentTaskRecord {
@@ -108,6 +196,10 @@ const baseAgentDetails: AgentDetailRecord[] = [
     status: 'ACTIVE',
     registeredAt: '2026-01-01 00:00:00',
     updatedAt: '2026-01-20 09:00:00',
+    runtimeState: 'RUNNING',
+    lastHeartbeat: '2026-01-20 09:05:00',
+    activeTaskCount: 2,
+    errorStreak: 0,
     tasks: [
       {
         id: 101,
@@ -228,7 +320,9 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ]
+    ],
+    resultSummary: '처리 결과: 성공 2건, 실패 1건. 결제 이슈는 수동 검수로 전환됨.',
+    resultArtifacts: ['order_validation_report.json', 'payment_issue_trace.log']
   },
   {
     id: 2,
@@ -238,6 +332,10 @@ const baseAgentDetails: AgentDetailRecord[] = [
     status: 'ACTIVE',
     registeredAt: '2026-01-02 00:00:00',
     updatedAt: '2026-01-20 09:00:00',
+    runtimeState: 'DEGRADED',
+    lastHeartbeat: '2026-01-20 09:08:00',
+    activeTaskCount: 1,
+    errorStreak: 1,
     tasks: [
       {
         id: 104,
@@ -358,7 +456,9 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ]
+    ],
+    resultSummary: '처리 결과: 응답 템플릿 2건 자동 생성, VOC 분류 오류 1건 발생.',
+    resultArtifacts: ['support_summary.md', 'voc_classification.csv']
   },
   {
     id: 3,
@@ -368,6 +468,10 @@ const baseAgentDetails: AgentDetailRecord[] = [
     status: 'ACTIVE',
     registeredAt: '2026-01-05 00:00:00',
     updatedAt: '2026-01-20 09:00:00',
+    runtimeState: 'RUNNING',
+    lastHeartbeat: '2026-01-20 09:10:00',
+    activeTaskCount: 0,
+    errorStreak: 0,
     tasks: [
       {
         id: 107,
@@ -426,7 +530,9 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'started'
       }
-    ]
+    ],
+    resultSummary: '처리 결과: 신규 가격대 3개 제안, 수익 개선 8.6% 추정.',
+    resultArtifacts: ['pricing_simulation.xlsx', 'margin_projection.png']
   }
 ];
 
@@ -469,7 +575,6 @@ const calculatePerformanceSummary = (
     };
   });
 };
-
 
 const baseAgentDetailByName = new Map(
   baseAgentDetails.map((agent) => [agent.agentName, agent])
@@ -555,6 +660,10 @@ const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
     status: agent.status,
     registeredAt: '2026-01-01 00:00:00',
     updatedAt: '2026-01-20 09:00:00',
+    runtimeState: agent.runtimeState ?? (seed % 3 === 0 ? 'RUNNING' : seed % 3 === 1 ? 'DEGRADED' : 'IDLE'),
+    lastHeartbeat: '2026-01-20 09:05:00',
+    activeTaskCount: seed % 3,
+    errorStreak: agent.runtimeErrors ?? seed % 2,
     tasks,
     metrics,
     infraCosts: [
@@ -576,7 +685,11 @@ const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
         newState: 'RUNNING',
         description: 'started'
       }
-    ]
+    ],
+    resultSummary: `${agent.name} 결과 요약: ${tasks.length}건 처리, 성공률 ${Math.round(
+      (tasks.filter((task) => task.status === 'COMPLETED').length / tasks.length) * 100
+    )}%`,
+    resultArtifacts: ['result_summary.txt']
   };
 };
 
@@ -587,7 +700,9 @@ const defaultAgents: AgentRecord[] = baseAgentDetails.map((agent, index) => ({
   status: '운영',
   category: agent.businessType,
   risk: index === 1 ? '중간' : '낮음',
-  lastUpdated: agent.updatedAt.slice(0, 10)
+  lastUpdated: agent.updatedAt.slice(0, 10),
+  runtimeState: agent.runtimeState as AgentRecord['runtimeState'],
+  runtimeErrors: agent.errorStreak
 }));
 
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
@@ -595,6 +710,7 @@ const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 
 const formatPercent = (value: number) => `${numberFormatter.format(value)}%`;
 const formatNumber = (value: number) => numberFormatter.format(value);
 const formatCost = (value: number) => numberFormatter.format(value);
+const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 
 const statusToneMap: Record<AgentRecord['status'], 'success' | 'warning' | 'neutral'> = {
   운영: 'success',
@@ -607,6 +723,19 @@ const riskToneMap: Record<AgentRecord['risk'], 'success' | 'warning' | 'neutral'
   중간: 'warning',
   높음: 'neutral'
 };
+
+const runtimeToneMap: Record<AgentRecord['runtimeState'], 'success' | 'warning' | 'neutral'> = {
+  RUNNING: 'success',
+  DEGRADED: 'warning',
+  IDLE: 'neutral',
+  ERROR: 'warning'
+};
+
+const normalizeAgent = (agent: AgentRecord): AgentRecord => ({
+  ...agent,
+  runtimeState: agent.runtimeState ?? 'IDLE',
+  runtimeErrors: agent.runtimeErrors ?? 0
+});
 
 const loadAgents = () => {
   if (typeof window === 'undefined') {
@@ -622,7 +751,7 @@ const loadAgents = () => {
     if (!Array.isArray(parsed)) {
       return defaultAgents;
     }
-    return parsed as AgentRecord[];
+    return (parsed as AgentRecord[]).map((agent) => normalizeAgent(agent));
   } catch {
     return defaultAgents;
   }
@@ -635,7 +764,7 @@ const PortalAgentListPage: React.FC = () => {
   const [riskFilter, setRiskFilter] = useState('전체');
   const [categoryFilter, setCategoryFilter] = useState('전체');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
-  const [selectedDetailTab, setSelectedDetailTab] = useState<'overview' | 'tasks' | 'metrics' | 'costs'>('overview');
+  const [selectedDetailTab, setSelectedDetailTab] = useState<'overview' | 'tasks' | 'metrics' | 'costs' | 'results'>('overview');
   const [formValues, setFormValues] = useState({
     name: '',
     owner: '',
@@ -686,7 +815,9 @@ const PortalAgentListPage: React.FC = () => {
       status: formValues.status,
       category: formValues.category,
       risk: formValues.risk,
-      lastUpdated: new Date().toISOString().slice(0, 10)
+      lastUpdated: new Date().toISOString().slice(0, 10),
+      runtimeState: 'IDLE',
+      runtimeErrors: 0
     };
 
     persistAgents((prev) => [nextAgent, ...prev]);
@@ -696,7 +827,6 @@ const PortalAgentListPage: React.FC = () => {
       owner: ''
     }));
   };
-
 
   const agentDetails = useMemo(() => {
     return agents.map((agent) => {
@@ -708,7 +838,9 @@ const PortalAgentListPage: React.FC = () => {
           agentName: agent.name,
           businessType: agent.category,
           status: agent.status,
-          updatedAt: agent.lastUpdated ? `${agent.lastUpdated} 09:00:00` : baseDetail.updatedAt
+          updatedAt: agent.lastUpdated ? `${agent.lastUpdated} 09:00:00` : baseDetail.updatedAt,
+          runtimeState: agent.runtimeState ?? baseDetail.runtimeState,
+          errorStreak: agent.runtimeErrors ?? baseDetail.errorStreak
         };
       }
       return buildGeneratedDetail(agent);
@@ -747,6 +879,12 @@ const PortalAgentListPage: React.FC = () => {
         : 0;
       const perTaskTokenCost = tasksInRange.length > 0 ? totalTokenCost / tasksInRange.length : 0;
       const perTaskTokenUsage = tasksInRange.length > 0 ? totalTokenUsage / tasksInRange.length : 0;
+      const avgLaborHourlyCost = 52000;
+      const baselineMinutes = 15;
+      const humanMinutes = task.status === 'COMPLETED' ? 1.2 : 4.5;
+      const savedMinutes = Math.max(0, baselineMinutes - ((durationSeconds / 60) + humanMinutes));
+      const savedCost = (savedMinutes / 60) * avgLaborHourlyCost;
+      const roiRatio = perTaskTokenCost > 0 ? ((savedCost - perTaskTokenCost) / perTaskTokenCost) * 100 : 0;
 
       return [
         task.id,
@@ -756,11 +894,29 @@ const PortalAgentListPage: React.FC = () => {
           perTaskTokenUsage,
           avgLatency,
           avgTimeToFirstToken,
-          avgErrorRate
+          avgErrorRate,
+          baselineMinutes,
+          humanMinutes,
+          savedMinutes,
+          savedCost,
+          roiRatio
         }
       ];
     })
   );
+  const totalTasksInRange = tasksInRange.length;
+  const completedTasksInRange = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
+  const failedTasksInRange = totalTasksInRange - completedTasksInRange;
+  const avgHumanInterventionRate = metricsInRange.length
+    ? metricsInRange.reduce((sum, metric) => sum + metric.humanIntervention, 0) / metricsInRange.length
+    : 0;
+  const manualInterventionCount = Math.round(totalTasksInRange * avgHumanInterventionRate);
+  const avgProcessingSeconds = totalTasksInRange
+    ? tasksInRange.reduce((sum, task) => {
+        const duration = taskMetricById.get(task.id)?.durationSeconds ?? 0;
+        return sum + duration;
+      }, 0) / totalTasksInRange
+    : 0;
 
   return (
     <PortalDashboardLayout
@@ -885,6 +1041,8 @@ const PortalAgentListPage: React.FC = () => {
                 <th>이름</th>
                 <th>소유 조직</th>
                 <th>상태</th>
+                <th>런타임 상태</th>
+                <th>런타임 에러</th>
                 <th>리스크</th>
                 <th>최근 업데이트</th>
               </tr>
@@ -916,6 +1074,10 @@ const PortalAgentListPage: React.FC = () => {
                   <td>
                     <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
                   </td>
+                  <td>
+                    <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
+                  </td>
+                  <td>{agent.runtimeErrors}</td>
                   <td>
                     <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
                   </td>
@@ -963,6 +1125,13 @@ const PortalAgentListPage: React.FC = () => {
                 >
                   비용
                 </button>
+                <button
+                  type="button"
+                  className={`ear-tab ${selectedDetailTab === 'results' ? 'ear-tab--active' : ''}`}
+                  onClick={() => setSelectedDetailTab('results')}
+                >
+                  처리 결과
+                </button>
               </div>
 
               {selectedDetailTab === 'overview' && (
@@ -983,6 +1152,42 @@ const PortalAgentListPage: React.FC = () => {
                     <div className="ear-stat">
                       <span>비즈니스 타입</span>
                       <strong>{selectedAgent.businessType}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>런타임 상태</span>
+                      <strong>{selectedAgent.runtimeState}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>활성 태스크</span>
+                      <strong>{selectedAgent.activeTaskCount}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>에러 누적</span>
+                      <strong>{selectedAgent.errorStreak}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>마지막 Heartbeat</span>
+                      <strong>{selectedAgent.lastHeartbeat}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>총 작업 수</span>
+                      <strong>{totalTasksInRange}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>성공 완료</span>
+                      <strong>{completedTasksInRange}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>실패/오류</span>
+                      <strong>{failedTasksInRange}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>수동 개입</span>
+                      <strong>{manualInterventionCount}</strong>
+                    </div>
+                    <div className="ear-stat">
+                      <span>평균 처리 시간</span>
+                      <strong>{formatMinutes(avgProcessingSeconds / 60)}</strong>
                     </div>
                   </div>
 
@@ -1031,6 +1236,24 @@ const PortalAgentListPage: React.FC = () => {
                       <span>Token/Infra 비용과 성공률을 성과 지표로 반영</span>
                     </div>
                   </div>
+
+                  <h4>처리 결과</h4>
+                  <div className="ear-list">
+                    <div className="ear-list__row">
+                      <strong>결과 요약</strong>
+                      <span>{selectedAgent.resultSummary}</span>
+                    </div>
+                    <div className="ear-list__row">
+                      <strong>Output Files</strong>
+                      <span>
+                        <ul>
+                          {selectedAgent.resultArtifacts.map((artifact) => (
+                            <li key={artifact}>{artifact}</li>
+                          ))}
+                        </ul>
+                      </span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -1051,6 +1274,11 @@ const PortalAgentListPage: React.FC = () => {
                         <th>Error Rate</th>
                         <th>Token Usage</th>
                         <th>Token Cost</th>
+                        <th>Baseline</th>
+                        <th>Human Min</th>
+                        <th>Saved Min</th>
+                        <th>Saved Cost</th>
+                        <th>ROI</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1070,6 +1298,11 @@ const PortalAgentListPage: React.FC = () => {
                           <td>{metrics ? formatPercent(metrics.avgErrorRate * 100) : '-'}</td>
                           <td>{metrics ? formatNumber(metrics.perTaskTokenUsage) : '-'}</td>
                           <td>{metrics ? formatCost(metrics.perTaskTokenCost) : '-'}</td>
+                          <td>{metrics ? formatMinutes(metrics.baselineMinutes) : '-'}</td>
+                          <td>{metrics ? formatMinutes(metrics.humanMinutes) : '-'}</td>
+                          <td>{metrics ? formatMinutes(metrics.savedMinutes) : '-'}</td>
+                          <td>{metrics ? formatCost(metrics.savedCost) : '-'}</td>
+                          <td>{metrics ? formatPercent(metrics.roiRatio) : '-'}</td>
                         </tr>
                         );
                       })}
@@ -1157,6 +1390,18 @@ const PortalAgentListPage: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
+                </div>
+              )}
+              {selectedDetailTab === 'results' && (
+                <div className="ear-card__body">
+                  <h4>처리 결과 요약</h4>
+                  <p>{selectedAgent.resultSummary}</p>
+                  <h4>Output Files</h4>
+                  <ul>
+                    {selectedAgent.resultArtifacts.map((artifact) => (
+                      <li key={artifact}>{artifact}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
             </div>
