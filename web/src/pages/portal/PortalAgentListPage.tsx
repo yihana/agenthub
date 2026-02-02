@@ -99,85 +99,6 @@ interface AgentPerformanceSummary {
   tokenCost: number;
   infraCostProrated: number;
   totalCost: number;
-
-interface AgentTaskRecord {
-  id: number;
-  agentId: number;
-  jobId: string;
-  status: string;
-  receivedAt: string;
-  startedAt: string;
-  finishedAt: string;
-}
-
-interface AgentMetricRecord {
-  id: number;
-  agentId: number;
-  startTime: string;
-  endTime: string;
-  durationSeconds: number;
-  cpuUsage: number;
-  memoryUsage: number;
-  requestsProcessed: number;
-  avgLatency: number;
-  errorRate: number;
-  queueTime: number;
-  inputTokenUsage: number;
-  outputTokenUsage: number;
-  totalTokenUsage: number;
-  tokenCost: number;
-  activeUsers: number;
-  totalUsers: number;
-  positiveFeedback: number;
-  totalFeedback: number;
-  retriesPerRequest: number;
-  avgTimeToFirstToken: number;
-  refusalRate: number;
-  avgResponseTime: number;
-  humanIntervention: number;
-}
-
-interface AgentInfraCostRecord {
-  id: number;
-  agentId: number;
-  monthlyCost: number;
-  createdAt: string;
-  updatedAt: string | null;
-}
-
-interface AgentLifecycleEvent {
-  id: number;
-  agentId: number;
-  eventType: string;
-  eventTime: string;
-  previousState: string;
-  newState: string;
-  description: string;
-}
-
-interface AgentDetailRecord {
-  id: number;
-  agentName: string;
-  type: string;
-  businessType: string;
-  status: string;
-  registeredAt: string;
-  updatedAt: string;
-  tasks: AgentTaskRecord[];
-  metrics: AgentMetricRecord[];
-  infraCosts: AgentInfraCostRecord[];
-  lifecycleEvents: AgentLifecycleEvent[];
-}
-
-interface AgentPerformanceSummary {
-  agentId: number;
-  agentName: string;
-  tasksTotal: number;
-  successfulTasks: number;
-  successRatePct: number;
-  tokenCost: number;
-  infraCostProrated: number;
-  totalCost: number;
 }
 
 const STORAGE_KEY = 'portal-agent-list';
@@ -849,6 +770,9 @@ const PortalAgentListPage: React.FC = () => {
     });
   }, [agents]);
 
+  const agentDetailById = useMemo(() => {
+    return new Map(agentDetails.map((agent) => [String(agent.id), agent]));
+  }, [agentDetails]);
   useEffect(() => {
     if (!agentId) {
       return;
@@ -1063,46 +987,92 @@ const PortalAgentListPage: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredAgents.map((agent) => (
-                    <tr
-                      key={agent.id}
-                      className={agent.id === selectedAgentId ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
-                      onClick={() => {
-                        setSelectedAgentId(agent.id);
-                        setSelectedDetailTab('overview');
-                        setIsDetailOpen(true);
-                        navigate(`/portal-agents/${agent.id}`);
-                      }}
-                      role="button"
-                      tabIndex={0}
-                      onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      setSelectedAgentId(agent.id);
-                      setSelectedDetailTab('overview');
-                      setIsDetailOpen(true);
-                      navigate(`/portal-agents/${agent.id}`);
-                    }
-                      }}
-                    >
-                      <td>{agent.id}</td>
-                      <td>
-                        <strong>{agent.name}</strong>
-                        <span className="ear-muted">{agent.category}</span>
-                      </td>
-                      <td>{agent.owner}</td>
-                      <td>
-                        <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
-                      </td>
-                      <td>
-                        <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
-                      </td>
-                      <td>{agent.runtimeErrors}</td>
-                      <td>
-                        <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
-                      </td>
-                      <td>{agent.lastUpdated}</td>
-                    </tr>
-                  ))}
+                  {filteredAgents.map((agent) => {
+                    const detail = agentDetailById.get(agent.id);
+                    const isSelected = agent.id === selectedAgentId;
+
+                    return (
+                      <React.Fragment key={agent.id}>
+                        <tr
+                          className={isSelected ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
+                          onClick={() => {
+                            setSelectedAgentId(agent.id);
+                            setSelectedDetailTab('overview');
+                            setIsDetailOpen(true);
+                            navigate(`/portal-agents/${agent.id}`);
+                          }}
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(event) => {
+                            if (event.key === 'Enter' || event.key === ' ') {
+                              setSelectedAgentId(agent.id);
+                              setSelectedDetailTab('overview');
+                              setIsDetailOpen(true);
+                              navigate(`/portal-agents/${agent.id}`);
+                            }
+                          }}
+                        >
+                          <td>{agent.id}</td>
+                          <td>
+                            <strong>{agent.name}</strong>
+                            <span className="ear-muted">{agent.category}</span>
+                          </td>
+                          <td>{agent.owner}</td>
+                          <td>
+                            <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
+                          </td>
+                          <td>
+                            <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
+                          </td>
+                          <td>{agent.runtimeErrors}</td>
+                          <td>
+                            <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
+                          </td>
+                          <td>{agent.lastUpdated}</td>
+                        </tr>
+                        {isSelected && (
+                          <tr className="ear-table__row ear-table__row--drilldown">
+                            <td colSpan={8}>
+                              <div className="ear-drilldown">
+                                <div>
+                                  <strong>Task 드릴다운</strong>
+                                  <span>선택한 에이전트의 최근 작업</span>
+                                </div>
+                                <div className="ear-drilldown__actions">
+                                  <button
+                                    type="button"
+                                    className="ear-secondary"
+                                    onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(agent.name)}`)}
+                                  >
+                                    태스크 목록
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="ear-ghost"
+                                    onClick={() => setIsDetailOpen((prev) => !prev)}
+                                  >
+                                    상세 패널 {isDetailOpen ? '접기' : '펼치기'}
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="ear-drilldown__list">
+                                {(detail?.tasks ?? []).slice(0, 3).map((task) => (
+                                  <div key={task.id} className="ear-drilldown__item">
+                                    <span>{task.jobId}</span>
+                                    <span>{task.status}</span>
+                                    <span>{task.receivedAt}</span>
+                                  </div>
+                                ))}
+                                {(!detail || detail.tasks.length === 0) && (
+                                  <span className="ear-muted">표시할 작업이 없습니다.</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
