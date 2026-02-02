@@ -98,8 +98,8 @@ const ANALYSIS_RANGE = {
   end: '2026-01-21 23:59:59'
 };
 const PRORATION_DAYS = 35.5;
+const baseAgentDetails: AgentDetailRecord[] = [
 
-const sampleAgentDetails: AgentDetailRecord[] = [
   {
     id: 1,
     agentName: 'OrderBot',
@@ -470,9 +470,117 @@ const calculatePerformanceSummary = (
   });
 };
 
-const performanceSummary = calculatePerformanceSummary(sampleAgentDetails, ANALYSIS_RANGE);
 
-const defaultAgents: AgentRecord[] = sampleAgentDetails.map((agent, index) => ({
+const baseAgentDetailByName = new Map(
+  baseAgentDetails.map((agent) => [agent.agentName, agent])
+);
+
+const hashString = (value: string) =>
+  value.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
+
+const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
+  const seed = hashString(agent.id);
+  const agentId = Number.isFinite(Number(agent.id)) ? Number(agent.id) : seed % 1000;
+  const taskCount = clamp((seed % 3) + 2, 2, 4);
+  const taskBaseHour = 8 + (seed % 5);
+  const tasks: AgentTaskRecord[] = Array.from({ length: taskCount }).map((_, index) => {
+    const dayOffset = index % 5;
+    const startMinute = (seed + index * 7) % 50;
+    const receivedAt = `2026-01-${15 + dayOffset} ${String(taskBaseHour).padStart(2, '0')}:${String(
+      startMinute
+    ).padStart(2, '0')}:00`;
+    const startedAt = `2026-01-${15 + dayOffset} ${String(taskBaseHour).padStart(2, '0')}:${String(
+      startMinute + 1
+    ).padStart(2, '0')}:02`;
+    const finishedAt = `2026-01-${15 + dayOffset} ${String(taskBaseHour).padStart(2, '0')}:${String(
+      startMinute + 4
+    ).padStart(2, '0')}:20`;
+    const status = index === taskCount - 1 && seed % 2 === 0 ? 'FAILED' : 'COMPLETED';
+
+    return {
+      id: agentId * 100 + index + 1,
+      agentId,
+      jobId: `J-${agentId}${index + 1}`.padEnd(6, '0'),
+      status,
+      receivedAt,
+      startedAt,
+      finishedAt
+    };
+  });
+
+  const metrics: AgentMetricRecord[] = Array.from({ length: 2 }).map((_, index) => {
+    const startTime = `2026-01-${15 + index * 2} ${String(8 + index).padStart(2, '0')}:00:00`;
+    const endTime = `2026-01-${15 + index * 2} ${String(10 + index).padStart(2, '0')}:00:00`;
+    const requestsProcessed = 20 + ((seed + index) % 15);
+    const avgLatency = Number((0.25 + ((seed % 15) / 100)).toFixed(3));
+    const errorRate = Number(((seed % 7) / 100).toFixed(3));
+    const totalTokenUsage = 10000 + index * 2000 + (seed % 4000);
+    const tokenCost = Number((totalTokenUsage / 100000).toFixed(3));
+
+    return {
+      id: agentId * 10 + index + 1,
+      agentId,
+      startTime,
+      endTime,
+      durationSeconds: 7200,
+      cpuUsage: Number((0.35 + (seed % 20) / 100).toFixed(2)),
+      memoryUsage: Number((0.45 + (seed % 15) / 100).toFixed(2)),
+      requestsProcessed,
+      avgLatency,
+      errorRate,
+      queueTime: Number((0.03 + (seed % 8) / 100).toFixed(3)),
+      inputTokenUsage: Math.round(totalTokenUsage * 0.55),
+      outputTokenUsage: Math.round(totalTokenUsage * 0.45),
+      totalTokenUsage,
+      tokenCost,
+      activeUsers: 10 + (seed % 15),
+      totalUsers: 25 + (seed % 30),
+      positiveFeedback: 10 + (seed % 20),
+      totalFeedback: 15 + (seed % 25),
+      retriesPerRequest: seed % 2,
+      avgTimeToFirstToken: Number((0.1 + (seed % 5) / 100).toFixed(3)),
+      refusalRate: Number(((seed % 3) / 100).toFixed(3)),
+      avgResponseTime: Number((0.3 + (seed % 10) / 100).toFixed(3)),
+      humanIntervention: Number((0.02 + (seed % 4) / 100).toFixed(3))
+    };
+  });
+
+  return {
+    id: agentId,
+    agentName: agent.name,
+    type: agent.category,
+    businessType: agent.category,
+    status: agent.status,
+    registeredAt: '2026-01-01 00:00:00',
+    updatedAt: '2026-01-20 09:00:00',
+    tasks,
+    metrics,
+    infraCosts: [
+      {
+        id: agentId,
+        agentId,
+        monthlyCost: 90 + (seed % 120),
+        createdAt: '2025-12-01 00:00:00',
+        updatedAt: null
+      }
+    ],
+    lifecycleEvents: [
+      {
+        id: agentId * 10 + 1,
+        agentId,
+        eventType: 'STATE_CHANGE',
+        eventTime: '2026-01-15 08:00:00',
+        previousState: 'STARTING',
+        newState: 'RUNNING',
+        description: 'started'
+      }
+    ]
+  };
+};
+
+const defaultAgents: AgentRecord[] = baseAgentDetails.map((agent, index) => ({
   id: String(agent.id),
   name: agent.agentName,
   owner: agent.businessType === 'commerce' ? '커머스팀' : agent.businessType === 'support' ? '지원팀' : '데이터팀',
@@ -589,7 +697,30 @@ const PortalAgentListPage: React.FC = () => {
     }));
   };
 
-  const selectedAgent = sampleAgentDetails.find((agent) => String(agent.id) === selectedAgentId);
+
+  const agentDetails = useMemo(() => {
+    return agents.map((agent) => {
+      const baseDetail = baseAgentDetailByName.get(agent.name);
+      if (baseDetail) {
+        return {
+          ...baseDetail,
+          id: Number(agent.id) || baseDetail.id,
+          agentName: agent.name,
+          businessType: agent.category,
+          status: agent.status,
+          updatedAt: agent.lastUpdated ? `${agent.lastUpdated} 09:00:00` : baseDetail.updatedAt
+        };
+      }
+      return buildGeneratedDetail(agent);
+    });
+  }, [agents]);
+
+  const performanceSummary = useMemo(
+    () => calculatePerformanceSummary(agentDetails, ANALYSIS_RANGE),
+    [agentDetails]
+  );
+
+  const selectedAgent = agentDetails.find((agent) => String(agent.id) === selectedAgentId);
   const selectedSummary = performanceSummary.find((summary) => String(summary.agentId) === selectedAgentId);
   const tasksInRange = selectedAgent
     ? selectedAgent.tasks.filter((task) => isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
