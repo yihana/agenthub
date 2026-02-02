@@ -98,8 +98,8 @@ const ANALYSIS_RANGE = {
   end: '2026-01-21 23:59:59'
 };
 const PRORATION_DAYS = 35.5;
-
 const baseAgentDetails: AgentDetailRecord[] = [
+
   {
     id: 1,
     agentName: 'OrderBot',
@@ -431,7 +431,6 @@ const baseAgentDetails: AgentDetailRecord[] = [
 ];
 
 const parseDate = (value: string) => new Date(value.replace(' ', 'T'));
-
 const isWithinRange = (value: string, start: string, end: string) => {
   const target = parseDate(value).getTime();
   return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
@@ -470,6 +469,7 @@ const calculatePerformanceSummary = (
     };
   });
 };
+
 
 const baseAgentDetailByName = new Map(
   baseAgentDetails.map((agent) => [agent.agentName, agent])
@@ -696,6 +696,7 @@ const PortalAgentListPage: React.FC = () => {
       owner: ''
     }));
   };
+
 
   const agentDetails = useMemo(() => {
     return agents.map((agent) => {
@@ -1011,7 +1012,6 @@ const PortalAgentListPage: React.FC = () => {
                       </tbody>
                     </table>
                   )}
-
                   <h4>사용자 관점 흐름</h4>
                   <div className="ear-list">
                     <div className="ear-list__row">
