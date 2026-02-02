@@ -100,14 +100,94 @@ interface AgentPerformanceSummary {
   totalCost: number;
 }
 
+interface AgentTaskRecord {
+  id: number;
+  agentId: number;
+  jobId: string;
+  status: string;
+  receivedAt: string;
+  startedAt: string;
+  finishedAt: string;
+}
+
+interface AgentMetricRecord {
+  id: number;
+  agentId: number;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  requestsProcessed: number;
+  avgLatency: number;
+  errorRate: number;
+  queueTime: number;
+  inputTokenUsage: number;
+  outputTokenUsage: number;
+  totalTokenUsage: number;
+  tokenCost: number;
+  activeUsers: number;
+  totalUsers: number;
+  positiveFeedback: number;
+  totalFeedback: number;
+  retriesPerRequest: number;
+  avgTimeToFirstToken: number;
+  refusalRate: number;
+  avgResponseTime: number;
+  humanIntervention: number;
+}
+
+interface AgentInfraCostRecord {
+  id: number;
+  agentId: number;
+  monthlyCost: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+interface AgentLifecycleEvent {
+  id: number;
+  agentId: number;
+  eventType: string;
+  eventTime: string;
+  previousState: string;
+  newState: string;
+  description: string;
+}
+
+interface AgentDetailRecord {
+  id: number;
+  agentName: string;
+  type: string;
+  businessType: string;
+  status: string;
+  registeredAt: string;
+  updatedAt: string;
+  tasks: AgentTaskRecord[];
+  metrics: AgentMetricRecord[];
+  infraCosts: AgentInfraCostRecord[];
+  lifecycleEvents: AgentLifecycleEvent[];
+}
+
+interface AgentPerformanceSummary {
+  agentId: number;
+  agentName: string;
+  tasksTotal: number;
+  successfulTasks: number;
+  successRatePct: number;
+  tokenCost: number;
+  infraCostProrated: number;
+  totalCost: number;
+}
+
 const STORAGE_KEY = 'portal-agent-list';
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
   end: '2026-01-21 23:59:59'
 };
 const PRORATION_DAYS = 35.5;
-
 const baseAgentDetails: AgentDetailRecord[] = [
+
   {
     id: 1,
     agentName: 'OrderBot',
@@ -240,8 +320,7 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ]
-    ,
+    ],
     resultSummary: '처리 결과: 성공 2건, 실패 1건. 결제 이슈는 수동 검수로 전환됨.',
     resultArtifacts: ['order_validation_report.json', 'payment_issue_trace.log']
   },
@@ -377,8 +456,7 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ]
-    ,
+    ],
     resultSummary: '처리 결과: 응답 템플릿 2건 자동 생성, VOC 분류 오류 1건 발생.',
     resultArtifacts: ['support_summary.md', 'voc_classification.csv']
   },
@@ -452,15 +530,13 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'started'
       }
-    ]
-    ,
+    ],
     resultSummary: '처리 결과: 신규 가격대 3개 제안, 수익 개선 8.6% 추정.',
     resultArtifacts: ['pricing_simulation.xlsx', 'margin_projection.png']
   }
 ];
 
 const parseDate = (value: string) => new Date(value.replace(' ', 'T'));
-
 const isWithinRange = (value: string, start: string, end: string) => {
   const target = parseDate(value).getTime();
   return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
@@ -609,8 +685,7 @@ const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
         newState: 'RUNNING',
         description: 'started'
       }
-    ]
-    ,
+    ],
     resultSummary: `${agent.name} 결과 요약: ${tasks.length}건 처리, 성공률 ${Math.round(
       (tasks.filter((task) => task.status === 'COMPLETED').length / tasks.length) * 100
     )}%`,
@@ -1142,7 +1217,6 @@ const PortalAgentListPage: React.FC = () => {
                       </tbody>
                     </table>
                   )}
-
                   <h4>사용자 관점 흐름</h4>
                   <div className="ear-list">
                     <div className="ear-list__row">
@@ -1318,7 +1392,6 @@ const PortalAgentListPage: React.FC = () => {
                   </table>
                 </div>
               )}
-
               {selectedDetailTab === 'results' && (
                 <div className="ear-card__body">
                   <h4>처리 결과 요약</h4>
