@@ -656,6 +656,7 @@ function App() {
         <Route path="/agents/monitoring" element={<Navigate to="/agent-monitoring" replace />} />
         <Route path="/portal-dashboard" element={<PortalDashboardHome />} />
         <Route path="/portal-agents" element={<PortalAgentListPage />} />
+        <Route path="/portal-agents/:agentId" element={<PortalAgentListPage />} />
         <Route path="/portal-tasks" element={<PortalTaskManagementPage />} />
         <Route path="/portal-usage" element={<PortalUsageImpactPage />} />
         <Route path="/portal-roadmap" element={<PortalRoadmapPage />} />

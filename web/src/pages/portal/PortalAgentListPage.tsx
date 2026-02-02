@@ -1,4 +1,5 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
@@ -98,7 +99,6 @@ interface AgentPerformanceSummary {
   tokenCost: number;
   infraCostProrated: number;
   totalCost: number;
-}
 
 interface AgentTaskRecord {
   id: number;
@@ -187,7 +187,6 @@ const ANALYSIS_RANGE = {
 };
 const PRORATION_DAYS = 35.5;
 const baseAgentDetails: AgentDetailRecord[] = [
-
   {
     id: 1,
     agentName: 'OrderBot',
@@ -758,6 +757,8 @@ const loadAgents = () => {
 };
 
 const PortalAgentListPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { agentId } = useParams<{ agentId?: string }>();
   const [agents, setAgents] = useState<AgentRecord[]>(() => loadAgents());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
@@ -765,6 +766,7 @@ const PortalAgentListPage: React.FC = () => {
   const [categoryFilter, setCategoryFilter] = useState('전체');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [selectedDetailTab, setSelectedDetailTab] = useState<'overview' | 'tasks' | 'metrics' | 'costs' | 'results'>('overview');
+  const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [formValues, setFormValues] = useState({
     name: '',
     owner: '',
@@ -846,6 +848,17 @@ const PortalAgentListPage: React.FC = () => {
       return buildGeneratedDetail(agent);
     });
   }, [agents]);
+
+  useEffect(() => {
+    if (!agentId) {
+      return;
+    }
+    if (agentId !== selectedAgentId) {
+      setSelectedAgentId(agentId);
+      setSelectedDetailTab('overview');
+      setIsDetailOpen(true);
+    }
+  }, [agentId, selectedAgentId]);
 
   const performanceSummary = useMemo(
     () => calculatePerformanceSummary(agentDetails, ANALYSIS_RANGE),
@@ -1023,7 +1036,7 @@ const PortalAgentListPage: React.FC = () => {
           </form>
         </aside>
 
-        <section className="ear-table-card">
+        <section className="ear-table-card ear-table-card--split">
           <div className="ear-table-card__header">
             <div>
               <h3>에이전트 목록</h3>
@@ -1034,73 +1047,111 @@ const PortalAgentListPage: React.FC = () => {
               <button className="ear-secondary">정렬</button>
             </div>
           </div>
-          <table className="ear-table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>이름</th>
-                <th>소유 조직</th>
-                <th>상태</th>
-                <th>런타임 상태</th>
-                <th>런타임 에러</th>
-                <th>리스크</th>
-                <th>최근 업데이트</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAgents.map((agent) => (
-                <tr
-                  key={agent.id}
-                  className={agent.id === selectedAgentId ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
-                  onClick={() => {
-                    setSelectedAgentId(agent.id);
-                    setSelectedDetailTab('overview');
-                  }}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(event) => {
+          <div className="ear-table-split">
+            <div className="ear-table-split__main">
+              <table className="ear-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>이름</th>
+                    <th>소유 조직</th>
+                    <th>상태</th>
+                    <th>런타임 상태</th>
+                    <th>런타임 에러</th>
+                    <th>리스크</th>
+                    <th>최근 업데이트</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredAgents.map((agent) => (
+                    <tr
+                      key={agent.id}
+                      className={agent.id === selectedAgentId ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
+                      onClick={() => {
+                        setSelectedAgentId(agent.id);
+                        setSelectedDetailTab('overview');
+                        setIsDetailOpen(true);
+                        navigate(`/portal-agents/${agent.id}`);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
                     if (event.key === 'Enter' || event.key === ' ') {
                       setSelectedAgentId(agent.id);
                       setSelectedDetailTab('overview');
+                      setIsDetailOpen(true);
+                      navigate(`/portal-agents/${agent.id}`);
                     }
-                  }}
-                >
-                  <td>{agent.id}</td>
-                  <td>
-                    <strong>{agent.name}</strong>
-                    <span className="ear-muted">{agent.category}</span>
-                  </td>
-                  <td>{agent.owner}</td>
-                  <td>
-                    <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
-                  </td>
-                  <td>
-                    <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
-                  </td>
-                  <td>{agent.runtimeErrors}</td>
-                  <td>
-                    <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
-                  </td>
-                  <td>{agent.lastUpdated}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                      }}
+                    >
+                      <td>{agent.id}</td>
+                      <td>
+                        <strong>{agent.name}</strong>
+                        <span className="ear-muted">{agent.category}</span>
+                      </td>
+                      <td>{agent.owner}</td>
+                      <td>
+                        <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
+                      </td>
+                      <td>
+                        <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
+                      </td>
+                      <td>{agent.runtimeErrors}</td>
+                      <td>
+                        <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
+                      </td>
+                      <td>{agent.lastUpdated}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-          {selectedAgent && (
-            <div className="ear-card ear-card--large">
-              <div className="ear-card__header">
-                <div>
-                  <h3>{selectedAgent.agentName} 상세</h3>
-                  <p>샘플 데이터 ({ANALYSIS_RANGE.start} ~ {ANALYSIS_RANGE.end}) 기준 요약</p>
+            {selectedAgent && (
+              <aside className="ear-card ear-card--panel">
+                <div className="ear-card__header">
+                  <div>
+                    <h3>{selectedAgent.agentName} 상세</h3>
+                    <p>샘플 데이터 ({ANALYSIS_RANGE.start} ~ {ANALYSIS_RANGE.end}) 기준 요약</p>
+                  </div>
+                  <div className="ear-card__actions">
+                    <button
+                      type="button"
+                      className="ear-secondary"
+                      onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
+                    >
+                      태스크 관리 보기
+                    </button>
+                    <button
+                      type="button"
+                      className="ear-ghost"
+                      onClick={() => setIsDetailOpen((prev) => !prev)}
+                    >
+                      {isDetailOpen ? '접기' : '펼치기'}
+                    </button>
+                  </div>
                 </div>
-              </div>
 
-              <div className="ear-tabs">
-                <button
-                  type="button"
-                  className={`ear-tab ${selectedDetailTab === 'overview' ? 'ear-tab--active' : ''}`}
-                  onClick={() => setSelectedDetailTab('overview')}
+                {!isDetailOpen && (
+                  <div className="ear-card__body ear-panel-collapsed">
+                    <p>상세 패널이 접혀 있습니다. 다시 열어 확인하세요.</p>
+                    <button
+                      type="button"
+                      className="ear-secondary"
+                      onClick={() => setIsDetailOpen(true)}
+                    >
+                      상세 열기
+                    </button>
+                  </div>
+                )}
+
+                {isDetailOpen && (
+                  <>
+                    <div className="ear-tabs">
+                      <button
+                        type="button"
+                        className={`ear-tab ${selectedDetailTab === 'overview' ? 'ear-tab--active' : ''}`}
+                        onClick={() => setSelectedDetailTab('overview')}
                 >
                   요약
                 </button>
@@ -1404,8 +1455,11 @@ const PortalAgentListPage: React.FC = () => {
                   </ul>
                 </div>
               )}
-            </div>
-          )}
+                  </>
+                )}
+              </aside>
+            )}
+          </div>
         </section>
       </div>
     </PortalDashboardLayout>

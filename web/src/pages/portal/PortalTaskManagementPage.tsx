@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
@@ -118,8 +119,12 @@ const formatCost = (value: number) => formatNumber(value);
 const formatPercent = (value: number) => `${formatNumber(value)}%`;
 
 const PortalTaskManagementPage: React.FC = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<TaskStatus | '전체'>('전체');
+  const agentFilter = searchParams.get('agent');
+  const normalizedAgentFilter = agentFilter?.trim().toLowerCase();
 
   const taskRows = useMemo(() => {
     return sampleTasks.map((task) => {
@@ -146,9 +151,12 @@ const PortalTaskManagementPage: React.FC = () => {
     return taskRows.filter((task) => {
       const matchesSearch = task.taskName.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === '전체' || task.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesAgent = normalizedAgentFilter
+        ? task.agentName.toLowerCase() === normalizedAgentFilter
+        : true;
+      return matchesSearch && matchesStatus && matchesAgent;
     });
-  }, [search, statusFilter, taskRows]);
+  }, [normalizedAgentFilter, search, statusFilter, taskRows]);
 
   const totals = useMemo(() => {
     return filteredTasks.reduce(
@@ -169,6 +177,36 @@ const PortalTaskManagementPage: React.FC = () => {
       subtitle="Task 단위 생산성/ROI를 추적하고 FTE 환산 지표를 확인합니다."
       actions={<button className="ear-primary">태스크 리포트 생성</button>}
     >
+      {agentFilter && (
+        <section className="ear-card">
+          <div className="ear-card__header">
+            <div>
+              <h3>에이전트 필터 적용됨</h3>
+              <p>{agentFilter} 기준으로 태스크를 표시합니다.</p>
+            </div>
+            <div className="ear-card__actions">
+              <button
+                type="button"
+                className="ear-secondary"
+                onClick={() => {
+                  const nextParams = new URLSearchParams(searchParams);
+                  nextParams.delete('agent');
+                  setSearchParams(nextParams);
+                }}
+              >
+                필터 해제
+              </button>
+              <button
+                type="button"
+                className="ear-ghost"
+                onClick={() => navigate('/portal-agents')}
+              >
+                에이전트 화면으로 이동
+              </button>
+            </div>
+          </div>
+        </section>
+      )}
       <section className="ear-card ear-card--large">
         <div className="ear-card__header">
           <div>
