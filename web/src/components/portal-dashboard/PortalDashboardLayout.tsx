@@ -5,6 +5,7 @@ import {
   Flag,
   LayoutGrid,
   ListChecks,
+  ClipboardList,
   Settings
 } from 'lucide-react';
 import '../../styles/portal-dashboard.css';
@@ -20,6 +21,7 @@ interface PortalDashboardLayoutProps {
 const navItems = [
   { to: '/portal-dashboard', label: '대시보드', icon: LayoutGrid },
   { to: '/portal-agents', label: '에이전트 목록', icon: ListChecks },
+  { to: '/portal-tasks', label: '태스크 관리', icon: ClipboardList },
   { to: '/portal-usage', label: '사용 현황/효과', icon: BarChart3 },
   { to: '/portal-roadmap', label: '로드맵', icon: Flag },
   { to: '/portal-settings', label: '화면 구성', icon: Settings, systemOnly: true }
