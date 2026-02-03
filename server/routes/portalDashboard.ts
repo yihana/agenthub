@@ -69,6 +69,125 @@ const normalizeErrorRate = (raw: number | null) => {
   return Math.max(0, normalized);
 };
 
+const toNumberSafe = (value: unknown, fallback = 0): number => {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : fallback;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) {
+      return fallback;
+    }
+    const parsed = Number(trimmed.replace(/,/g, ''));
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  if (typeof value === 'bigint') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : fallback;
+  }
+  if (value === null || value === undefined) {
+    return fallback;
+  }
+  if (typeof value === 'object') {
+    const objectValue = value as {
+      value?: unknown;
+      valueOf?: () => unknown;
+      toString?: () => string;
+    };
+    if (Object.prototype.hasOwnProperty.call(objectValue, 'value')) {
+      return toNumberSafe(objectValue.value, fallback);
+    }
+    if (typeof objectValue.valueOf === 'function') {
+      const valueOfResult = objectValue.valueOf();
+      if (valueOfResult !== value) {
+        return toNumberSafe(valueOfResult, fallback);
+      }
+    }
+    if (typeof objectValue.toString === 'function') {
+      const parsed = Number(objectValue.toString());
+      return Number.isFinite(parsed) ? parsed : fallback;
+    }
+  }
+  return fallback;
+};
+
+const toFixedSafe = (value: unknown, digits: number, fallback = '0.0'): string => {
+  const numericValue = toNumberSafe(value, Number.NaN);
+  return Number.isFinite(numericValue) ? numericValue.toFixed(digits) : fallback;
+};
+
+/*
+toFixedSafe('1.234', 1) => '1.2'
+toFixedSafe(null, 1) => '0.0'
+toFixedSafe({ value: '2.5' }, 1) => '2.5'
+toFixedSafe('abc', 1) => '0.0'
+*/
+
+const buildFallbackMetrics = (
+  period: string,
+  baselines: Array<{ metric_key: string; value: number; unit?: string; description?: string }>,
+  includeDates: boolean
+) => ({
+  period,
+  ...(includeDates ? { date_from: null, date_to: null } : {}),
+  total_requests: 0,
+  prev_total_requests: 0,
+  growth_rate_pct: 0,
+  completed_requests: 0,
+  pending_requests: 0,
+  avg_latency_ms: 0,
+  error_rate_pct: 0,
+  quality_score: 0,
+  stability_score: 0,
+  avg_queue_time_ms: 0,
+  task_success_rate_pct: 0,
+  task_error_rate_pct: 0,
+  sla_compliance_pct: 0,
+  user_coverage_pct: 0,
+  requests_processed: 0,
+  breakdown: [],
+  domain_stats: [],
+  domain_penetration: [],
+  funnel_stats: [],
+  baselines: baselines.map((item) => ({
+    metric_key: item.metric_key,
+    value: item.value,
+    unit: item.unit || null,
+    description: item.description || null
+  })),
+  collaboration: {
+    decision_accuracy_pct: 0,
+    override_rate_pct: 0,
+    cognitive_load_reduction_pct: 0,
+    handoff_time_seconds: 0,
+    team_satisfaction_score: 0,
+    innovation_count: 0
+  },
+  risk: {
+    risk_exposure_score: 0,
+    audit_required_rate_pct: 0,
+    audit_completed_rate_pct: 0,
+    human_review_rate_pct: 0,
+    total_risk_items: 0
+  },
+  value: {
+    role_redesign_ratio_pct: 0,
+    customer_nps_delta: 0,
+    error_reduction_pct: 0,
+    decision_speed_improvement_pct: 0
+  },
+  savings: {
+    baseline_minutes_per_request: 0,
+    avg_response_minutes: 0,
+    time_savings_minutes: 0,
+    cost_savings: 0,
+    baseline_cost: 0,
+    investment_cost: 0,
+    roi_ratio_pct: 0,
+    sla_latency_ms: 0
+  }
+});
+
 const buildFilter = (agentIndex: number, businessIndex: number) =>
   `AND ($${agentIndex}::text IS NULL OR a.type = $${agentIndex}) AND ($${businessIndex}::text IS NULL OR a.business_type = $${businessIndex})`;
 
@@ -266,134 +385,175 @@ router.get('/metrics', async (req, res) => {
         [businessType || null, agentType || null]
       );
 
-      const baselineMap = new Map<string, { value: number }>();
-      baselines.rows.forEach((item: any) => {
-        baselineMap.set(item.metric_key, item);
+      const baselineMap = new Map<string, { value: number; unit?: string; description?: string; rawValue?: unknown }>();
+      baselines.rows.forEach((item: { metric_key: string; value: unknown; unit?: string; description?: string }) => {
+        baselineMap.set(item.metric_key, {
+          value: toNumberSafe(item.value, 0),
+          unit: item.unit,
+          description: item.description,
+          rawValue: item.value
+        });
       });
       DEFAULT_BASELINES.forEach((item) => {
         if (!baselineMap.has(item.metric_key)) {
-          baselineMap.set(item.metric_key, item as any);
+          baselineMap.set(item.metric_key, { ...item, rawValue: item.value });
         }
       });
 
-      const avgLatency = Number(row.avg_latency || 0);
-      const avgQueueTime = Number(row.avg_queue_time || 0);
-      const errorRateRaw = Number(row.avg_error_rate || 0);
-      const normalizedErrorRate = normalizeErrorRate(errorRateRaw) ?? 0;
-      const errorRatePct = normalizedErrorRate * 100;
-      const qualityScore = Math.max(0, (1 - normalizedErrorRate) * 5);
-      const stabilityScore = Math.max(0, 100 - errorRatePct);
+      const fallbackBaselines = Array.from(baselineMap.entries()).map(([key, value]) => ({
+        metric_key: key,
+        value: value.value,
+        unit: value.unit,
+        description: value.description
+      }));
 
+      let customerNpsDeltaRaw: unknown = null;
+      let avgLatency = 0;
+      let avgQueueTime = 0;
+      let errorRateRaw = 0;
       let baselineMinutes = baselineMap.get('baseline_minutes_per_request')?.value ?? 12;
       let costPerHour = baselineMap.get('cost_per_hour')?.value ?? 45000;
-      const slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? 2000;
-      const investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
-      const totalRoles = baselineMap.get('total_roles')?.value ?? 0;
-      const rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
-      const customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
-      const errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
-      const decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
-      const avgResponseMinutes = (avgLatency + avgQueueTime) / 1000 / 60;
-      const completedRequests = Number(row.completed_requests || 0);
+      let slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? 2000;
+      let investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
+      let totalRoles = baselineMap.get('total_roles')?.value ?? 0;
+      let rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
+      let customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
+      let errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
+      let decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
+      let avgResponseMinutes = 0;
+      let completedRequests = 0;
       let baselineCostOverride: number | null = null;
 
-      if (businessType) {
-        const taskBaseline = await query(
-          `SELECT AVG(before_time_min) AS before_time_min, AVG(before_cost) AS before_cost
-           FROM business_task_baseline
-           WHERE domain = $1`,
-          [businessType]
+      try {
+        avgLatency = toNumberSafe(row.avg_latency, 0);
+        avgQueueTime = toNumberSafe(row.avg_queue_time, 0);
+        errorRateRaw = toNumberSafe(row.avg_error_rate, 0);
+        customerNpsDeltaRaw = baselineMap.get('customer_nps_delta')?.rawValue;
+
+        const normalizedErrorRate = normalizeErrorRate(errorRateRaw) ?? 0;
+        const errorRatePct = normalizedErrorRate * 100;
+        const qualityScore = Math.max(0, (1 - normalizedErrorRate) * 5);
+        const stabilityScore = Math.max(0, 100 - errorRatePct);
+
+        slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? 2000;
+        investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
+        totalRoles = baselineMap.get('total_roles')?.value ?? 0;
+        rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
+        customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
+        errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
+        decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
+        avgResponseMinutes = (avgLatency + avgQueueTime) / 1000 / 60;
+        completedRequests = Number(row.completed_requests || 0);
+
+        if (process.env.DEBUG_PORTAL_METRICS === 'true') {
+          console.info('[portalDashboard/metrics] debug', {
+            customerNpsDeltaRaw,
+            customerNpsDeltaRawType: typeof customerNpsDeltaRaw,
+            avgLatency,
+            avgQueueTime,
+            errorRateRaw,
+            baselineMinutes,
+            costPerHour
+          });
+        }
+
+        if (businessType) {
+          const taskBaseline = await query(
+            `SELECT AVG(before_time_min) AS before_time_min, AVG(before_cost) AS before_cost
+             FROM business_task_baseline
+             WHERE domain = $1`,
+            [businessType]
+          );
+          if (taskBaseline.rows[0]?.before_time_min) {
+            baselineMinutes = toNumberSafe(taskBaseline.rows[0].before_time_min, baselineMinutes);
+          }
+          if (taskBaseline.rows[0]?.before_cost) {
+            baselineCostOverride = toNumberSafe(taskBaseline.rows[0].before_cost, 0) * completedRequests;
+          }
+        }
+
+        const laborCost = await query(
+          `SELECT hourly_cost
+           FROM labor_cost
+           WHERE (business_type = $1 OR business_type IS NULL)
+           ORDER BY business_type DESC NULLS LAST
+           LIMIT 1`,
+          [businessType || null]
         );
-        if (taskBaseline.rows[0]?.before_time_min) {
-          baselineMinutes = Number(taskBaseline.rows[0].before_time_min);
+        if (laborCost.rows[0]?.hourly_cost) {
+          costPerHour = toNumberSafe(laborCost.rows[0].hourly_cost, costPerHour);
         }
-        if (taskBaseline.rows[0]?.before_cost) {
-          baselineCostOverride = Number(taskBaseline.rows[0].before_cost) * completedRequests;
-        }
-      }
 
-      const laborCost = await query(
-        `SELECT hourly_cost
-         FROM labor_cost
-         WHERE (business_type = $1 OR business_type IS NULL)
-         ORDER BY business_type DESC NULLS LAST
-         LIMIT 1`,
-        [businessType || null]
-      );
-      if (laborCost.rows[0]?.hourly_cost) {
-        costPerHour = Number(laborCost.rows[0].hourly_cost);
-      }
+        const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
+        const costSavings = (timeSavingsMinutes / 60) * costPerHour;
+        const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
+        const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
+        const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
 
-      const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
-      const costSavings = (timeSavingsMinutes / 60) * costPerHour;
-      const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
-      const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
-      const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
+        const totalTasks = Number(row.total_tasks || 0);
+        const successTasks = Number(row.success_tasks || 0);
+        const errorTasks = Number(row.error_tasks || 0);
+        const taskSuccessRate = totalTasks > 0 ? (successTasks / totalTasks) * 100 : 0;
+        const taskErrorRate = totalTasks > 0 ? (errorTasks / totalTasks) * 100 : 0;
 
-      const totalTasks = Number(row.total_tasks || 0);
-      const successTasks = Number(row.success_tasks || 0);
-      const errorTasks = Number(row.error_tasks || 0);
-      const taskSuccessRate = totalTasks > 0 ? (successTasks / totalTasks) * 100 : 0;
-      const taskErrorRate = totalTasks > 0 ? (errorTasks / totalTasks) * 100 : 0;
+        const avgLatencyTotal = avgLatency + avgQueueTime;
+        const slaCompliance = avgLatencyTotal <= slaLatencyMs
+          ? 100
+          : Math.max(0, 100 - ((avgLatencyTotal - slaLatencyMs) / slaLatencyMs) * 100);
 
-      const avgLatencyTotal = avgLatency + avgQueueTime;
-      const slaCompliance = avgLatencyTotal <= slaLatencyMs
-        ? 100
-        : Math.max(0, 100 - ((avgLatencyTotal - slaLatencyMs) / slaLatencyMs) * 100);
+        const prevTotal = Number(row.prev_total_requests || 0);
+        const growthRate = prevTotal > 0 ? ((Number(row.total_requests || 0) - prevTotal) / prevTotal) * 100 : 0;
 
-      const prevTotal = Number(row.prev_total_requests || 0);
-      const growthRate = prevTotal > 0 ? ((Number(row.total_requests || 0) - prevTotal) / prevTotal) * 100 : 0;
+        const totalUsers = Number(row.total_users || 0);
+        const mappedUsers = Number(row.mapped_users || 0);
+        const userCoverage = totalUsers > 0 ? (mappedUsers / totalUsers) * 100 : 0;
 
-      const totalUsers = Number(row.total_users || 0);
-      const mappedUsers = Number(row.mapped_users || 0);
-      const userCoverage = totalUsers > 0 ? (mappedUsers / totalUsers) * 100 : 0;
+        const assistedDecisions = Number(row.ai_assisted_decisions || 0);
+        const validatedDecisions = Number(row.ai_validated_decisions || 0);
+        const aiRecommendations = Number(row.ai_recommendations || 0);
+        const overriddenDecisions = Number(row.decisions_overridden || 0);
+        const avgCognitiveLoadBefore = Number(row.avg_cognitive_load_before || 0);
+        const avgCognitiveLoadAfter = Number(row.avg_cognitive_load_after || 0);
+        const avgHandoffTime = Number(row.avg_handoff_time_seconds || 0);
+        const avgTeamSatisfaction = Number(row.avg_team_satisfaction_score || 0);
+        const innovationCount = Number(row.innovation_count || 0);
 
-      const assistedDecisions = Number(row.ai_assisted_decisions || 0);
-      const validatedDecisions = Number(row.ai_validated_decisions || 0);
-      const aiRecommendations = Number(row.ai_recommendations || 0);
-      const overriddenDecisions = Number(row.decisions_overridden || 0);
-      const avgCognitiveLoadBefore = Number(row.avg_cognitive_load_before || 0);
-      const avgCognitiveLoadAfter = Number(row.avg_cognitive_load_after || 0);
-      const avgHandoffTime = Number(row.avg_handoff_time_seconds || 0);
-      const avgTeamSatisfaction = Number(row.avg_team_satisfaction_score || 0);
-      const innovationCount = Number(row.innovation_count || 0);
+        const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
+        const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
+        const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
+          ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
+          : 0;
 
-      const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
-      const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
-      const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
-        ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
-        : 0;
+        const collaborationDecisionAccuracy = row.decision_accuracy_pct !== null && row.decision_accuracy_pct !== undefined
+          ? Number(row.decision_accuracy_pct)
+          : null;
+        const collaborationOverrideRate = row.override_rate_pct !== null && row.override_rate_pct !== undefined
+          ? Number(row.override_rate_pct)
+          : null;
+        const collaborationCognitiveReduction = row.cognitive_load_reduction_pct !== null && row.cognitive_load_reduction_pct !== undefined
+          ? Number(row.cognitive_load_reduction_pct)
+          : null;
+        const collaborationHandoff = row.collaboration_handoff_time_seconds !== null && row.collaboration_handoff_time_seconds !== undefined
+          ? Number(row.collaboration_handoff_time_seconds)
+          : null;
+        const collaborationSatisfaction = row.collaboration_team_satisfaction_score !== null && row.collaboration_team_satisfaction_score !== undefined
+          ? Number(row.collaboration_team_satisfaction_score)
+          : null;
+        const collaborationInnovation = row.collaboration_innovation_count !== null && row.collaboration_innovation_count !== undefined
+          ? Number(row.collaboration_innovation_count)
+          : null;
 
-      const collaborationDecisionAccuracy = row.decision_accuracy_pct !== null && row.decision_accuracy_pct !== undefined
-        ? Number(row.decision_accuracy_pct)
-        : null;
-      const collaborationOverrideRate = row.override_rate_pct !== null && row.override_rate_pct !== undefined
-        ? Number(row.override_rate_pct)
-        : null;
-      const collaborationCognitiveReduction = row.cognitive_load_reduction_pct !== null && row.cognitive_load_reduction_pct !== undefined
-        ? Number(row.cognitive_load_reduction_pct)
-        : null;
-      const collaborationHandoff = row.collaboration_handoff_time_seconds !== null && row.collaboration_handoff_time_seconds !== undefined
-        ? Number(row.collaboration_handoff_time_seconds)
-        : null;
-      const collaborationSatisfaction = row.collaboration_team_satisfaction_score !== null && row.collaboration_team_satisfaction_score !== undefined
-        ? Number(row.collaboration_team_satisfaction_score)
-        : null;
-      const collaborationInnovation = row.collaboration_innovation_count !== null && row.collaboration_innovation_count !== undefined
-        ? Number(row.collaboration_innovation_count)
-        : null;
+        const totalRisks = Number(row.total_risks || 0);
+        const avgRiskScore = Number(row.avg_risk_score || 0);
+        const auditRequiredCount = Number(row.audit_required_count || 0);
+        const auditCompletedCount = Number(row.audit_completed_count || 0);
+        const humanReviewedCount = Number(row.human_reviewed_count || 0);
 
-      const totalRisks = Number(row.total_risks || 0);
-      const avgRiskScore = Number(row.avg_risk_score || 0);
-      const auditRequiredCount = Number(row.audit_required_count || 0);
-      const auditCompletedCount = Number(row.audit_completed_count || 0);
-      const humanReviewedCount = Number(row.human_reviewed_count || 0);
+        const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
+        const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
+        const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
 
-      const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
-      const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
-      const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
-
-      const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
+        const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
 
       try {
         await query(
@@ -406,9 +566,9 @@ router.get('/metrics', async (req, res) => {
             row.date_to,
             businessType || null,
             agentType || null,
-            Number((timeSavingsMinutes / 60).toFixed(2)),
-            Number(costSavings.toFixed(2)),
-            Number(roiRatio.toFixed(2))
+            Number(toFixedSafe(timeSavingsMinutes / 60, 2, '0.00')),
+            Number(toFixedSafe(costSavings, 2, '0.00')),
+            Number(toFixedSafe(roiRatio, 2, '0.00'))
           ]
         );
       } catch (error) {
@@ -430,18 +590,18 @@ router.get('/metrics', async (req, res) => {
         date_to: row.date_to,
         total_requests: Number(row.total_requests || 0),
         prev_total_requests: prevTotal,
-        growth_rate_pct: Number(growthRate.toFixed(2)),
+        growth_rate_pct: Number(toFixedSafe(growthRate, 2, '0.00')),
         completed_requests: completedRequests,
         pending_requests: Number(row.pending_requests || 0),
         avg_latency_ms: avgLatency,
         error_rate_pct: errorRatePct,
-        quality_score: Number(qualityScore.toFixed(2)),
-        stability_score: Number(stabilityScore.toFixed(2)),
+        quality_score: Number(toFixedSafe(qualityScore, 2, '0.00')),
+        stability_score: Number(toFixedSafe(stabilityScore, 2, '0.00')),
         avg_queue_time_ms: avgQueueTime,
-        task_success_rate_pct: Number(taskSuccessRate.toFixed(2)),
-        task_error_rate_pct: Number(taskErrorRate.toFixed(2)),
-        sla_compliance_pct: Number(slaCompliance.toFixed(2)),
-        user_coverage_pct: Number(userCoverage.toFixed(2)),
+        task_success_rate_pct: Number(toFixedSafe(taskSuccessRate, 2, '0.00')),
+        task_error_rate_pct: Number(toFixedSafe(taskErrorRate, 2, '0.00')),
+        sla_compliance_pct: Number(toFixedSafe(slaCompliance, 2, '0.00')),
+        user_coverage_pct: Number(toFixedSafe(userCoverage, 2, '0.00')),
         requests_processed: Number(row.requests_processed || 0),
         breakdown: row.breakdown || [],
         domain_stats: domainStats,
@@ -455,44 +615,54 @@ router.get('/metrics', async (req, res) => {
         })),
         collaboration: {
           decision_accuracy_pct: Number(
-            ((collaborationDecisionAccuracy ?? decisionAccuracyFallback) as number).toFixed(2)
+            toFixedSafe(collaborationDecisionAccuracy ?? decisionAccuracyFallback, 2, '0.00')
           ),
-          override_rate_pct: Number(((collaborationOverrideRate ?? overrideRateFallback) as number).toFixed(2)),
+          override_rate_pct: Number(
+            toFixedSafe(collaborationOverrideRate ?? overrideRateFallback, 2, '0.00')
+          ),
           cognitive_load_reduction_pct: Number(
-            ((collaborationCognitiveReduction ?? cognitiveLoadReductionFallback) as number).toFixed(2)
+            toFixedSafe(collaborationCognitiveReduction ?? cognitiveLoadReductionFallback, 2, '0.00')
           ),
-          handoff_time_seconds: Number(
-            ((collaborationHandoff ?? avgHandoffTime) as number).toFixed(2)
-          ),
+          handoff_time_seconds: Number(toFixedSafe(collaborationHandoff ?? avgHandoffTime, 2, '0.00')),
           team_satisfaction_score: Number(
-            ((collaborationSatisfaction ?? avgTeamSatisfaction) as number).toFixed(2)
+            toFixedSafe(collaborationSatisfaction ?? avgTeamSatisfaction, 2, '0.00')
           ),
-          innovation_count: Number((collaborationInnovation ?? innovationCount).toFixed(0))
+          innovation_count: Number(toFixedSafe(collaborationInnovation ?? innovationCount, 0, '0'))
         },
         risk: {
-          risk_exposure_score: Number(avgRiskScore.toFixed(2)),
-          audit_required_rate_pct: Number(auditRequiredRate.toFixed(2)),
-          audit_completed_rate_pct: Number(auditCompletedRate.toFixed(2)),
-          human_review_rate_pct: Number(humanReviewRate.toFixed(2)),
+          risk_exposure_score: Number(toFixedSafe(avgRiskScore, 2, '0.00')),
+          audit_required_rate_pct: Number(toFixedSafe(auditRequiredRate, 2, '0.00')),
+          audit_completed_rate_pct: Number(toFixedSafe(auditCompletedRate, 2, '0.00')),
+          human_review_rate_pct: Number(toFixedSafe(humanReviewRate, 2, '0.00')),
           total_risk_items: totalRisks
         },
         value: {
-          role_redesign_ratio_pct: Number(roleRedesignRatio.toFixed(2)),
-          customer_nps_delta: Number(customerNpsDelta.toFixed(2)),
-          error_reduction_pct: Number(errorReductionPct.toFixed(2)),
-          decision_speed_improvement_pct: Number(decisionSpeedImprovementPct.toFixed(2))
+          role_redesign_ratio_pct: Number(toFixedSafe(roleRedesignRatio, 2, '0.00')),
+          customer_nps_delta: Number(toFixedSafe(customerNpsDelta, 2, '0.00')),
+          error_reduction_pct: Number(toFixedSafe(errorReductionPct, 2, '0.00')),
+          decision_speed_improvement_pct: Number(toFixedSafe(decisionSpeedImprovementPct, 2, '0.00'))
         },
         savings: {
           baseline_minutes_per_request: baselineMinutes,
-          avg_response_minutes: Number(avgResponseMinutes.toFixed(4)),
-          time_savings_minutes: Number(timeSavingsMinutes.toFixed(2)),
-          cost_savings: Number(costSavings.toFixed(2)),
-          baseline_cost: Number(baselineCost.toFixed(2)),
-          investment_cost: Number(normalizedInvestmentCost.toFixed(2)),
-          roi_ratio_pct: Number(roiRatio.toFixed(2)),
+          avg_response_minutes: Number(toFixedSafe(avgResponseMinutes, 4, '0.0000')),
+          time_savings_minutes: Number(toFixedSafe(timeSavingsMinutes, 2, '0.00')),
+          cost_savings: Number(toFixedSafe(costSavings, 2, '0.00')),
+          baseline_cost: Number(toFixedSafe(baselineCost, 2, '0.00')),
+          investment_cost: Number(toFixedSafe(normalizedInvestmentCost, 2, '0.00')),
+          roi_ratio_pct: Number(toFixedSafe(roiRatio, 2, '0.00')),
           sla_latency_ms: slaLatencyMs
         }
       });
+      } catch (error) {
+        console.error('Portal dashboard metrics assembly error:', {
+          route: 'portalDashboard/metrics',
+          error,
+          customerNpsDeltaRawType: typeof customerNpsDeltaRaw,
+          avgLatencyType: typeof avgLatency,
+          avgQueueTimeType: typeof avgQueueTime
+        });
+        return res.json(buildFallbackMetrics(period, fallbackBaselines, true));
+      }
     }
 
     const hanaAgentFilter: string[] = [];
@@ -682,223 +852,285 @@ router.get('/metrics', async (req, res) => {
     ];
     const hanaResult = await query(hanaMetricsSql, hanaParams);
     const row = hanaResult.rows?.[0] || hanaResult[0] || {};
-    const avgLatency = Number(row.AVG_LATENCY || 0);
-    const avgQueueTime = Number(row.AVG_QUEUE_TIME || 0);
-    const errorRateRaw = Number(row.AVG_ERROR_RATE || 0);
-    const normalizedErrorRate = normalizeErrorRate(errorRateRaw) ?? 0;
-    const errorRatePct = normalizedErrorRate * 100;
-    const qualityScore = Math.max(0, (1 - normalizedErrorRate) * 5);
-    const stabilityScore = Math.max(0, 100 - errorRatePct);
-    const totalTasks = Number(row.TOTAL_TASKS || 0);
-    const successTasks = Number(row.SUCCESS_TASKS || 0);
-    const errorTasks = Number(row.ERROR_TASKS || 0);
-    const taskSuccessRate = totalTasks > 0 ? (successTasks / totalTasks) * 100 : 0;
-    const taskErrorRate = totalTasks > 0 ? (errorTasks / totalTasks) * 100 : 0;
-    const avgLatencyTotal = avgLatency + avgQueueTime;
-    const baselineRows = await query(
-      'SELECT METRIC_KEY, VALUE, UNIT, DESCRIPTION FROM EAR.PORTAL_METRIC_INPUTS'
-    );
-    const baselineMap = new Map<string, { value: number; unit?: string; description?: string }>();
-    (baselineRows.rows || baselineRows || []).forEach((item: any) => {
-      baselineMap.set(item.METRIC_KEY || item.metric_key, {
-        value: Number(item.VALUE || item.value),
-        unit: item.UNIT || item.unit,
-        description: item.DESCRIPTION || item.description
-      });
-    });
-    DEFAULT_BASELINES.forEach((item) => {
-      if (!baselineMap.has(item.metric_key)) {
-        baselineMap.set(item.metric_key, { value: item.value, unit: item.unit, description: item.description });
-      }
-    });
-
-    let baselineMinutes = baselineMap.get('baseline_minutes_per_request')?.value ?? 12;
-    let costPerHour = baselineMap.get('cost_per_hour')?.value ?? 45000;
-    const slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? DEFAULT_BASELINES[2].value;
-    const investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
-    const totalRoles = baselineMap.get('total_roles')?.value ?? 0;
-    const rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
-    const customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
-    const errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
-    const decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
-    const slaCompliance = avgLatencyTotal <= slaLatencyMs
-      ? 100
-      : Math.max(0, 100 - ((avgLatencyTotal - slaLatencyMs) / slaLatencyMs) * 100);
-    const totalUsers = Number(row.TOTAL_USERS || 0);
-    const mappedUsers = Number(row.MAPPED_USERS || 0);
-    const userCoverage = totalUsers > 0 ? (mappedUsers / totalUsers) * 100 : 0;
-    const prevTotal = Number(row.PREV_TOTAL_REQUESTS || 0);
-    const growthRate = prevTotal > 0 ? ((Number(row.TOTAL_REQUESTS || 0) - prevTotal) / prevTotal) * 100 : 0;
-    const avgResponseMinutes = (avgLatency + avgQueueTime) / 1000 / 60;
-    const completedRequests = Number(row.COMPLETED_REQUESTS || 0);
-    let baselineCostOverride: number | null = null;
-
-    if (businessType) {
-      const taskBaseline = await query(
-        'SELECT AVG(BEFORE_TIME_MIN) AS BEFORE_TIME_MIN, AVG(BEFORE_COST) AS BEFORE_COST FROM EAR.BUSINESS_TASK_BASELINE WHERE DOMAIN = ?',
-        [businessType]
-      );
-      const taskRow = taskBaseline.rows?.[0] || taskBaseline[0] || {};
-      if (taskRow.BEFORE_TIME_MIN) {
-        baselineMinutes = Number(taskRow.BEFORE_TIME_MIN);
-      }
-      if (taskRow.BEFORE_COST) {
-        baselineCostOverride = Number(taskRow.BEFORE_COST) * completedRequests;
-      }
-    }
-
-    const laborCost = await query(
-      'SELECT HOURLY_COST FROM EAR.LABOR_COST WHERE (BUSINESS_TYPE = ? OR BUSINESS_TYPE IS NULL) ORDER BY BUSINESS_TYPE DESC LIMIT 1',
-      [businessType || null]
-    );
-    const laborRow = laborCost.rows?.[0] || laborCost[0] || {};
-    if (laborRow.HOURLY_COST) {
-      costPerHour = Number(laborRow.HOURLY_COST);
-    }
-
-    const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
-    const costSavings = (timeSavingsMinutes / 60) * costPerHour;
-    const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
-    const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
-    const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
-
-    const assistedDecisions = Number(row.AI_ASSISTED_DECISIONS || 0);
-    const validatedDecisions = Number(row.AI_ASSISTED_DECISIONS_VALIDATED || 0);
-    const aiRecommendations = Number(row.AI_RECOMMENDATIONS || 0);
-    const overriddenDecisions = Number(row.DECISIONS_OVERRIDDEN || 0);
-    const avgCognitiveLoadBefore = Number(row.AVG_COGNITIVE_LOAD_BEFORE || 0);
-    const avgCognitiveLoadAfter = Number(row.AVG_COGNITIVE_LOAD_AFTER || 0);
-    const avgHandoffTime = Number(row.AVG_HANDOFF_TIME_SECONDS || 0);
-    const avgTeamSatisfaction = Number(row.AVG_TEAM_SATISFACTION_SCORE || 0);
-    const innovationCount = Number(row.INNOVATION_COUNT || 0);
-
-    const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
-    const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
-    const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
-      ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
-      : 0;
-
-    const collaborationDecisionAccuracy = row.DECISION_ACCURACY_PCT !== null && row.DECISION_ACCURACY_PCT !== undefined
-      ? Number(row.DECISION_ACCURACY_PCT)
-      : null;
-    const collaborationOverrideRate = row.OVERRIDE_RATE_PCT !== null && row.OVERRIDE_RATE_PCT !== undefined
-      ? Number(row.OVERRIDE_RATE_PCT)
-      : null;
-    const collaborationCognitiveReduction = row.COGNITIVE_LOAD_REDUCTION_PCT !== null && row.COGNITIVE_LOAD_REDUCTION_PCT !== undefined
-      ? Number(row.COGNITIVE_LOAD_REDUCTION_PCT)
-      : null;
-    const collaborationHandoff = row.COLLAB_HANDOFF_TIME_SECONDS !== null && row.COLLAB_HANDOFF_TIME_SECONDS !== undefined
-      ? Number(row.COLLAB_HANDOFF_TIME_SECONDS)
-      : null;
-    const collaborationSatisfaction = row.COLLAB_TEAM_SATISFACTION_SCORE !== null && row.COLLAB_TEAM_SATISFACTION_SCORE !== undefined
-      ? Number(row.COLLAB_TEAM_SATISFACTION_SCORE)
-      : null;
-    const collaborationInnovation = row.COLLAB_INNOVATION_COUNT !== null && row.COLLAB_INNOVATION_COUNT !== undefined
-      ? Number(row.COLLAB_INNOVATION_COUNT)
-      : null;
-
-    const totalRisks = Number(row.TOTAL_RISKS || 0);
-    const avgRiskScore = Number(row.AVG_RISK_SCORE || 0);
-    const auditRequiredCount = Number(row.AUDIT_REQUIRED_COUNT || 0);
-    const auditCompletedCount = Number(row.AUDIT_COMPLETED_COUNT || 0);
-    const humanReviewedCount = Number(row.HUMAN_REVIEWED_COUNT || 0);
-
-    const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
-    const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
-    const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
-
-    const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
+    const fallbackBaselines = DEFAULT_BASELINES.map((item) => ({
+      metric_key: item.metric_key,
+      value: item.value,
+      unit: item.unit,
+      description: item.description
+    }));
+    let customerNpsDeltaRaw: unknown = null;
+    let avgLatency = 0;
+    let avgQueueTime = 0;
+    let errorRateRaw = 0;
+    let baselineMinutes = DEFAULT_BASELINES[0].value;
+    let costPerHour = DEFAULT_BASELINES[1].value;
+    let slaLatencyMs = DEFAULT_BASELINES[2].value;
+    let investmentCostInput = 0;
+    let totalRoles = 0;
+    let rolesRedefined = 0;
+    let customerNpsDelta = 0;
+    let errorReductionPct = 0;
+    let decisionSpeedImprovementPct = 0;
 
     try {
-      await query(
-        `MERGE INTO EAR.ROI_METRICS AS target
-         USING (SELECT ADD_DAYS(CURRENT_DATE, -${days}) AS PERIOD_START, CURRENT_DATE AS PERIOD_END, ? AS BUSINESS_TYPE, ? AS AGENT_TYPE FROM DUMMY) AS source
-         ON (target.PERIOD_START = source.PERIOD_START
-             AND target.PERIOD_END = source.PERIOD_END
-             AND ((target.BUSINESS_TYPE = source.BUSINESS_TYPE) OR (target.BUSINESS_TYPE IS NULL AND source.BUSINESS_TYPE IS NULL))
-             AND ((target.AGENT_TYPE = source.AGENT_TYPE) OR (target.AGENT_TYPE IS NULL AND source.AGENT_TYPE IS NULL)))
-         WHEN MATCHED THEN
-           UPDATE SET SAVED_HOURS = ?, SAVED_COST = ?, ROI_RATIO_PCT = ?, UPDATED_AT = CURRENT_TIMESTAMP
-         WHEN NOT MATCHED THEN
-           INSERT (PERIOD_START, PERIOD_END, BUSINESS_TYPE, AGENT_TYPE, SAVED_HOURS, SAVED_COST, ROI_RATIO_PCT, CREATED_AT, UPDATED_AT)
-           VALUES (source.PERIOD_START, source.PERIOD_END, source.BUSINESS_TYPE, source.AGENT_TYPE, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
-        [
-          businessType || null,
-          agentType || null,
-          Number((timeSavingsMinutes / 60).toFixed(2)),
-          Number(costSavings.toFixed(2)),
-          Number(roiRatio.toFixed(2)),
-          Number((timeSavingsMinutes / 60).toFixed(2)),
-          Number(costSavings.toFixed(2)),
-          Number(roiRatio.toFixed(2))
-        ]
+      avgLatency = toNumberSafe(row.AVG_LATENCY, 0);
+      avgQueueTime = toNumberSafe(row.AVG_QUEUE_TIME, 0);
+      errorRateRaw = toNumberSafe(row.AVG_ERROR_RATE, 0);
+      const normalizedErrorRate = normalizeErrorRate(errorRateRaw) ?? 0;
+      const errorRatePct = normalizedErrorRate * 100;
+      const qualityScore = Math.max(0, (1 - normalizedErrorRate) * 5);
+      const stabilityScore = Math.max(0, 100 - errorRatePct);
+      const totalTasks = Number(row.TOTAL_TASKS || 0);
+      const successTasks = Number(row.SUCCESS_TASKS || 0);
+      const errorTasks = Number(row.ERROR_TASKS || 0);
+      const taskSuccessRate = totalTasks > 0 ? (successTasks / totalTasks) * 100 : 0;
+      const taskErrorRate = totalTasks > 0 ? (errorTasks / totalTasks) * 100 : 0;
+      const avgLatencyTotal = avgLatency + avgQueueTime;
+      const baselineRows = await query(
+        'SELECT METRIC_KEY, VALUE, UNIT, DESCRIPTION FROM EAR.PORTAL_METRIC_INPUTS'
       );
-    } catch (error) {
-      console.warn('HANA ROI metrics cache update failed:', error);
-    }
+      const baselineMap = new Map<string, { value: number; unit?: string; description?: string; rawValue?: unknown }>();
+      (baselineRows.rows || baselineRows || []).forEach(
+        (item: {
+          METRIC_KEY?: string;
+          metric_key?: string;
+          VALUE?: unknown;
+          value?: unknown;
+          UNIT?: string;
+          unit?: string;
+          DESCRIPTION?: string;
+          description?: string;
+        }) => {
+          baselineMap.set(item.METRIC_KEY || item.metric_key || '', {
+            value: toNumberSafe(item.VALUE ?? item.value, 0),
+            unit: item.UNIT || item.unit,
+            description: item.DESCRIPTION || item.description,
+            rawValue: item.VALUE ?? item.value
+          });
+        }
+      );
+      DEFAULT_BASELINES.forEach((item) => {
+        if (!baselineMap.has(item.metric_key)) {
+          baselineMap.set(item.metric_key, { ...item, rawValue: item.value });
+        }
+      });
 
-    return res.json({
-      period,
-      total_requests: Number(row.TOTAL_REQUESTS || 0),
-      prev_total_requests: prevTotal,
-      growth_rate_pct: Number(growthRate.toFixed(2)),
-      completed_requests: Number(row.COMPLETED_REQUESTS || 0),
-      pending_requests: Number(row.PENDING_REQUESTS || 0),
-      avg_latency_ms: avgLatency,
-      error_rate_pct: errorRatePct,
-      quality_score: Number(qualityScore.toFixed(2)),
-      stability_score: Number(stabilityScore.toFixed(2)),
-      avg_queue_time_ms: avgQueueTime,
-      task_success_rate_pct: Number(taskSuccessRate.toFixed(2)),
-      task_error_rate_pct: Number(taskErrorRate.toFixed(2)),
-      sla_compliance_pct: Number(slaCompliance.toFixed(2)),
-      user_coverage_pct: Number(userCoverage.toFixed(2)),
-      requests_processed: Number(row.REQUESTS_PROCESSED || 0),
-      breakdown: [],
-      domain_stats: [],
-      funnel_stats: [],
-      baselines: Array.from(baselineMap.entries()).map(([key, value]) => ({
+      const baselineEntries = Array.from(baselineMap.entries()).map(([key, value]) => ({
         metric_key: key,
         value: value.value,
         unit: value.unit || null,
         description: value.description || null
-      })),
-      collaboration: {
-        decision_accuracy_pct: Number(
-          ((collaborationDecisionAccuracy ?? decisionAccuracyFallback) as number).toFixed(2)
-        ),
-        override_rate_pct: Number(((collaborationOverrideRate ?? overrideRateFallback) as number).toFixed(2)),
-        cognitive_load_reduction_pct: Number(
-          ((collaborationCognitiveReduction ?? cognitiveLoadReductionFallback) as number).toFixed(2)
-        ),
-        handoff_time_seconds: Number(((collaborationHandoff ?? avgHandoffTime) as number).toFixed(2)),
-        team_satisfaction_score: Number(((collaborationSatisfaction ?? avgTeamSatisfaction) as number).toFixed(2)),
-        innovation_count: Number((collaborationInnovation ?? innovationCount).toFixed(0))
-      },
-      risk: {
-        risk_exposure_score: Number(avgRiskScore.toFixed(2)),
-        audit_required_rate_pct: Number(auditRequiredRate.toFixed(2)),
-        audit_completed_rate_pct: Number(auditCompletedRate.toFixed(2)),
-        human_review_rate_pct: Number(humanReviewRate.toFixed(2)),
-        total_risk_items: totalRisks
-      },
-      value: {
-        role_redesign_ratio_pct: Number(roleRedesignRatio.toFixed(2)),
-        customer_nps_delta: Number(customerNpsDelta.toFixed(2)),
-        error_reduction_pct: Number(errorReductionPct.toFixed(2)),
-        decision_speed_improvement_pct: Number(decisionSpeedImprovementPct.toFixed(2))
-      },
-      savings: {
-        baseline_minutes_per_request: baselineMinutes,
-        avg_response_minutes: Number(avgResponseMinutes.toFixed(4)),
-        time_savings_minutes: Number(timeSavingsMinutes.toFixed(2)),
-        cost_savings: Number(costSavings.toFixed(2)),
-        baseline_cost: Number(baselineCost.toFixed(2)),
-        investment_cost: Number(normalizedInvestmentCost.toFixed(2)),
-        roi_ratio_pct: Number(roiRatio.toFixed(2)),
-        sla_latency_ms: slaLatencyMs
+      }));
+
+      customerNpsDeltaRaw = baselineMap.get('customer_nps_delta')?.rawValue;
+      baselineMinutes = baselineMap.get('baseline_minutes_per_request')?.value ?? baselineMinutes;
+      costPerHour = baselineMap.get('cost_per_hour')?.value ?? costPerHour;
+      slaLatencyMs = baselineMap.get('sla_latency_ms')?.value ?? slaLatencyMs;
+      investmentCostInput = baselineMap.get('investment_cost')?.value ?? 0;
+      totalRoles = baselineMap.get('total_roles')?.value ?? 0;
+      rolesRedefined = baselineMap.get('roles_redefined')?.value ?? 0;
+      customerNpsDelta = baselineMap.get('customer_nps_delta')?.value ?? 0;
+      errorReductionPct = baselineMap.get('error_reduction_pct')?.value ?? 0;
+      decisionSpeedImprovementPct = baselineMap.get('decision_speed_improvement_pct')?.value ?? 0;
+      const slaCompliance = avgLatencyTotal <= slaLatencyMs
+        ? 100
+        : Math.max(0, 100 - ((avgLatencyTotal - slaLatencyMs) / slaLatencyMs) * 100);
+      const totalUsers = Number(row.TOTAL_USERS || 0);
+      const mappedUsers = Number(row.MAPPED_USERS || 0);
+      const userCoverage = totalUsers > 0 ? (mappedUsers / totalUsers) * 100 : 0;
+      const prevTotal = Number(row.PREV_TOTAL_REQUESTS || 0);
+      const growthRate = prevTotal > 0 ? ((Number(row.TOTAL_REQUESTS || 0) - prevTotal) / prevTotal) * 100 : 0;
+      const avgResponseMinutes = (avgLatency + avgQueueTime) / 1000 / 60;
+      const completedRequests = Number(row.COMPLETED_REQUESTS || 0);
+      let baselineCostOverride: number | null = null;
+
+      if (process.env.DEBUG_PORTAL_METRICS === 'true') {
+        console.info('[portalDashboard/metrics] debug', {
+          customerNpsDeltaRaw,
+          customerNpsDeltaRawType: typeof customerNpsDeltaRaw,
+          avgLatency,
+          avgQueueTime,
+          errorRateRaw,
+          baselineMinutes,
+          costPerHour
+        });
       }
-    });
+
+      if (businessType) {
+        const taskBaseline = await query(
+          'SELECT AVG(BEFORE_TIME_MIN) AS BEFORE_TIME_MIN, AVG(BEFORE_COST) AS BEFORE_COST FROM EAR.BUSINESS_TASK_BASELINE WHERE DOMAIN = ?',
+          [businessType]
+        );
+        const taskRow = taskBaseline.rows?.[0] || taskBaseline[0] || {};
+        if (taskRow.BEFORE_TIME_MIN) {
+          baselineMinutes = toNumberSafe(taskRow.BEFORE_TIME_MIN, baselineMinutes);
+        }
+        if (taskRow.BEFORE_COST) {
+          baselineCostOverride = toNumberSafe(taskRow.BEFORE_COST, 0) * completedRequests;
+        }
+      }
+
+      const laborCost = await query(
+        'SELECT HOURLY_COST FROM EAR.LABOR_COST WHERE (BUSINESS_TYPE = ? OR BUSINESS_TYPE IS NULL) ORDER BY BUSINESS_TYPE DESC LIMIT 1',
+        [businessType || null]
+      );
+      const laborRow = laborCost.rows?.[0] || laborCost[0] || {};
+      if (laborRow.HOURLY_COST) {
+        costPerHour = toNumberSafe(laborRow.HOURLY_COST, costPerHour);
+      }
+
+      const timeSavingsMinutes = Math.max(0, (baselineMinutes - avgResponseMinutes) * completedRequests);
+      const costSavings = (timeSavingsMinutes / 60) * costPerHour;
+      const baselineCost = baselineCostOverride ?? (baselineMinutes / 60) * completedRequests * costPerHour;
+      const normalizedInvestmentCost = investmentCostInput > 0 ? investmentCostInput : baselineCost;
+      const roiRatio = normalizedInvestmentCost > 0 ? (costSavings / normalizedInvestmentCost) * 100 : 0;
+
+      const assistedDecisions = Number(row.AI_ASSISTED_DECISIONS || 0);
+      const validatedDecisions = Number(row.AI_ASSISTED_DECISIONS_VALIDATED || 0);
+      const aiRecommendations = Number(row.AI_RECOMMENDATIONS || 0);
+      const overriddenDecisions = Number(row.DECISIONS_OVERRIDDEN || 0);
+      const avgCognitiveLoadBefore = Number(row.AVG_COGNITIVE_LOAD_BEFORE || 0);
+      const avgCognitiveLoadAfter = Number(row.AVG_COGNITIVE_LOAD_AFTER || 0);
+      const avgHandoffTime = Number(row.AVG_HANDOFF_TIME_SECONDS || 0);
+      const avgTeamSatisfaction = Number(row.AVG_TEAM_SATISFACTION_SCORE || 0);
+      const innovationCount = Number(row.INNOVATION_COUNT || 0);
+
+      const decisionAccuracyFallback = assistedDecisions > 0 ? (validatedDecisions / assistedDecisions) * 100 : 0;
+      const overrideRateFallback = aiRecommendations > 0 ? (overriddenDecisions / aiRecommendations) * 100 : 0;
+      const cognitiveLoadReductionFallback = avgCognitiveLoadBefore > 0
+        ? ((avgCognitiveLoadBefore - avgCognitiveLoadAfter) / avgCognitiveLoadBefore) * 100
+        : 0;
+
+      const collaborationDecisionAccuracy = row.DECISION_ACCURACY_PCT !== null && row.DECISION_ACCURACY_PCT !== undefined
+        ? Number(row.DECISION_ACCURACY_PCT)
+        : null;
+      const collaborationOverrideRate = row.OVERRIDE_RATE_PCT !== null && row.OVERRIDE_RATE_PCT !== undefined
+        ? Number(row.OVERRIDE_RATE_PCT)
+        : null;
+      const collaborationCognitiveReduction = row.COGNITIVE_LOAD_REDUCTION_PCT !== null && row.COGNITIVE_LOAD_REDUCTION_PCT !== undefined
+        ? Number(row.COGNITIVE_LOAD_REDUCTION_PCT)
+        : null;
+      const collaborationHandoff = row.COLLAB_HANDOFF_TIME_SECONDS !== null && row.COLLAB_HANDOFF_TIME_SECONDS !== undefined
+        ? Number(row.COLLAB_HANDOFF_TIME_SECONDS)
+        : null;
+      const collaborationSatisfaction = row.COLLAB_TEAM_SATISFACTION_SCORE !== null && row.COLLAB_TEAM_SATISFACTION_SCORE !== undefined
+        ? Number(row.COLLAB_TEAM_SATISFACTION_SCORE)
+        : null;
+      const collaborationInnovation = row.COLLAB_INNOVATION_COUNT !== null && row.COLLAB_INNOVATION_COUNT !== undefined
+        ? Number(row.COLLAB_INNOVATION_COUNT)
+        : null;
+
+      const totalRisks = Number(row.TOTAL_RISKS || 0);
+      const avgRiskScore = Number(row.AVG_RISK_SCORE || 0);
+      const auditRequiredCount = Number(row.AUDIT_REQUIRED_COUNT || 0);
+      const auditCompletedCount = Number(row.AUDIT_COMPLETED_COUNT || 0);
+      const humanReviewedCount = Number(row.HUMAN_REVIEWED_COUNT || 0);
+
+      const auditRequiredRate = totalRisks > 0 ? (auditRequiredCount / totalRisks) * 100 : 0;
+      const auditCompletedRate = totalRisks > 0 ? (auditCompletedCount / totalRisks) * 100 : 0;
+      const humanReviewRate = totalRisks > 0 ? (humanReviewedCount / totalRisks) * 100 : 0;
+
+      const roleRedesignRatio = totalRoles > 0 ? (rolesRedefined / totalRoles) * 100 : 0;
+
+      try {
+        await query(
+          `MERGE INTO EAR.ROI_METRICS AS target
+           USING (SELECT ADD_DAYS(CURRENT_DATE, -${days}) AS PERIOD_START, CURRENT_DATE AS PERIOD_END, ? AS BUSINESS_TYPE, ? AS AGENT_TYPE FROM DUMMY) AS source
+           ON (target.PERIOD_START = source.PERIOD_START
+               AND target.PERIOD_END = source.PERIOD_END
+               AND ((target.BUSINESS_TYPE = source.BUSINESS_TYPE) OR (target.BUSINESS_TYPE IS NULL AND source.BUSINESS_TYPE IS NULL))
+               AND ((target.AGENT_TYPE = source.AGENT_TYPE) OR (target.AGENT_TYPE IS NULL AND source.AGENT_TYPE IS NULL)))
+           WHEN MATCHED THEN
+             UPDATE SET SAVED_HOURS = ?, SAVED_COST = ?, ROI_RATIO_PCT = ?, UPDATED_AT = CURRENT_TIMESTAMP
+           WHEN NOT MATCHED THEN
+             INSERT (PERIOD_START, PERIOD_END, BUSINESS_TYPE, AGENT_TYPE, SAVED_HOURS, SAVED_COST, ROI_RATIO_PCT, CREATED_AT, UPDATED_AT)
+             VALUES (source.PERIOD_START, source.PERIOD_END, source.BUSINESS_TYPE, source.AGENT_TYPE, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+          [
+            businessType || null,
+            agentType || null,
+            Number(toFixedSafe(timeSavingsMinutes / 60, 2, '0.00')),
+            Number(toFixedSafe(costSavings, 2, '0.00')),
+            Number(toFixedSafe(roiRatio, 2, '0.00')),
+            Number(toFixedSafe(timeSavingsMinutes / 60, 2, '0.00')),
+            Number(toFixedSafe(costSavings, 2, '0.00')),
+            Number(toFixedSafe(roiRatio, 2, '0.00'))
+          ]
+        );
+      } catch (error) {
+        console.warn('HANA ROI metrics cache update failed:', error);
+      }
+
+      return res.json({
+        period,
+        total_requests: Number(row.TOTAL_REQUESTS || 0),
+        prev_total_requests: prevTotal,
+        growth_rate_pct: Number(toFixedSafe(growthRate, 2, '0.00')),
+        completed_requests: Number(row.COMPLETED_REQUESTS || 0),
+        pending_requests: Number(row.PENDING_REQUESTS || 0),
+        avg_latency_ms: avgLatency,
+        error_rate_pct: errorRatePct,
+        quality_score: Number(toFixedSafe(qualityScore, 2, '0.00')),
+        stability_score: Number(toFixedSafe(stabilityScore, 2, '0.00')),
+        avg_queue_time_ms: avgQueueTime,
+        task_success_rate_pct: Number(toFixedSafe(taskSuccessRate, 2, '0.00')),
+        task_error_rate_pct: Number(toFixedSafe(taskErrorRate, 2, '0.00')),
+        sla_compliance_pct: Number(toFixedSafe(slaCompliance, 2, '0.00')),
+        user_coverage_pct: Number(toFixedSafe(userCoverage, 2, '0.00')),
+        requests_processed: Number(row.REQUESTS_PROCESSED || 0),
+        breakdown: [],
+        domain_stats: [],
+        funnel_stats: [],
+        baselines: baselineEntries,
+        collaboration: {
+          decision_accuracy_pct: Number(
+            toFixedSafe(collaborationDecisionAccuracy ?? decisionAccuracyFallback, 2, '0.00')
+          ),
+          override_rate_pct: Number(
+            toFixedSafe(collaborationOverrideRate ?? overrideRateFallback, 2, '0.00')
+          ),
+          cognitive_load_reduction_pct: Number(
+            toFixedSafe(collaborationCognitiveReduction ?? cognitiveLoadReductionFallback, 2, '0.00')
+          ),
+          handoff_time_seconds: Number(toFixedSafe(collaborationHandoff ?? avgHandoffTime, 2, '0.00')),
+          team_satisfaction_score: Number(
+            toFixedSafe(collaborationSatisfaction ?? avgTeamSatisfaction, 2, '0.00')
+          ),
+          innovation_count: Number(toFixedSafe(collaborationInnovation ?? innovationCount, 0, '0'))
+        },
+        risk: {
+          risk_exposure_score: Number(toFixedSafe(avgRiskScore, 2, '0.00')),
+          audit_required_rate_pct: Number(toFixedSafe(auditRequiredRate, 2, '0.00')),
+          audit_completed_rate_pct: Number(toFixedSafe(auditCompletedRate, 2, '0.00')),
+          human_review_rate_pct: Number(toFixedSafe(humanReviewRate, 2, '0.00')),
+          total_risk_items: totalRisks
+        },
+        value: {
+          role_redesign_ratio_pct: Number(toFixedSafe(roleRedesignRatio, 2, '0.00')),
+          customer_nps_delta: Number(toFixedSafe(customerNpsDelta, 2, '0.00')),
+          error_reduction_pct: Number(toFixedSafe(errorReductionPct, 2, '0.00')),
+          decision_speed_improvement_pct: Number(toFixedSafe(decisionSpeedImprovementPct, 2, '0.00'))
+        },
+        savings: {
+          baseline_minutes_per_request: baselineMinutes,
+          avg_response_minutes: Number(toFixedSafe(avgResponseMinutes, 4, '0.0000')),
+          time_savings_minutes: Number(toFixedSafe(timeSavingsMinutes, 2, '0.00')),
+          cost_savings: Number(toFixedSafe(costSavings, 2, '0.00')),
+          baseline_cost: Number(toFixedSafe(baselineCost, 2, '0.00')),
+          investment_cost: Number(toFixedSafe(normalizedInvestmentCost, 2, '0.00')),
+          roi_ratio_pct: Number(toFixedSafe(roiRatio, 2, '0.00')),
+          sla_latency_ms: slaLatencyMs
+        }
+      });
+    } catch (error) {
+      console.error('Portal dashboard metrics assembly error:', {
+        route: 'portalDashboard/metrics',
+        error,
+        customerNpsDeltaRawType: typeof customerNpsDeltaRaw,
+        avgLatencyType: typeof avgLatency,
+        avgQueueTimeType: typeof avgQueueTime
+      });
+      return res.json(buildFallbackMetrics(period, fallbackBaselines, false));
+    }
   } catch (error) {
     console.error('Portal dashboard metrics error:', error);
     res.status(500).json({ error: '포털 지표 집계 중 오류가 발생했습니다.' });
