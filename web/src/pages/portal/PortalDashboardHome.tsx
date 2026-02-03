@@ -1,264 +1,185 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
-import WidgetCard from '../../components/portal-dashboard/WidgetCard';
-import StatTile from '../../components/portal-dashboard/StatTile';
 import TagPill from '../../components/portal-dashboard/TagPill';
-import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
-import ProgressRow from '../../components/portal-dashboard/ProgressRow';
-import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
-import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
 
-interface PortalMetrics {
-  total_requests: number;
-  prev_total_requests: number;
-  growth_rate_pct: number;
-  completed_requests: number;
-  pending_requests: number;
-  avg_latency_ms: number;
-  avg_queue_time_ms: number;
-  error_rate_pct: number;
-  quality_score: number;
-  stability_score: number;
-  task_success_rate_pct: number;
-  sla_compliance_pct: number;
-  user_coverage_pct: number;
-  requests_processed: number;
-  savings: {
-    baseline_minutes_per_request: number;
-    avg_response_minutes: number;
-    time_savings_minutes: number;
-    cost_savings: number;
-    roi_ratio_pct: number;
-  };
-}
-
-const agentUpdates: Array<{
-  name: string;
-  owner: string;
-  status: string;
-  tone: 'success' | 'warning' | 'info';
-}> = [
-  { name: 'Finance Insight', owner: '재무팀', status: '운영', tone: 'success' },
-  { name: 'Policy Guard', owner: '보안실', status: '점검', tone: 'warning' },
-  { name: 'Support Copilot', owner: '고객지원', status: '승인 대기', tone: 'info' }
+const stepTwoAgents = [
+  { name: 'Routing Agent', status: '완료', tone: 'success' as const },
+  { name: 'Finance KPI Agent', status: '대기', tone: 'neutral' as const },
+  { name: 'Cost Analysis Agent', status: '대기', tone: 'neutral' as const },
+  { name: 'Compute Agent', status: '대기', tone: 'neutral' as const }
 ];
 
-const alerts = [
-  { title: 'FAQ 에이전트 오류율 증가', detail: '지난 4시간 동안 오류율 2.4%p 상승' },
-  { title: '주요 프롬프트 업데이트', detail: '에이전트 5건이 정책 갱신 완료' },
-  { title: '데이터 소스 동기화', detail: 'CRM 데이터 동기화 지연 12분' }
+const stepTwoStages = [
+  { label: 'Request received', status: 'done' },
+  { label: 'Intent classified: Profit Analysis', status: 'done' },
+  { label: 'Tasks generated (Revenue / Cost / Profit)', status: 'pending' },
+  { label: 'Agents dispatched', status: 'pending' }
+];
+
+const stepThreeProcessing = [
+  { label: 'Routing Agent 실행 완료', status: 'done' },
+  { label: 'Finance KPI Agent 완료', status: 'done' },
+  { label: 'Cost Analysis Agent 완료', status: 'done' },
+  { label: 'Compute Agent 완료', status: 'done' }
+];
+
+const stepThreeAgents = [
+  { name: 'Routing Agent', status: '완료', tone: 'success' as const },
+  { name: 'Finance KPI Agent', status: '완료', tone: 'success' as const },
+  { name: 'Cost Analysis Agent', status: '완료', tone: 'success' as const },
+  { name: 'Compute Agent', status: '완료', tone: 'success' as const }
 ];
 
 const PortalDashboardHome: React.FC = () => {
-  const { widgets } = usePortalDashboardConfig();
-  const enabledWidgets = widgets.filter((widget) => widget.enabled);
-  const [metrics, setMetrics] = useState<PortalMetrics | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    const fetchMetrics = async () => {
-      setLoading(true);
-      try {
-        const response = await fetch('/api/portal-dashboard/metrics?period=week');
-        if (!response.ok) {
-          throw new Error('Failed to load metrics');
-        }
-        const data = await response.json();
-        setMetrics(data);
-      } catch (error) {
-        console.error('Portal metrics error:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMetrics();
-  }, []);
-
-  const heroStats = useMemo(() => {
-    if (!metrics) {
-      return [
-        { label: '주간 요청', value: '12.4K', delta: '+9%' },
-        { label: '품질 점수', value: '4.8/5', delta: '+0.2', highlight: true },
-        { label: '평균 응답', value: '1.3s', delta: '-0.4s' }
-      ];
-    }
-
-    return [
-      { label: '주간 요청', value: `${metrics.total_requests.toLocaleString()}`, delta: `${metrics.growth_rate_pct.toFixed(1)}%` },
-      { label: '품질 점수', value: `${metrics.quality_score.toFixed(1)}/5`, delta: `-${metrics.error_rate_pct.toFixed(1)}%`, highlight: true },
-      { label: '평균 응답', value: `${((metrics.avg_latency_ms + metrics.avg_queue_time_ms) / 1000).toFixed(1)}s`, delta: `${metrics.pending_requests}건 대기` }
-    ];
-  }, [metrics]);
-
-  const renderWidget = (widget: DashboardWidgetConfig) => {
-    switch (widget.type) {
-      case 'status':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-          >
-            <div className="ear-stat-grid">
-              <StatTile label="완료 요청" value={`${metrics?.completed_requests ?? 18}`} delta="+2" highlight />
-              <StatTile label="성공률" value={`${(metrics?.task_success_rate_pct ?? 98.4).toFixed(1)}%`} delta="+0.4%" />
-              <StatTile label="SLA 준수율" value={`${(metrics?.sla_compliance_pct ?? 96.2).toFixed(1)}%`} delta="+0.8%" />
-              <StatTile label="사용자 커버리지" value={`${(metrics?.user_coverage_pct ?? 62).toFixed(1)}%`} delta="+1.2%" />
-            </div>
-          </WidgetCard>
-        );
-      case 'chart':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-            actions={<button className="ear-ghost">보고서 보기</button>}
-          >
-            <ChartPlaceholder label="처리량" summary="주간 12% 증가" />
-            <div className="ear-progress-group">
-              <ProgressRow label="자동 처리" value="72%" percent={72} />
-              <ProgressRow label="검토 필요" value="18%" percent={18} />
-              <ProgressRow label="예외 처리" value="10%" percent={10} />
-            </div>
-          </WidgetCard>
-        );
-      case 'list':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-          >
-            <div className="ear-list">
-              {agentUpdates.map((item) => (
-                <div className="ear-list__row" key={item.name}>
-                  <div>
-                    <strong>{item.name}</strong>
-                    <span>{item.owner}</span>
-                  </div>
-                  <TagPill label={item.status} tone={item.tone} />
-                </div>
-              ))}
-            </div>
-          </WidgetCard>
-        );
-      case 'insight':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-          >
-            <div className="ear-insight">
-              <div>
-                <strong>예상 절감 시간</strong>
-                <span>{metrics ? `${Math.round(metrics.savings.time_savings_minutes / 60)}h` : '312h'}</span>
-              </div>
-              <div>
-                <strong>비용 절감 추정</strong>
-                <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
-              </div>
-              <div>
-                <strong>ROI</strong>
-                <span>{metrics ? `${metrics.savings.roi_ratio_pct.toFixed(1)}%` : '18%'}</span>
-              </div>
-            </div>
-          </WidgetCard>
-        );
-      case 'timeline':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-          >
-            <ul className="ear-timeline">
-              <li>
-                <span>10:00</span>
-                <div>
-                  <strong>새 모델 배포</strong>
-                  <p>FAQ 에이전트 v2.3 롤아웃</p>
-                </div>
-              </li>
-              <li>
-                <span>14:30</span>
-                <div>
-                  <strong>품질 점검</strong>
-                  <p>리스크 점검 리포트 공유</p>
-                </div>
-              </li>
-              <li>
-                <span>17:00</span>
-                <div>
-                  <strong>정책 워크숍</strong>
-                  <p>거버넌스 위원회 주간 미팅</p>
-                </div>
-              </li>
-            </ul>
-          </WidgetCard>
-        );
-      case 'activity':
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-          >
-            <div className="ear-activity">
-              {alerts.map((alert) => (
-                <div key={alert.title}>
-                  <strong>{alert.title}</strong>
-                  <span>{alert.detail}</span>
-                </div>
-              ))}
-            </div>
-          </WidgetCard>
-        );
-      default:
-        return null;
-    }
-  };
-
   return (
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
-      subtitle="실시간 운영 현황과 효과 지표를 한 화면에서 확인합니다."
+      subtitle="사용자 요청부터 멀티 에이전트 처리 결과까지 흐름을 시각화합니다."
       actions={
-        <>
-          <button className="ear-secondary">공유</button>
-          <button className="ear-primary">새 리포트</button>
-        </>
+        <button className="ear-primary">구글 리포트 작성</button>
       }
     >
-      <section className="ear-hero">
-        <div>
-          <span className="ear-pill ear-pill--info">이번 주 핵심 지표</span>
-          <h2>운영 안정성 {metrics ? metrics.stability_score.toFixed(1) : '98.7'}% 유지</h2>
-          <p>{loading ? '지표를 집계 중입니다.' : '자동화 처리량과 품질 관리 지표가 모두 상승하고 있습니다.'}</p>
+      <section className="ear-section">
+        <div className="ear-section__title">Step 2. 사용자 분석 요청</div>
+        <div className="ear-section__subtitle">
+          Step 2 ↔ 시퀀스 ①~④ (사용자 요청 &amp; 라우팅)
+          <span>① 질문 입력 → ② Conversation Manager 요청 수신 → ③ Routing Agent 의도 분석 → ④ 작업 분해</span>
         </div>
-        <div className="ear-hero__stats">
-          {heroStats.map((item) => (
-            <StatTile
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              delta={item.delta}
-              highlight={item.highlight}
-            />
-          ))}
+        <div className="ear-split">
+          <div className="ear-card ear-card--large ear-flow-card">
+            <div className="ear-hero ear-hero--compact">
+              <div>
+                <span className="ear-pill ear-pill--info">사용자 입력 예시</span>
+                <h2>2025년 11월 단위 원가, 매출, 이익 계산해줘</h2>
+              </div>
+              <div className="ear-hero__stats">
+                <div className="ear-stat">
+                  <span>평균 응답</span>
+                  <strong>3.4s</strong>
+                </div>
+                <div className="ear-stat">
+                  <span>처리량</span>
+                  <strong>4,500</strong>
+                </div>
+                <div className="ear-stat">
+                  <span>성공률</span>
+                  <strong>6.0%</strong>
+                </div>
+              </div>
+            </div>
+            <div className="ear-system-panel">
+              <h4>시스템 응답 상태</h4>
+              <ul>
+                <li>요청 접수 완료</li>
+                <li>의도 분석 완료</li>
+                <li>
+                  처리 의도: <strong>Profit Analysis (수익성 분석)</strong>
+                </li>
+              </ul>
+            </div>
+          </div>
+          <aside className="ear-card ear-task-panel">
+            <div className="ear-task-panel__header">
+              <h4>Tasks</h4>
+              <span className="ear-muted">4</span>
+            </div>
+            <div className="ear-task-list">
+              {stepTwoAgents.map((agent) => (
+                <div className="ear-task-item" key={agent.name}>
+                  <span className={`ear-status-dot ear-status-dot--${agent.tone}`} />
+                  <span>{agent.name}</span>
+                  <TagPill label={agent.status} tone={agent.tone} />
+                </div>
+              ))}
+            </div>
+            <div className="ear-divider" />
+            <div className="ear-step-list">
+              <strong>처리 단계 표시</strong>
+              <ul>
+                {stepTwoStages.map((step) => (
+                  <li key={step.label} className={`ear-step-item ear-step-item--${step.status}`}>
+                    <span />
+                    {step.label}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </aside>
         </div>
       </section>
-      <div className="ear-grid">
-        {enabledWidgets.map((widget) => renderWidget(widget))}
-      </div>
+
+      <section className="ear-section">
+        <div className="ear-section__title">Step 3. 멀티 에이전트 처리 및 결과</div>
+        <div className="ear-section__subtitle">
+          Step 3 ↔ 시퀀스 ⑤~⑫ (멀티 에이전트 실행)
+          <span>⑤ Revenue → ⑥ Cost → ⑦ Profit → ⑧ Query → ⑨ Data Retriever → ⑩ Compute → ⑪ 결과 생성 → ⑫ Audit</span>
+        </div>
+        <div className="ear-split">
+          <div className="ear-card ear-card--large ear-flow-card">
+            <div className="ear-hero ear-hero--compact">
+              <div>
+                <span className="ear-pill ear-pill--info">Processing</span>
+                <h2>단위당 수익성 분석 워크플로</h2>
+              </div>
+              <div className="ear-hero__stats">
+                <div className="ear-stat">
+                  <span>분석 단계</span>
+                  <strong>8</strong>
+                </div>
+                <div className="ear-stat">
+                  <span>진행률</span>
+                  <strong>100%</strong>
+                </div>
+              </div>
+            </div>
+            <div className="ear-dual-pane">
+              <div className="ear-system-panel">
+                <h4>처리 상태</h4>
+                <ul>
+                  {stepThreeProcessing.map((step) => (
+                    <li key={step.label}>{step.label}</li>
+                  ))}
+                </ul>
+              </div>
+              <div className="ear-system-panel">
+                <h4>Tasks</h4>
+                <div className="ear-task-list">
+                  {stepThreeAgents.map((agent) => (
+                    <div className="ear-task-item" key={agent.name}>
+                      <span className={`ear-status-dot ear-status-dot--${agent.tone}`} />
+                      <span>{agent.name}</span>
+                      <TagPill label={agent.status} tone={agent.tone} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+          <aside className="ear-card ear-result-panel">
+            <div className="ear-result-header">
+              <h4>단위당 수익성 분석 완료</h4>
+              <span className="ear-muted">파란 원에서 보기</span>
+            </div>
+            <div className="ear-result-block">
+              <strong>분석 결과 - 단위당 수익성 분석 리포트</strong>
+              <ul>
+                <li>매출: ₩123,400,000</li>
+                <li>비용: ₩85,300,000</li>
+                <li>이익: ₩18,000</li>
+              </ul>
+            </div>
+            <div className="ear-result-block">
+              <strong>처리 메타 정보</strong>
+              <ul>
+                <li>사용 에이전트 수: 4</li>
+                <li>평균 처리 시간: 1.8s</li>
+                <li>데이터 출처: ERP / Internal DB</li>
+              </ul>
+            </div>
+            <button className="ear-primary ear-full">사용자 상세 요약 보기</button>
+          </aside>
+        </div>
+      </section>
     </PortalDashboardLayout>
   );
 };
