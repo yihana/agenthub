@@ -59,6 +59,10 @@
   padding: 6px 10px;
   font-size: 12px;
   cursor: pointer;
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 6px;
 }
 
 .ear-sidebar--collapsed .ear-nav__item {
@@ -483,6 +487,17 @@
   grid-template-columns: 260px 1fr;
 }
 
+.ear-agent-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 360px);
+  gap: 20px;
+  align-items: start;
+}
+
+.ear-agent-detail .ear-card__body {
+  padding-top: 0;
+}
+
 .ear-card {
   background: var(--ear-surface);
   border-radius: 16px;
@@ -826,6 +841,7 @@
   border: 1px solid #dfe3eb;
   box-shadow: 0 2px 6px rgba(15, 23, 42, 0.04);
 }
+
 .ear-drilldown strong {
   display: block;
   font-size: 14px;
@@ -1097,6 +1113,9 @@
     grid-template-columns: 1fr;
   }
 
+  .ear-agent-layout {
+    grid-template-columns: 1fr;
+  }
   .ear-split {
     grid-template-columns: 1fr;
   }

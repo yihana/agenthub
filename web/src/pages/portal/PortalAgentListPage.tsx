@@ -90,23 +90,12 @@ interface AgentDetailRecord {
   resultArtifacts: string[];
 }
 
-interface AgentPerformanceSummary {
-  agentId: number;
-  agentName: string;
-  tasksTotal: number;
-  successfulTasks: number;
-  successRatePct: number;
-  tokenCost: number;
-  infraCostProrated: number;
-  totalCost: number;
-}
-
 const STORAGE_KEY = 'portal-agent-list';
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
   end: '2026-01-21 23:59:59'
 };
-const PRORATION_DAYS = 35.5;
+
 const baseAgentDetails: AgentDetailRecord[] = [
   {
     id: 1,
@@ -462,40 +451,6 @@ const isWithinRange = (value: string, start: string, end: string) => {
   return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
 };
 
-const calculatePerformanceSummary = (
-  agentDetails: AgentDetailRecord[],
-  range: { start: string; end: string }
-): AgentPerformanceSummary[] => {
-  const rangeDays = Math.max(
-    1,
-    Math.round(
-      (parseDate(range.end).getTime() - parseDate(range.start).getTime()) / (1000 * 60 * 60 * 24)
-    ) + 1
-  );
-
-  return agentDetails.map((agent) => {
-    const tasksInRange = agent.tasks.filter((task) => isWithinRange(task.receivedAt, range.start, range.end));
-    const successfulTasks = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
-    const metricsInRange = agent.metrics.filter((metric) => isWithinRange(metric.startTime, range.start, range.end));
-    const tokenCost = metricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
-    const infraCost = agent.infraCosts[0]?.monthlyCost ?? 0;
-    const infraCostProrated = infraCost > 0 ? (infraCost / PRORATION_DAYS) * rangeDays : 0;
-    const totalCost = tokenCost + infraCostProrated;
-    const successRatePct = tasksInRange.length > 0 ? (successfulTasks / tasksInRange.length) * 100 : 0;
-
-    return {
-      agentId: agent.id,
-      agentName: agent.agentName,
-      tasksTotal: tasksInRange.length,
-      successfulTasks,
-      successRatePct,
-      tokenCost,
-      infraCostProrated,
-      totalCost
-    };
-  });
-};
-
 const baseAgentDetailByName = new Map(
   baseAgentDetails.map((agent) => [agent.agentName, agent])
 );
@@ -686,8 +641,6 @@ const PortalAgentListPage: React.FC = () => {
   const [riskFilter, setRiskFilter] = useState('전체');
   const [categoryFilter, setCategoryFilter] = useState('전체');
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
-  const [selectedDetailTab, setSelectedDetailTab] = useState<'overview' | 'tasks' | 'metrics' | 'costs' | 'results'>('overview');
-  const [isDetailOpen, setIsDetailOpen] = useState(true);
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
     name: '',
@@ -778,86 +731,18 @@ const PortalAgentListPage: React.FC = () => {
     if (!agentId) {
       return;
     }
-        if (agentId !== selectedAgentId) {
-          setSelectedAgentId(agentId);
-          setSelectedDetailTab('overview');
-          setIsDetailOpen(true);
-        }
-        if (agentId !== drilldownAgentId) {
-          setDrilldownAgentId(null);
-        }
-      }, [agentId, drilldownAgentId, selectedAgentId]);
-
-  const performanceSummary = useMemo(
-    () => calculatePerformanceSummary(agentDetails, ANALYSIS_RANGE),
-    [agentDetails]
-  );
+    if (agentId !== selectedAgentId) {
+      setSelectedAgentId(agentId);
+    }
+    if (agentId !== drilldownAgentId) {
+      setDrilldownAgentId(null);
+    }
+  }, [agentId, drilldownAgentId, selectedAgentId]);
 
   const selectedAgent = agentDetails.find((agent) => String(agent.id) === selectedAgentId);
-  const selectedSummary = performanceSummary.find((summary) => String(summary.agentId) === selectedAgentId);
   const tasksInRange = selectedAgent
     ? selectedAgent.tasks.filter((task) => isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
     : [];
-  const metricsInRange = selectedAgent
-    ? selectedAgent.metrics.filter((metric) => isWithinRange(metric.startTime, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
-    : [];
-  const totalTokenCost = metricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
-  const totalTokenUsage = metricsInRange.reduce((sum, metric) => sum + metric.totalTokenUsage, 0);
-  const avgLatency = metricsInRange.length
-    ? metricsInRange.reduce((sum, metric) => sum + metric.avgLatency, 0) / metricsInRange.length
-    : 0;
-  const avgTimeToFirstToken = metricsInRange.length
-    ? metricsInRange.reduce((sum, metric) => sum + metric.avgTimeToFirstToken, 0) / metricsInRange.length
-    : 0;
-  const avgErrorRate = metricsInRange.length
-    ? metricsInRange.reduce((sum, metric) => sum + metric.errorRate, 0) / metricsInRange.length
-    : 0;
-
-  const taskMetricById = new Map(
-    tasksInRange.map((task) => {
-      const durationSeconds = task.startedAt && task.finishedAt
-        ? Math.max(0, (parseDate(task.finishedAt).getTime() - parseDate(task.startedAt).getTime()) / 1000)
-        : 0;
-      const perTaskTokenCost = tasksInRange.length > 0 ? totalTokenCost / tasksInRange.length : 0;
-      const perTaskTokenUsage = tasksInRange.length > 0 ? totalTokenUsage / tasksInRange.length : 0;
-      const avgLaborHourlyCost = 52000;
-      const baselineMinutes = 15;
-      const humanMinutes = task.status === 'COMPLETED' ? 1.2 : 4.5;
-      const savedMinutes = Math.max(0, baselineMinutes - ((durationSeconds / 60) + humanMinutes));
-      const savedCost = (savedMinutes / 60) * avgLaborHourlyCost;
-      const roiRatio = perTaskTokenCost > 0 ? ((savedCost - perTaskTokenCost) / perTaskTokenCost) * 100 : 0;
-
-      return [
-        task.id,
-        {
-          durationSeconds,
-          perTaskTokenCost,
-          perTaskTokenUsage,
-          avgLatency,
-          avgTimeToFirstToken,
-          avgErrorRate,
-          baselineMinutes,
-          humanMinutes,
-          savedMinutes,
-          savedCost,
-          roiRatio
-        }
-      ];
-    })
-  );
-  const totalTasksInRange = tasksInRange.length;
-  const completedTasksInRange = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
-  const failedTasksInRange = totalTasksInRange - completedTasksInRange;
-  const avgHumanInterventionRate = metricsInRange.length
-    ? metricsInRange.reduce((sum, metric) => sum + metric.humanIntervention, 0) / metricsInRange.length
-    : 0;
-  const manualInterventionCount = Math.round(totalTasksInRange * avgHumanInterventionRate);
-  const avgProcessingSeconds = totalTasksInRange
-    ? tasksInRange.reduce((sum, task) => {
-        const duration = taskMetricById.get(task.id)?.durationSeconds ?? 0;
-        return sum + duration;
-      }, 0) / totalTasksInRange
-    : 0;
 
   return (
     <PortalDashboardLayout
@@ -963,11 +848,11 @@ const PortalAgentListPage: React.FC = () => {
             <button type="submit" className="ear-primary">등록 저장</button>
           </form>
         </aside>
-
-        <section className="ear-table-card ear-table-card--split">
-          <div className="ear-table-card__header">
-            <div>
-              <h3>에이전트 목록</h3>
+        <div className="ear-agent-layout">
+          <section className="ear-table-card">
+            <div className="ear-table-card__header">
+              <div>
+                <h3>에이전트 목록</h3>
               <p>총 {filteredAgents.length}개 에이전트</p>
             </div>
             <div className="ear-table-card__actions">
@@ -975,475 +860,153 @@ const PortalAgentListPage: React.FC = () => {
               <button className="ear-secondary">정렬</button>
             </div>
           </div>
-          <div className="ear-table-split">
-            <div className="ear-table-split__main">
-              <table className="ear-table">
-                <thead>
-                  <tr>
-                    <th>ID</th>
-                    <th>이름</th>
-                    <th>소유 조직</th>
-                    <th>상태</th>
-                    <th>런타임 상태</th>
-                    <th>런타임 에러</th>
-                    <th>리스크</th>
-                    <th>최근 업데이트</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredAgents.map((agent) => {
-                    const detail = agentDetailById.get(agent.id);
-                    const isSelected = agent.id === selectedAgentId;
-                    const isDrilldownOpen = drilldownAgentId === agent.id;
-                    return (
-                      <React.Fragment key={agent.id}>
-                        <tr
-                          className={isSelected ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
-                          onClick={() => {
-                            setSelectedAgentId(agent.id);
-                            setSelectedDetailTab('overview');
-                            setIsDetailOpen(true);
-                            setDrilldownAgentId(null);
-                            navigate(`/portal-agents/${agent.id}`);
-                          }}
-                          onDoubleClick={() => {
-                            setSelectedAgentId(agent.id);
-                            setSelectedDetailTab('overview');
-                            setIsDetailOpen(true);
-                            setDrilldownAgentId(agent.id);
-                            navigate(`/portal-agents/${agent.id}`);
-                          }}
-                          role="button"
-                          tabIndex={0}
-                          onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                              setSelectedAgentId(agent.id);
-                              setSelectedDetailTab('overview');
-                              setIsDetailOpen(true);
-                              setDrilldownAgentId(null);
-                              navigate(`/portal-agents/${agent.id}`);
-                            }
-                          }}
-                        >
-                          <td>{agent.id}</td>
-                          <td>
-                            <strong>{agent.name}</strong>
-                            <span className="ear-muted">{agent.category}</span>
-                          </td>
-                          <td>{agent.owner}</td>
-                          <td>
-                            <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
-                          </td>
-                          <td>
-                            <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
-                          </td>
-                          <td>{agent.runtimeErrors}</td>
-                          <td>
-                            <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
-                          </td>
-                          <td>{agent.lastUpdated}</td>
-                        </tr>
-                        {isDrilldownOpen && (
-                          <tr className="ear-table__row ear-table__row--drilldown">
-                            <td colSpan={8}>
-                              <div className="ear-drilldown">
-                                <div>
-                                  <strong>Task 드릴다운</strong>
-                                  <span>선택한 에이전트의 최근 작업</span>
-                                </div>
-                                <div className="ear-drilldown__actions">
-                                  <button
-                                    type="button"
-                                    className="ear-secondary"
-                                    onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(agent.name)}`)}
-                                  >
-                                    크게 보기
-                                  </button>
-                                  <button
-                                    type="button"
-                                    className="ear-ghost"
-                                    onClick={() => setIsDetailOpen((prev) => !prev)}
-                                  >
-                                    상세 패널 {isDetailOpen ? '접기' : '펼치기'}
-                                  </button>
-                                </div>
-                              </div>
-                              <div className="ear-drilldown__list">
-                                {(detail?.tasks ?? []).slice(0, 3).map((task) => (
-                                  <div key={task.id} className="ear-drilldown__item">
-                                    <span>{task.jobId}</span>
-                                    <span>{task.status}</span>
-                                    <span>{task.receivedAt}</span>
-                                  </div>
-                                ))}
-                                {(!detail || detail.tasks.length === 0) && (
-                                  <span className="ear-muted">표시할 작업이 없습니다.</span>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+          <table className="ear-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>이름</th>
+                <th>소유 조직</th>
+                <th>상태</th>
+                <th>런타임 상태</th>
+                <th>런타임 에러</th>
+                <th>리스크</th>
+                <th>최근 업데이트</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAgents.map((agent) => {
+                const detail = agentDetailById.get(agent.id);
+                const isSelected = agent.id === selectedAgentId;
+                const isDrilldownOpen = drilldownAgentId === agent.id;
 
-            {selectedAgent && (
-              <aside className="ear-card ear-card--panel">
-                <div className="ear-card__header">
-                  <div>
-                    <h3>{selectedAgent.agentName} 상세</h3>
-                    <p>샘플 데이터 ({ANALYSIS_RANGE.start} ~ {ANALYSIS_RANGE.end}) 기준 요약</p>
-                  </div>
-                  <div className="ear-card__actions">
-                    <button
-                      type="button"
-                      className="ear-secondary"
-                      onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
+                return (
+                  <React.Fragment key={agent.id}>
+                    <tr
+                      className={isSelected ? 'ear-table__row ear-table__row--active' : 'ear-table__row'}
+                      onClick={() => {
+                        setSelectedAgentId(agent.id);
+                        setDrilldownAgentId(null);
+                        navigate(`/portal-agents/${agent.id}`);
+                      }}
+                      onDoubleClick={() => {
+                        setSelectedAgentId(agent.id);
+                        setDrilldownAgentId(agent.id);
+                        navigate(`/portal-agents/${agent.id}`);
+                      }}
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          setSelectedAgentId(agent.id);
+                          setDrilldownAgentId(null);
+                          navigate(`/portal-agents/${agent.id}`);
+                        }
+                      }}
                     >
-                      태스크 관리 보기
-                    </button>
-                    <button
-                      type="button"
-                      className="ear-ghost"
-                      onClick={() => setIsDetailOpen((prev) => !prev)}
-                    >
-                      {isDetailOpen ? '접기' : '펼치기'}
-                    </button>
-                  </div>
+                      <td>{agent.id}</td>
+                      <td>
+                        <strong>{agent.name}</strong>
+                        <span className="ear-muted">{agent.category}</span>
+                      </td>
+                      <td>{agent.owner}</td>
+                      <td>
+                        <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
+                      </td>
+                      <td>
+                        <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
+                      </td>
+                      <td>{agent.runtimeErrors}</td>
+                      <td>
+                        <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
+                      </td>
+                      <td>{agent.lastUpdated}</td>
+                    </tr>
+                    {isDrilldownOpen && (
+                      <tr className="ear-table__row ear-table__row--drilldown">
+                        <td colSpan={8}>
+                          <div className="ear-drilldown">
+                            <div>
+                              <strong>Task 드릴다운</strong>
+                              <span>선택한 에이전트의 최근 작업</span>
+                            </div>
+                            <div className="ear-drilldown__actions">
+                              <button
+                                type="button"
+                                className="ear-secondary"
+                                onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(agent.name)}`)}
+                              >
+                                크게 보기
+                              </button>
+                            </div>
+                          </div>
+                          <div className="ear-drilldown__list">
+                            {(detail?.tasks ?? []).slice(0, 3).map((task) => (
+                              <div key={task.id} className="ear-drilldown__item">
+                                <span>{task.jobId}</span>
+                                <span>{task.status}</span>
+                                <span>{task.receivedAt}</span>
+                              </div>
+                            ))}
+                            {(!detail || detail.tasks.length === 0) && (
+                              <span className="ear-muted">표시할 작업이 없습니다.</span>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          </section>
+          {selectedAgent && (
+            <aside className="ear-card ear-card--panel ear-agent-detail">
+              <div className="ear-card__header">
+                <div>
+                  <h3>{selectedAgent.agentName} Task 상세</h3>
+                  <p>에이전트 선택 시 Task 정보만 노출됩니다.</p>
                 </div>
-
-                {!isDetailOpen && (
-                  <div className="ear-card__body ear-panel-collapsed">
-                    <p>상세 패널이 접혀 있습니다. 다시 열어 확인하세요.</p>
-                    <button
-                      type="button"
-                      className="ear-secondary"
-                      onClick={() => setIsDetailOpen(true)}
-                    >
-                      상세 열기
-                    </button>
-                  </div>
-                )}
-
-                {isDetailOpen && (
-                  <>
-                    <div className="ear-tabs">
-                      <button
-                        type="button"
-                        className={`ear-tab ${selectedDetailTab === 'overview' ? 'ear-tab--active' : ''}`}
-                        onClick={() => setSelectedDetailTab('overview')}
-                >
-                  요약
-                </button>
-                <button
-                  type="button"
-                  className={`ear-tab ${selectedDetailTab === 'tasks' ? 'ear-tab--active' : ''}`}
-                  onClick={() => setSelectedDetailTab('tasks')}
-                >
-                  작업
-                </button>
-                <button
-                  type="button"
-                  className={`ear-tab ${selectedDetailTab === 'metrics' ? 'ear-tab--active' : ''}`}
-                  onClick={() => setSelectedDetailTab('metrics')}
-                >
-                  메트릭
-                </button>
-                <button
-                  type="button"
-                  className={`ear-tab ${selectedDetailTab === 'costs' ? 'ear-tab--active' : ''}`}
-                  onClick={() => setSelectedDetailTab('costs')}
-                >
-                  비용
-                </button>
-                <button
-                  type="button"
-                  className={`ear-tab ${selectedDetailTab === 'results' ? 'ear-tab--active' : ''}`}
-                  onClick={() => setSelectedDetailTab('results')}
-                >
-                  처리 결과
-                </button>
+                <div className="ear-card__actions">
+                  <button
+                    type="button"
+                    className="ear-secondary"
+                    onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
+                  >
+                    크게 보기
+                  </button>
+                </div>
               </div>
-
-              {selectedDetailTab === 'overview' && (
-                <div className="ear-card__body">
-                  <div className="ear-stat-grid">
-                    <div className="ear-stat">
-                      <span>등록일</span>
-                      <strong>{selectedAgent.registeredAt}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>최근 업데이트</span>
-                      <strong>{selectedAgent.updatedAt}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>업무 유형</span>
-                      <strong>{selectedAgent.type}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>비즈니스 타입</span>
-                      <strong>{selectedAgent.businessType}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>런타임 상태</span>
-                      <strong>{selectedAgent.runtimeState}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>활성 태스크</span>
-                      <strong>{selectedAgent.activeTaskCount}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>에러 누적</span>
-                      <strong>{selectedAgent.errorStreak}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>마지막 Heartbeat</span>
-                      <strong>{selectedAgent.lastHeartbeat}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>총 작업 수</span>
-                      <strong>{totalTasksInRange}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>성공 완료</span>
-                      <strong>{completedTasksInRange}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>실패/오류</span>
-                      <strong>{failedTasksInRange}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>수동 개입</span>
-                      <strong>{manualInterventionCount}</strong>
-                    </div>
-                    <div className="ear-stat">
-                      <span>평균 처리 시간</span>
-                      <strong>{formatMinutes(avgProcessingSeconds / 60)}</strong>
-                    </div>
-                  </div>
-
-                  {selectedSummary && (
-                    <table className="ear-table ear-table--compact">
-                      <thead>
-                        <tr>
-                          <th>에이전트</th>
-                          <th>작업 수</th>
-                          <th>성공 작업</th>
-                          <th>성공률</th>
-                          <th>Token Cost Σ</th>
-                          <th>Infra Cost (Prorated)</th>
-                          <th>Total Cost</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr>
-                          <td>{selectedSummary.agentName}</td>
-                          <td>{selectedSummary.tasksTotal}</td>
-                          <td>{selectedSummary.successfulTasks}</td>
-                          <td>{formatPercent(selectedSummary.successRatePct)}</td>
-                          <td>{formatCost(selectedSummary.tokenCost)}</td>
-                          <td>{formatCost(selectedSummary.infraCostProrated)}</td>
-                          <td>{formatCost(selectedSummary.totalCost)}</td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  )}
-                  <h4>사용자 관점 흐름</h4>
-                  <div className="ear-list">
-                    <div className="ear-list__row">
-                      <strong>요청 접수</strong>
-                      <span>사용자 요청 → EAR_REQUEST 생성</span>
-                    </div>
-                    <div className="ear-list__row">
-                      <strong>대화 시작</strong>
-                      <span>AGENT_CONVERSATIONS 생성 후 채팅 이력 기록</span>
-                    </div>
-                    <div className="ear-list__row">
-                      <strong>작업 실행</strong>
-                      <span>AGENT_TASKS/AGENT_METRICS에 Task·Metric 집계</span>
-                    </div>
-                    <div className="ear-list__row">
-                      <strong>성과 확인</strong>
-                      <span>Token/Infra 비용과 성공률을 성과 지표로 반영</span>
-                    </div>
-                  </div>
-
-                  <h4>처리 결과</h4>
-                  <div className="ear-list">
-                    <div className="ear-list__row">
-                      <strong>결과 요약</strong>
-                      <span>{selectedAgent.resultSummary}</span>
-                    </div>
-                    <div className="ear-list__row">
-                      <strong>Output Files</strong>
-                      <span>
-                        <ul>
-                          {selectedAgent.resultArtifacts.map((artifact) => (
-                            <li key={artifact}>{artifact}</li>
-                          ))}
-                        </ul>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {selectedDetailTab === 'tasks' && (
-                <div className="ear-card__body">
-                  <table className="ear-table ear-table--compact">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>Job ID</th>
-                        <th>Status</th>
-                        <th>Received</th>
-                        <th>Started</th>
-                        <th>Finished</th>
-                        <th>Duration (s)</th>
-                        <th>Avg Latency</th>
-                        <th>TTFT</th>
-                        <th>Error Rate</th>
-                        <th>Token Usage</th>
-                        <th>Token Cost</th>
-                        <th>Baseline</th>
-                        <th>Human Min</th>
-                        <th>Saved Min</th>
-                        <th>Saved Cost</th>
-                        <th>ROI</th>
+              <div className="ear-card__body">
+                <table className="ear-table ear-table--compact">
+                  <thead>
+                    <tr>
+                      <th>ID</th>
+                      <th>Job ID</th>
+                      <th>Status</th>
+                      <th>Received</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tasksInRange.map((task) => (
+                      <tr key={task.id}>
+                        <td>{task.id}</td>
+                        <td>{task.jobId}</td>
+                        <td>{task.status}</td>
+                        <td>{task.receivedAt}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {tasksInRange.map((task) => {
-                        const metrics = taskMetricById.get(task.id);
-                        return (
-                          <tr key={task.id}>
-                          <td>{task.id}</td>
-                          <td>{task.jobId}</td>
-                          <td>{task.status}</td>
-                          <td>{task.receivedAt}</td>
-                          <td>{task.startedAt}</td>
-                          <td>{task.finishedAt}</td>
-                          <td>{metrics ? formatNumber(metrics.durationSeconds) : '-'}</td>
-                          <td>{metrics ? formatNumber(metrics.avgLatency) : '-'}</td>
-                          <td>{metrics ? formatNumber(metrics.avgTimeToFirstToken) : '-'}</td>
-                          <td>{metrics ? formatPercent(metrics.avgErrorRate * 100) : '-'}</td>
-                          <td>{metrics ? formatNumber(metrics.perTaskTokenUsage) : '-'}</td>
-                          <td>{metrics ? formatCost(metrics.perTaskTokenCost) : '-'}</td>
-                          <td>{metrics ? formatMinutes(metrics.baselineMinutes) : '-'}</td>
-                          <td>{metrics ? formatMinutes(metrics.humanMinutes) : '-'}</td>
-                          <td>{metrics ? formatMinutes(metrics.savedMinutes) : '-'}</td>
-                          <td>{metrics ? formatCost(metrics.savedCost) : '-'}</td>
-                          <td>{metrics ? formatPercent(metrics.roiRatio) : '-'}</td>
-                        </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {selectedDetailTab === 'metrics' && (
-                <div className="ear-card__body">
-                  <table className="ear-table ear-table--compact">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>기간</th>
-                        <th>Requests</th>
-                        <th>Latency (avg)</th>
-                        <th>Error Rate</th>
-                        <th>Queue Time</th>
-                        <th>Token Usage</th>
-                        <th>Token Cost</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {metricsInRange.map((metric) => (
-                        <tr key={metric.id}>
-                          <td>{metric.id}</td>
-                          <td>{metric.startTime} ~ {metric.endTime}</td>
-                          <td>{metric.requestsProcessed}</td>
-                          <td>{formatNumber(metric.avgLatency)}</td>
-                          <td>{formatPercent(metric.errorRate * 100)}</td>
-                          <td>{formatNumber(metric.queueTime)}</td>
-                          <td>{formatNumber(metric.totalTokenUsage)}</td>
-                          <td>{formatCost(metric.tokenCost)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {selectedDetailTab === 'costs' && (
-                <div className="ear-card__body">
-                  <table className="ear-table ear-table--compact">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>월 비용</th>
-                        <th>시작일</th>
-                        <th>종료일</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedAgent.infraCosts.map((cost) => (
-                        <tr key={cost.id}>
-                          <td>{cost.id}</td>
-                          <td>{formatCost(cost.monthlyCost)}</td>
-                          <td>{cost.createdAt}</td>
-                          <td>{cost.updatedAt ?? 'active'}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-
-                  <h4>Lifecycle Events</h4>
-                  <table className="ear-table ear-table--compact">
-                    <thead>
-                      <tr>
-                        <th>ID</th>
-                        <th>시간</th>
-                        <th>이전 상태</th>
-                        <th>현재 상태</th>
-                        <th>설명</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {selectedAgent.lifecycleEvents.map((event) => (
-                        <tr key={event.id}>
-                          <td>{event.id}</td>
-                          <td>{event.eventTime}</td>
-                          <td>{event.previousState}</td>
-                          <td>{event.newState}</td>
-                          <td>{event.description}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              {selectedDetailTab === 'results' && (
-                <div className="ear-card__body">
-                  <h4>처리 결과 요약</h4>
-                  <p>{selectedAgent.resultSummary}</p>
-                  <h4>Output Files</h4>
-                  <ul>
-                    {selectedAgent.resultArtifacts.map((artifact) => (
-                      <li key={artifact}>{artifact}</li>
                     ))}
-                  </ul>
-                </div>
-              )}
-                  </>
-                )}
-              </aside>
-            )}
-          </div>
-        </section>
+                    {tasksInRange.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="ear-muted">표시할 Task가 없습니다.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </aside>
+          )}
+        </div>
       </div>
     </PortalDashboardLayout>
   );
