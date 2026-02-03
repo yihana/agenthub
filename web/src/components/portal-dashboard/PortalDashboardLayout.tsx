@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   BarChart3,
@@ -33,16 +33,28 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
   actions,
   children
 }) => {
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { role, company, updateRole, updateCompany } = usePortalRole();
   const filteredNavItems = navItems.filter((item) => !item.systemOnly || role === 'system_admin');
   return (
-    <div className="ear-shell">
-      <aside className="ear-sidebar">
+    <div className={`ear-shell${isSidebarCollapsed ? ' ear-shell--collapsed' : ''}`}>
+      <aside className={`ear-sidebar${isSidebarCollapsed ? ' ear-sidebar--collapsed' : ''}`}>
         <div className="ear-sidebar__brand">
           <span className="ear-badge">Agent Portal</span>
-          <strong>Agent 관리 시스템</strong>
-          <p>사용자화 가능한 운영 허브</p>
+          {!isSidebarCollapsed && (
+            <>
+              <strong>Agent 관리 시스템</strong>
+              <p>사용자화 가능한 운영 허브</p>
+            </>
+          )}
         </div>
+        <button
+          type="button"
+          className="ear-sidebar__toggle"
+          onClick={() => setIsSidebarCollapsed((prev) => !prev)}
+        >
+          {isSidebarCollapsed ? '▶' : '◀'} {isSidebarCollapsed ? '열기' : '접기'}
+        </button>
         <nav className="ear-nav">
           {filteredNavItems.map((item) => {
             const Icon = item.icon;
@@ -55,48 +67,50 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
                 }
               >
                 <Icon size={16} />
-                <span>{item.label}</span>
+                {!isSidebarCollapsed && <span>{item.label}</span>}
               </NavLink>
             );
           })}
         </nav>
-        <div className="ear-sidebar__footer">
-          <div>
-            <span className="ear-muted">버전</span>
-            <strong>Mockup v1.0</strong>
+        {!isSidebarCollapsed && (
+          <div className="ear-sidebar__footer">
+            <div>
+              <span className="ear-muted">버전</span>
+              <strong>Mockup v1.0</strong>
+            </div>
+            <div className="ear-role">
+              <span className="ear-muted">권한</span>
+              <strong>{roleLabels[role]}</strong>
+            </div>
+            <label className="ear-select">
+              <span className="ear-muted">회사</span>
+              <select
+                value={company}
+                onChange={(event) => updateCompany(event.target.value as typeof company)}
+              >
+                {companyOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="ear-select">
+              <span className="ear-muted">권한 선택</span>
+              <select
+                value={role}
+                onChange={(event) => updateRole(event.target.value as typeof role)}
+              >
+                {Object.entries(roleLabels).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <button type="button" className="ear-ghost">공유 링크</button>
           </div>
-          <div className="ear-role">
-            <span className="ear-muted">권한</span>
-            <strong>{roleLabels[role]}</strong>
-          </div>
-          <label className="ear-select">
-            <span className="ear-muted">회사</span>
-            <select
-              value={company}
-              onChange={(event) => updateCompany(event.target.value as typeof company)}
-            >
-              {companyOptions.map((option) => (
-                <option key={option} value={option}>
-                  {option}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="ear-select">
-            <span className="ear-muted">권한 선택</span>
-            <select
-              value={role}
-              onChange={(event) => updateRole(event.target.value as typeof role)}
-            >
-              {Object.entries(roleLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button type="button" className="ear-ghost">공유 링크</button>
-        </div>
+        )}
       </aside>
       <div className="ear-main">
         <header className="ear-header">

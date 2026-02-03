@@ -688,6 +688,7 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [selectedDetailTab, setSelectedDetailTab] = useState<'overview' | 'tasks' | 'metrics' | 'costs' | 'results'>('overview');
   const [isDetailOpen, setIsDetailOpen] = useState(true);
+  const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
     name: '',
     owner: '',
@@ -777,12 +778,15 @@ const PortalAgentListPage: React.FC = () => {
     if (!agentId) {
       return;
     }
-    if (agentId !== selectedAgentId) {
-      setSelectedAgentId(agentId);
-      setSelectedDetailTab('overview');
-      setIsDetailOpen(true);
-    }
-  }, [agentId, selectedAgentId]);
+        if (agentId !== selectedAgentId) {
+          setSelectedAgentId(agentId);
+          setSelectedDetailTab('overview');
+          setIsDetailOpen(true);
+        }
+        if (agentId !== drilldownAgentId) {
+          setDrilldownAgentId(null);
+        }
+      }, [agentId, drilldownAgentId, selectedAgentId]);
 
   const performanceSummary = useMemo(
     () => calculatePerformanceSummary(agentDetails, ANALYSIS_RANGE),
@@ -990,7 +994,7 @@ const PortalAgentListPage: React.FC = () => {
                   {filteredAgents.map((agent) => {
                     const detail = agentDetailById.get(agent.id);
                     const isSelected = agent.id === selectedAgentId;
-
+                    const isDrilldownOpen = drilldownAgentId === agent.id;
                     return (
                       <React.Fragment key={agent.id}>
                         <tr
@@ -999,6 +1003,14 @@ const PortalAgentListPage: React.FC = () => {
                             setSelectedAgentId(agent.id);
                             setSelectedDetailTab('overview');
                             setIsDetailOpen(true);
+                            setDrilldownAgentId(null);
+                            navigate(`/portal-agents/${agent.id}`);
+                          }}
+                          onDoubleClick={() => {
+                            setSelectedAgentId(agent.id);
+                            setSelectedDetailTab('overview');
+                            setIsDetailOpen(true);
+                            setDrilldownAgentId(agent.id);
                             navigate(`/portal-agents/${agent.id}`);
                           }}
                           role="button"
@@ -1008,6 +1020,7 @@ const PortalAgentListPage: React.FC = () => {
                               setSelectedAgentId(agent.id);
                               setSelectedDetailTab('overview');
                               setIsDetailOpen(true);
+                              setDrilldownAgentId(null);
                               navigate(`/portal-agents/${agent.id}`);
                             }
                           }}
@@ -1030,7 +1043,7 @@ const PortalAgentListPage: React.FC = () => {
                           </td>
                           <td>{agent.lastUpdated}</td>
                         </tr>
-                        {isSelected && (
+                        {isDrilldownOpen && (
                           <tr className="ear-table__row ear-table__row--drilldown">
                             <td colSpan={8}>
                               <div className="ear-drilldown">
@@ -1044,7 +1057,7 @@ const PortalAgentListPage: React.FC = () => {
                                     className="ear-secondary"
                                     onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(agent.name)}`)}
                                   >
-                                    태스크 목록
+                                    크게 보기
                                   </button>
                                   <button
                                     type="button"
