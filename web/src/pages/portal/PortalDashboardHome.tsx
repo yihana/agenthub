@@ -56,6 +56,27 @@ interface TaskBaseline {
   description?: string;
 }
 
+
+interface BaselineEntry {
+  metric_key?: string;
+  metricKey?: string;
+  value?: number | string;
+  unit?: string;
+  description?: string;
+}
+
+interface TaskBaseline {
+  task_code?: string;
+  taskCode?: string;
+  domain?: string;
+  before_time_min?: number | string;
+  beforeTimeMin?: number | string;
+  before_cost?: number | string;
+  beforeCost?: number | string;
+  description?: string;
+}
+
+
 interface LaborCostEntry {
   role?: string;
   hourly_cost?: number | string;
@@ -127,7 +148,6 @@ const PortalDashboardHome: React.FC = () => {
     fetchDashboardData();
   }, []);
 
-dashboard-metrics-n0hj51
   const agentUpdates = useMemo<AgentUpdate[]>(() => {
     const topTasks = [...taskBaselines]
       .sort((a, b) => toTaskCost(b) - toTaskCost(a) || toTaskTime(b) - toTaskTime(a))
@@ -135,9 +155,9 @@ dashboard-metrics-n0hj51
 
     if (!topTasks.length) {
       return [
-        { name: 'Finance Insight', owner: '재무팀', status: '운영', tone: 'success' as const },
-        { name: 'Policy Guard', owner: '보안실', status: '점검', tone: 'warning' as const },
-        { name: 'Support Copilot', owner: '고객지원', status: '승인 대기', tone: 'info' as const }
+        { name: 'Finance Insight', owner: '재무팀', status: '운영', tone: 'success' },
+        { name: 'Policy Guard', owner: '보안실', status: '점검', tone: 'warning' },
+        { name: 'Support Copilot', owner: '고객지원', status: '승인 대기', tone: 'info' }
       ];
     }
 
@@ -223,7 +243,7 @@ dashboard-metrics-n0hj51
             </div>
           </WidgetCard>
         );
-      }
+        
       case 'chart': {
         const autoPercent = metrics ? Math.max(0, Math.min(100, metrics.task_success_rate_pct)) : 72;
         const reviewPercent = metrics ? Math.max(0, Math.min(100, 100 - metrics.sla_compliance_pct)) : 18;

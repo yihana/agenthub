@@ -449,6 +449,7 @@ const baseAgentDetails: AgentDetailRecord[] = [
 ];
 
 const parseDate = (value: string) => new Date(value.replace(' ', 'T'));
+
 const isWithinRange = (value: string, start: string, end: string) => {
   const target = parseDate(value).getTime();
   return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
