@@ -449,7 +449,6 @@ const baseAgentDetails: AgentDetailRecord[] = [
 ];
 
 const parseDate = (value: string) => new Date(value.replace(' ', 'T'));
-
 const isWithinRange = (value: string, start: string, end: string) => {
   const target = parseDate(value).getTime();
   return target >= parseDate(start).getTime() && target <= parseDate(end).getTime();
@@ -732,7 +731,6 @@ const PortalAgentListPage: React.FC = () => {
   const agentDetailById = useMemo(() => {
     return new Map(agentDetails.map((agent) => [String(agent.id), agent]));
   }, [agentDetails]);
-
   useEffect(() => {
     if (!agentId) {
       return;
@@ -866,7 +864,6 @@ const PortalAgentListPage: React.FC = () => {
             <button type="submit" className="ear-primary">등록 저장</button>
           </form>
         </aside>
-
         <div className="ear-agent-layout">
           <section className="ear-table-card">
             <div className="ear-table-card__header">

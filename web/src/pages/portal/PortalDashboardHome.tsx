@@ -1,36 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
-import WidgetCard from '../../components/portal-dashboard/WidgetCard';
-import StatTile from '../../components/portal-dashboard/StatTile';
 import TagPill from '../../components/portal-dashboard/TagPill';
-import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
-import ProgressRow from '../../components/portal-dashboard/ProgressRow';
-import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
-import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
 
-interface PortalMetrics {
-  total_requests: number;
-  prev_total_requests: number;
-  growth_rate_pct: number;
-  completed_requests: number;
-  pending_requests: number;
-  avg_latency_ms: number;
-  avg_queue_time_ms: number;
-  error_rate_pct: number;
-  quality_score: number;
-  stability_score: number;
-  task_success_rate_pct: number;
-  sla_compliance_pct: number;
-  user_coverage_pct: number;
-  requests_processed: number;
-  savings: {
-    baseline_minutes_per_request: number;
-    avg_response_minutes: number;
-    time_savings_minutes: number;
-    cost_savings: number;
-    roi_ratio_pct: number;
-  };
-}
+const stepTwoAgents = [
+  { name: 'Routing Agent', status: '완료', tone: 'success' as const },
+  { name: 'Finance KPI Agent', status: '대기', tone: 'neutral' as const },
+  { name: 'Cost Analysis Agent', status: '대기', tone: 'neutral' as const },
+  { name: 'Compute Agent', status: '대기', tone: 'neutral' as const }
+];
 
 interface BaselineEntry {
   metric_key?: string;
@@ -314,7 +291,7 @@ const PortalDashboardHome: React.FC = () => {
                   <strong>{alert.title}</strong>
                   <span>{alert.detail}</span>
                 </div>
-              ))}
+              </div>
             </div>
           </WidgetCard>
         );
