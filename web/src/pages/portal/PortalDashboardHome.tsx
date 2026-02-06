@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
@@ -256,7 +256,7 @@ const PortalDashboardHome: React.FC = () => {
                   <strong>{a.title}</strong>
                   <span>{a.detail}</span>
                 </div>
-              </div>
+              ))} 
             </div>
           </WidgetCard>
         );
