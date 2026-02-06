@@ -11,6 +11,14 @@ interface BaselineEntry {
   description?: string;
 }
 
+interface BaselineEntry {
+  metric_key?: string;
+  metricKey?: string;
+  value?: number | string;
+  unit?: string;
+  description?: string;
+}
+
 interface TaskBaseline {
   task_code?: string;
   taskCode?: string;
@@ -67,6 +75,7 @@ const PortalDashboardHome: React.FC = () => {
         const payload = await baselineResult.value.json();
         setBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
       }
+
 
       if (taskBaselineResult.status === 'fulfilled' && taskBaselineResult.value.ok) {
         const payload = await taskBaselineResult.value.json();
@@ -294,16 +303,18 @@ const PortalDashboardHome: React.FC = () => {
     }
   };
 
+  const headerActions = (
+    <div className="ear-header__actions">
+      <button className="ear-secondary">내보내기</button>
+      <button className="ear-primary">리포트 생성</button>
+    </div>
+  );
+
   return (
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
-      subtitle="피그마 시안 기준의 정보 구조로 운영 현황/성과 지표/리스크를 한 화면에서 확인합니다."
-      actions={(
-        <div className="ear-header__actions">
-          <button className="ear-secondary">내보내기</button>
-          <button className="ear-primary">리포트 생성</button>
-        </div>
-      )}
+      subtitle="운영 현황/성과 지표/리스크를 확인합니다."
+      actions={headerActions}
     >
       <section className="ear-hero ear-hero--portal">
         <div>
