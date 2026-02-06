@@ -439,7 +439,8 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'started'
       }
-    ],
+    ]
+    ,
     resultSummary: '처리 결과: 신규 가격대 3개 제안, 수익 개선 8.6% 추정.',
     resultArtifacts: ['pricing_simulation.xlsx', 'margin_projection.png']
   }
@@ -560,7 +561,8 @@ const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
         newState: 'RUNNING',
         description: 'started'
       }
-    ],
+    ]
+    ,
     resultSummary: `${agent.name} 결과 요약: ${tasks.length}건 처리, 성공률 ${Math.round(
       (tasks.filter((task) => task.status === 'COMPLETED').length / tasks.length) * 100
     )}%`,
