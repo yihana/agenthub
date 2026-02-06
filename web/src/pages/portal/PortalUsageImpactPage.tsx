@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import StatTile from '../../components/portal-dashboard/StatTile';
@@ -38,8 +39,50 @@ interface UsageMetrics {
 }
 
 const PortalUsageImpactPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [metrics, setMetrics] = useState<UsageMetrics | null>(null);
   const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
+  const selectedAgent = searchParams.get('agent');
+
+  const agentFlowMetrics = useMemo(() => {
+    const metricByAgent = {
+      OrderBot: { taskTotal: 3, successTotal: 2, tokenUsageSum: 39500, tokenCostSum: 0.395, avgLatency: 0.325 },
+      SupportGPT: { taskTotal: 3, successTotal: 2, tokenUsageSum: 57000, tokenCostSum: 0.57, avgLatency: 0.575 },
+      PricingAI: { taskTotal: 1, successTotal: 1, tokenUsageSum: 10500, tokenCostSum: 0.105, avgLatency: 0.25 }
+    } as const;
+
+    if (selectedAgent && selectedAgent in metricByAgent) {
+      const selected = metricByAgent[selectedAgent as keyof typeof metricByAgent];
+      return {
+        taskTotal: selected.taskTotal,
+        successRate: selected.taskTotal > 0 ? (selected.successTotal / selected.taskTotal) * 100 : 0,
+        tokenUsageSum: selected.tokenUsageSum,
+        tokenCostSum: selected.tokenCostSum,
+        avgLatency: selected.avgLatency
+      };
+    }
+
+    const total = Object.values(metricByAgent).reduce(
+      (acc, agent) => {
+        acc.taskTotal += agent.taskTotal;
+        acc.successTotal += agent.successTotal;
+        acc.tokenUsageSum += agent.tokenUsageSum;
+        acc.tokenCostSum += agent.tokenCostSum;
+        acc.avgLatencySum += agent.avgLatency;
+        return acc;
+      },
+      { taskTotal: 0, successTotal: 0, tokenUsageSum: 0, tokenCostSum: 0, avgLatencySum: 0 }
+    );
+
+    const agentCount = Object.keys(metricByAgent).length;
+    return {
+      taskTotal: total.taskTotal,
+      successRate: total.taskTotal > 0 ? (total.successTotal / total.taskTotal) * 100 : 0,
+      tokenUsageSum: total.tokenUsageSum,
+      tokenCostSum: total.tokenCostSum,
+      avgLatency: agentCount > 0 ? total.avgLatencySum / agentCount : 0
+    };
+  }, [selectedAgent]);
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -64,6 +107,23 @@ const PortalUsageImpactPage: React.FC = () => {
       subtitle="에이전트 활용 현황과 업무 개선 효과를 시각화합니다."
       actions={<button className="ear-primary">효과 리포트 생성</button>}
     >
+      {selectedAgent && (
+        <section className="ear-card">
+          <div className="ear-card__header">
+            <div>
+              <h3>{selectedAgent} 운영지표 흐름</h3>
+              <p>Task 합 → Agent 지표 합산 흐름으로 계산된 값입니다.</p>
+            </div>
+          </div>
+          <div className="ear-stat-grid">
+            <div className="ear-stat"><span>Task 합계</span><strong>{agentFlowMetrics.taskTotal}</strong></div>
+            <div className="ear-stat"><span>성공률</span><strong>{agentFlowMetrics.successRate.toFixed(1)}%</strong></div>
+            <div className="ear-stat"><span>Token 합계</span><strong>{agentFlowMetrics.tokenUsageSum.toLocaleString()}</strong></div>
+            <div className="ear-stat"><span>Token Cost 합계</span><strong>{agentFlowMetrics.tokenCostSum.toFixed(3)}</strong></div>
+            <div className="ear-stat"><span>평균 Latency</span><strong>{agentFlowMetrics.avgLatency.toFixed(3)}</strong></div>
+          </div>
+        </section>
+      )}
       <section className="ear-hero ear-hero--compact">
         <div>
           <h2>조직별 활용도 Top 3</h2>
