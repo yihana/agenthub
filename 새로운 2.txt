@@ -1,0 +1,255 @@
+%% Mermaid extended ERD with PK/FK definitions %
+erDiagram
+USERS {
+bigint id PK
+string username
+string email
+datetime created_at
+}
+
+CHAT_HISTORY {
+    bigint id PK
+    bigint user_id FK
+    text message
+    datetime created_at
+}
+
+LOGIN_HISTORY {
+    bigint id PK
+    bigint user_id FK
+    string ip_address
+    datetime created_at
+}
+
+IMPROVEMENT_REQUESTS {
+    bigint id PK
+    bigint user_id FK
+    bigint chat_id FK
+    text content
+    datetime created_at
+}
+
+EAR_REQUESTS {
+    bigint id PK
+    bigint user_id FK
+    bigint template_id FK
+    integer agent_id FK
+    string status
+    string business_type
+    json payload
+    datetime created_at
+    datetime updated_at
+}
+
+EAR_KEYWORDS {
+    bigint id PK
+    string keyword
+}
+
+EAR_REQUEST_TEMPLATES {
+    bigint id PK
+    bigint keyword_id FK
+    string name
+    json schema
+}
+
+RAG_DOCUMENTS {
+    bigint id PK
+    string filename
+    string source
+}
+
+RAG_CHUNKS {
+    bigint id PK
+    bigint document_id FK
+    text chunk
+    vector embedding
+}
+
+COMPANY_INTERFACES {
+    bigint id PK
+    string company_code
+    string interface_name
+}
+
+INTERFACE_HISTORY {
+    bigint id PK
+    bigint interface_id FK
+    json payload
+    datetime created_at
+}
+
+MENUS {
+    bigint id PK
+    string menu_name
+    string path
+}
+
+GROUP_MENU_MAPPINGS {
+    bigint id PK
+    bigint menu_id FK
+    bigint group_id FK
+}
+
+AGENTS {
+    bigint id PK
+    string agent_name
+    string type
+    string business_type
+    string status
+}
+
+AGENT_TASKS {
+    bigint id PK
+    bigint agent_id FK
+    string job_id
+    string status
+    timestamp received_at
+    timestamp started_at
+    timestamp finished_at
+    nclob result
+}
+
+AGENT_ROLES {
+    bigint id PK
+    bigint agent_id FK
+    string role_name
+}
+
+AGENT_METRICS {
+    bigint id PK
+    bigint agent_id FK
+    timestamp timestamp
+    decimal cpu_usage
+    decimal memory_usage
+    integer requests_processed
+    decimal avg_latency
+    decimal error_rate
+    decimal queue_time
+}
+
+JOB_QUEUE {
+    nvarchar job_id PK
+    nclob payload
+    integer priority
+    string status
+    bigint assigned_agent_id FK
+    datetime created_at
+    datetime scheduled_at
+}
+
+AGENT_SYSTEM_MAPPINGS {
+    bigint id PK
+    bigint agent_id FK
+    string system_cd
+    datetime created_at
+    datetime updated_at
+}
+
+AGENT_ERP_AUTH {
+    bigint id PK
+    bigint agent_id FK
+    string system_cd
+    string sys_auth_cd
+    datetime created_at
+    datetime updated_at
+}
+
+PORTAL_METRIC_INPUTS {
+    bigint id PK
+    string metric_key
+    decimal value
+    string unit
+    nclob description
+    string business_type
+    string agent_type
+    datetime created_at
+    datetime updated_at
+}
+
+USER_JOB_ROLE {
+    bigint id PK
+    bigint user_id FK
+    string role_name
+    datetime created_at
+    datetime updated_at
+}
+
+USER_BUSINESS_DOMAIN {
+    bigint id PK
+    bigint user_id FK
+    string business_type
+    datetime created_at
+    datetime updated_at
+}
+
+BUSINESS_TASK_BASELINE {
+    bigint id PK
+    string task_code
+    string domain
+    decimal before_time_min
+    decimal before_cost
+    nclob description
+    datetime created_at
+    datetime updated_at
+}
+
+LABOR_COST {
+    bigint id PK
+    string role
+    decimal hourly_cost
+    string currency
+    string business_type
+    datetime created_at
+    datetime updated_at
+}
+
+ROI_METRICS {
+    bigint id PK
+    date period_start
+    date period_end
+    string business_type
+    string agent_type
+    decimal saved_hours
+    decimal saved_cost
+    decimal roi_ratio_pct
+    datetime created_at
+    datetime updated_at
+}
+
+ADOPTION_FUNNEL_EVENTS {
+    bigint id PK
+    bigint user_id FK
+    string stage
+    string business_type
+    string agent_type
+    nclob metadata
+    timestamp event_time
+}
+
+USERS ||--o{ CHAT_HISTORY : has
+USERS ||--o{ LOGIN_HISTORY : has
+USERS ||--o{ IMPROVEMENT_REQUESTS : creates
+USERS ||--o{ EAR_REQUESTS : creates
+USERS ||--o{ USER_JOB_ROLE : assigned
+USERS ||--o{ USER_BUSINESS_DOMAIN : classified
+USERS ||--o{ ADOPTION_FUNNEL_EVENTS : logs
+
+CHAT_HISTORY ||--o{ IMPROVEMENT_REQUESTS : references
+
+EAR_KEYWORDS ||--o{ EAR_REQUEST_TEMPLATES : has
+EAR_REQUEST_TEMPLATES ||--o{ EAR_REQUESTS : used_by
+
+RAG_DOCUMENTS ||--o{ RAG_CHUNKS : contains
+
+COMPANY_INTERFACES ||--o{ INTERFACE_HISTORY : logs
+
+MENUS ||--o{ GROUP_MENU_MAPPINGS : mapped_to
+
+AGENTS ||--o{ AGENT_TASKS : executes
+AGENTS ||--o{ AGENT_ROLES : has
+AGENTS ||--o{ AGENT_METRICS : records
+AGENTS ||--o{ AGENT_SYSTEM_MAPPINGS : maps_to
+AGENTS ||--o{ AGENT_ERP_AUTH : authorized
+
+AGENT_TASKS ||--o{ JOB_QUEUE : queued

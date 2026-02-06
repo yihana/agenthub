@@ -90,6 +90,97 @@ interface AgentDetailRecord {
   resultArtifacts: string[];
 }
 
+interface AgentPerformanceSummary {
+  agentId: number;
+  agentName: string;
+  tasksTotal: number;
+  successfulTasks: number;
+  successRatePct: number;
+  tokenCost: number;
+  infraCostProrated: number;
+  totalCost: number;
+}
+
+interface AgentTaskRecord {
+  id: number;
+  agentId: number;
+  jobId: string;
+  status: string;
+  receivedAt: string;
+  startedAt: string;
+  finishedAt: string;
+}
+
+interface AgentMetricRecord {
+  id: number;
+  agentId: number;
+  startTime: string;
+  endTime: string;
+  durationSeconds: number;
+  cpuUsage: number;
+  memoryUsage: number;
+  requestsProcessed: number;
+  avgLatency: number;
+  errorRate: number;
+  queueTime: number;
+  inputTokenUsage: number;
+  outputTokenUsage: number;
+  totalTokenUsage: number;
+  tokenCost: number;
+  activeUsers: number;
+  totalUsers: number;
+  positiveFeedback: number;
+  totalFeedback: number;
+  retriesPerRequest: number;
+  avgTimeToFirstToken: number;
+  refusalRate: number;
+  avgResponseTime: number;
+  humanIntervention: number;
+}
+
+interface AgentInfraCostRecord {
+  id: number;
+  agentId: number;
+  monthlyCost: number;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+interface AgentLifecycleEvent {
+  id: number;
+  agentId: number;
+  eventType: string;
+  eventTime: string;
+  previousState: string;
+  newState: string;
+  description: string;
+}
+
+interface AgentDetailRecord {
+  id: number;
+  agentName: string;
+  type: string;
+  businessType: string;
+  status: string;
+  registeredAt: string;
+  updatedAt: string;
+  tasks: AgentTaskRecord[];
+  metrics: AgentMetricRecord[];
+  infraCosts: AgentInfraCostRecord[];
+  lifecycleEvents: AgentLifecycleEvent[];
+}
+
+interface AgentPerformanceSummary {
+  agentId: number;
+  agentName: string;
+  tasksTotal: number;
+  successfulTasks: number;
+  successRatePct: number;
+  tokenCost: number;
+  infraCostProrated: number;
+  totalCost: number;
+}
+
 const STORAGE_KEY = 'portal-agent-list';
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
