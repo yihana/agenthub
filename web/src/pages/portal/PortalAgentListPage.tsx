@@ -90,97 +90,6 @@ interface AgentDetailRecord {
   resultArtifacts: string[];
 }
 
-interface AgentPerformanceSummary {
-  agentId: number;
-  agentName: string;
-  tasksTotal: number;
-  successfulTasks: number;
-  successRatePct: number;
-  tokenCost: number;
-  infraCostProrated: number;
-  totalCost: number;
-}
-
-interface AgentTaskRecord {
-  id: number;
-  agentId: number;
-  jobId: string;
-  status: string;
-  receivedAt: string;
-  startedAt: string;
-  finishedAt: string;
-}
-
-interface AgentMetricRecord {
-  id: number;
-  agentId: number;
-  startTime: string;
-  endTime: string;
-  durationSeconds: number;
-  cpuUsage: number;
-  memoryUsage: number;
-  requestsProcessed: number;
-  avgLatency: number;
-  errorRate: number;
-  queueTime: number;
-  inputTokenUsage: number;
-  outputTokenUsage: number;
-  totalTokenUsage: number;
-  tokenCost: number;
-  activeUsers: number;
-  totalUsers: number;
-  positiveFeedback: number;
-  totalFeedback: number;
-  retriesPerRequest: number;
-  avgTimeToFirstToken: number;
-  refusalRate: number;
-  avgResponseTime: number;
-  humanIntervention: number;
-}
-
-interface AgentInfraCostRecord {
-  id: number;
-  agentId: number;
-  monthlyCost: number;
-  createdAt: string;
-  updatedAt: string | null;
-}
-
-interface AgentLifecycleEvent {
-  id: number;
-  agentId: number;
-  eventType: string;
-  eventTime: string;
-  previousState: string;
-  newState: string;
-  description: string;
-}
-
-interface AgentDetailRecord {
-  id: number;
-  agentName: string;
-  type: string;
-  businessType: string;
-  status: string;
-  registeredAt: string;
-  updatedAt: string;
-  tasks: AgentTaskRecord[];
-  metrics: AgentMetricRecord[];
-  infraCosts: AgentInfraCostRecord[];
-  lifecycleEvents: AgentLifecycleEvent[];
-}
-
-interface AgentPerformanceSummary {
-  agentId: number;
-  agentName: string;
-  tasksTotal: number;
-  successfulTasks: number;
-  successRatePct: number;
-  tokenCost: number;
-  infraCostProrated: number;
-  totalCost: number;
-}
-
 const STORAGE_KEY = 'portal-agent-list';
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
@@ -834,6 +743,18 @@ const PortalAgentListPage: React.FC = () => {
   const tasksInRange = selectedAgent
     ? selectedAgent.tasks.filter((task) => isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
     : [];
+  const selectedMetricsInRange = selectedAgent
+    ? selectedAgent.metrics.filter((metric) => isWithinRange(metric.startTime, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
+    : [];
+  const taskCount = tasksInRange.length;
+  const successCount = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
+  const successRate = taskCount > 0 ? (successCount / taskCount) * 100 : 0;
+  const metricRequestSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.requestsProcessed, 0);
+  const metricTokenSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.totalTokenUsage, 0);
+  const metricCostSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
+  const avgMetricLatency = selectedMetricsInRange.length > 0
+    ? selectedMetricsInRange.reduce((sum, metric) => sum + metric.avgLatency, 0) / selectedMetricsInRange.length
+    : 0;
 
   return (
     <PortalDashboardLayout
@@ -1058,17 +979,50 @@ const PortalAgentListPage: React.FC = () => {
                   <h3>{selectedAgent.agentName} Task 상세</h3>
                   <p>에이전트 선택 시 Task 정보만 노출됩니다.</p>
                 </div>
-                <div className="ear-card__actions">
-                  <button
-                    type="button"
-                    className="ear-secondary"
-                    onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
-                  >
-                    크게 보기
-                  </button>
-                </div>
+              <div className="ear-card__actions">
+                <button
+                  type="button"
+                  className="ear-secondary"
+                  onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
+                >
+                  크게 보기
+                </button>
+                <button
+                  type="button"
+                  className="ear-ghost"
+                  onClick={() => navigate(`/portal-usage?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
+                >
+                  운영지표 보기
+                </button>
               </div>
+            </div>
               <div className="ear-card__body">
+                <div className="ear-stat-grid ear-stat-grid--compact">
+                  <div className="ear-stat">
+                    <span>Task 합계</span>
+                    <strong>{formatNumber(taskCount)}</strong>
+                  </div>
+                  <div className="ear-stat">
+                    <span>Task 성공률</span>
+                    <strong>{formatPercent(successRate)}</strong>
+                  </div>
+                  <div className="ear-stat">
+                    <span>Metric 요청 합</span>
+                    <strong>{formatNumber(metricRequestSum)}</strong>
+                  </div>
+                  <div className="ear-stat">
+                    <span>Metric Token 합</span>
+                    <strong>{formatNumber(metricTokenSum)}</strong>
+                  </div>
+                  <div className="ear-stat">
+                    <span>Metric Cost 합</span>
+                    <strong>{formatCost(metricCostSum)}</strong>
+                  </div>
+                  <div className="ear-stat">
+                    <span>평균 Latency</span>
+                    <strong>{formatNumber(avgMetricLatency)}</strong>
+                  </div>
+                </div>
                 <table className="ear-table ear-table--compact">
                   <thead>
                     <tr>

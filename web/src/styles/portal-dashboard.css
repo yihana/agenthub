@@ -52,17 +52,21 @@
 }
 
 .ear-sidebar__toggle {
-  border: 1px solid rgba(148, 163, 184, 0.4);
-  background: rgba(15, 23, 42, 0.2);
-  color: #e2e8f0;
+  border: 1px solid rgba(148, 163, 184, 0.6);
+  background: #f59e0b;
+  color: #111827;
   border-radius: 10px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   font-size: 12px;
+  font-weight: 700;
   cursor: pointer;
   width: 100%;
   display: flex;
   justify-content: center;
   gap: 6px;
+  position: sticky;
+  top: 8px;
+  z-index: 3;
 }
 
 .ear-sidebar--collapsed .ear-nav__item {
@@ -547,6 +551,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   gap: 12px;
+}
+
+.ear-stat-grid--compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .ear-stat {
@@ -1116,6 +1124,7 @@
   .ear-agent-layout {
     grid-template-columns: 1fr;
   }
+
   .ear-split {
     grid-template-columns: 1fr;
   }
