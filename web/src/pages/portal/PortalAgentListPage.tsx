@@ -229,7 +229,8 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ],
+    ]
+    ,
     resultSummary: '처리 결과: 성공 2건, 실패 1건. 결제 이슈는 수동 검수로 전환됨.',
     resultArtifacts: ['order_validation_report.json', 'payment_issue_trace.log']
   },
@@ -365,7 +366,8 @@ const baseAgentDetails: AgentDetailRecord[] = [
         newState: 'RUNNING',
         description: 'recovered'
       }
-    ],
+    ]
+    ,
     resultSummary: '처리 결과: 응답 템플릿 2건 자동 생성, VOC 분류 오류 1건 발생.',
     resultArtifacts: ['support_summary.md', 'voc_classification.csv']
   },
