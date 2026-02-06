@@ -2,12 +2,6 @@ import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
-const stepTwoAgents = [
-  { name: 'Routing Agent', status: '완료', tone: 'success' as const },
-  { name: 'Finance KPI Agent', status: '대기', tone: 'neutral' as const },
-  { name: 'Cost Analysis Agent', status: '대기', tone: 'neutral' as const },
-  { name: 'Compute Agent', status: '대기', tone: 'neutral' as const }
-];
 
 interface BaselineEntry {
   metric_key?: string;
@@ -304,12 +298,12 @@ const PortalDashboardHome: React.FC = () => {
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
       subtitle="피그마 시안 기준의 정보 구조로 운영 현황/성과 지표/리스크를 한 화면에서 확인합니다."
-      actions={
-        <>
+      actions={(
+        <div className="ear-header__actions">
           <button className="ear-secondary">내보내기</button>
           <button className="ear-primary">리포트 생성</button>
-        </>
-      }
+        </div>
+      )}
     >
       <section className="ear-hero ear-hero--portal">
         <div>
