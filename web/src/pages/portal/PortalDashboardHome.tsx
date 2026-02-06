@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
@@ -14,7 +14,6 @@ import type PortalMetrics from '../../types/portal-dashboard';
 /* =======================
  * Types
  * ======================= */
-
 interface BaselineEntry {
   metric_key?: string;
   metricKey?: string;
@@ -50,10 +49,10 @@ interface AgentUpdate {
   tone: AgentUpdateTone;
 }
 
+
 /* =======================
  * Utils
  * ======================= */
-
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -66,7 +65,6 @@ const toTaskCost = (task: TaskBaseline) => toNumber(task.before_cost ?? task.bef
 /* =======================
  * Component
  * ======================= */
-
 const PortalDashboardHome: React.FC = () => {
   const { widgets } = usePortalDashboardConfig();
   const enabledWidgets = widgets.filter((w) => w.enabled);
@@ -90,6 +88,7 @@ const PortalDashboardHome: React.FC = () => {
         fetch('/api/portal-dashboard/task-baselines'),
         fetch('/api/portal-dashboard/labor-costs')
       ]);
+
 
       if (m.status === 'fulfilled' && m.value.ok) {
         setMetrics(await m.value.json());
@@ -119,7 +118,6 @@ const PortalDashboardHome: React.FC = () => {
   /* =======================
    * Derived Data
    * ======================= */
-
   const agentUpdates = useMemo<AgentUpdate[]>(() => {
     const topTasks = [...taskBaselines]
       .sort((a, b) => toTaskCost(b) - toTaskCost(a) || toTaskTime(b) - toTaskTime(a))
@@ -258,7 +256,7 @@ const PortalDashboardHome: React.FC = () => {
                   <strong>{a.title}</strong>
                   <span>{a.detail}</span>
                 </div>
-              ))}
+              </div>
             </div>
           </WidgetCard>
         );
@@ -269,10 +267,10 @@ const PortalDashboardHome: React.FC = () => {
     }
   };
 
+
   /* =======================
    * Render
    * ======================= */
-
   return (
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
@@ -285,8 +283,8 @@ const PortalDashboardHome: React.FC = () => {
           ))}
         </div>
       </section>
-
       <div className="ear-grid">{enabledWidgets.map(renderWidget)}</div>
+
     </PortalDashboardLayout>
   );
 };
