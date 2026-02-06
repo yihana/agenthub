@@ -69,3 +69,6 @@ export const defaultWidgets: DashboardWidgetConfig[] = [
     category: 'overview'
   }
 ];
+
+
+export type { DashboardWidgetConfig as default };

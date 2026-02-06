@@ -2,41 +2,18 @@ import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import TagPill from '../../components/portal-dashboard/TagPill';
 
+import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
+import WidgetCard from '../../components/portal-dashboard/WidgetCard';
+import StatTile from '../../components/portal-dashboard/StatTile';
+import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
+import ProgressRow from '../../components/portal-dashboard/ProgressRow';
 
-interface BaselineEntry {
-  metric_key?: string;
-  metricKey?: string;
-  value?: number | string;
-  unit?: string;
-  description?: string;
-}
+import DashboardWidgetConfig from '../../data/portalDashboardConfig';
+import type PortalMetrics from '../../types/portal-dashboard';
 
-interface BaselineEntry {
-  metric_key?: string;
-  metricKey?: string;
-  value?: number | string;
-  unit?: string;
-  description?: string;
-}
-
-interface TaskBaseline {
-  task_code?: string;
-  taskCode?: string;
-  domain?: string;
-  before_time_min?: number | string;
-  beforeTimeMin?: number | string;
-  before_cost?: number | string;
-  beforeCost?: number | string;
-  description?: string;
-}
-
-interface LaborCostEntry {
-  role?: string;
-  hourly_cost?: number | string;
-  hourlyCost?: number | string;
-  currency?: string;
-}
-
+/* =======================
+ * Types
+ * ======================= */
 interface BaselineEntry {
   metric_key?: string;
   metricKey?: string;
@@ -55,27 +32,6 @@ interface TaskBaseline {
   beforeCost?: number | string;
   description?: string;
 }
-
-
-interface BaselineEntry {
-  metric_key?: string;
-  metricKey?: string;
-  value?: number | string;
-  unit?: string;
-  description?: string;
-}
-
-interface TaskBaseline {
-  task_code?: string;
-  taskCode?: string;
-  domain?: string;
-  before_time_min?: number | string;
-  beforeTimeMin?: number | string;
-  before_cost?: number | string;
-  beforeCost?: number | string;
-  description?: string;
-}
-
 
 interface LaborCostEntry {
   role?: string;
@@ -93,6 +49,10 @@ interface AgentUpdate {
   tone: AgentUpdateTone;
 }
 
+
+/* =======================
+ * Utils
+ * ======================= */
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -102,9 +62,12 @@ const toTaskCode = (task: TaskBaseline) => task.task_code ?? task.taskCode ?? 'T
 const toTaskTime = (task: TaskBaseline) => toNumber(task.before_time_min ?? task.beforeTimeMin);
 const toTaskCost = (task: TaskBaseline) => toNumber(task.before_cost ?? task.beforeCost);
 
+/* =======================
+ * Component
+ * ======================= */
 const PortalDashboardHome: React.FC = () => {
   const { widgets } = usePortalDashboardConfig();
-  const enabledWidgets = widgets.filter((widget) => widget.enabled);
+  const enabledWidgets = widgets.filter((w) => w.enabled);
 
   const [metrics, setMetrics] = useState<PortalMetrics | null>(null);
   const [baselines, setBaselines] = useState<BaselineEntry[]>([]);
@@ -112,42 +75,49 @@ const PortalDashboardHome: React.FC = () => {
   const [laborCosts, setLaborCosts] = useState<LaborCostEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
+  /* =======================
+   * Data Fetch
+   * ======================= */
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchData = async () => {
       setLoading(true);
 
-      const [metricsResult, baselineResult, taskBaselineResult, laborCostResult] = await Promise.allSettled([
+      const [m, b, t, l] = await Promise.allSettled([
         fetch('/api/portal-dashboard/metrics?period=week'),
         fetch('/api/portal-dashboard/baselines'),
         fetch('/api/portal-dashboard/task-baselines'),
         fetch('/api/portal-dashboard/labor-costs')
       ]);
 
-      if (metricsResult.status === 'fulfilled' && metricsResult.value.ok) {
-        setMetrics(await metricsResult.value.json());
+
+      if (m.status === 'fulfilled' && m.value.ok) {
+        setMetrics(await m.value.json());
       }
 
-      if (baselineResult.status === 'fulfilled' && baselineResult.value.ok) {
-        const payload = await baselineResult.value.json();
+      if (b.status === 'fulfilled' && b.value.ok) {
+        const payload = await b.value.json();
         setBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
       }
 
-      if (taskBaselineResult.status === 'fulfilled' && taskBaselineResult.value.ok) {
-        const payload = await taskBaselineResult.value.json();
+      if (t.status === 'fulfilled' && t.value.ok) {
+        const payload = await t.value.json();
         setTaskBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
       }
 
-      if (laborCostResult.status === 'fulfilled' && laborCostResult.value.ok) {
-        const payload = await laborCostResult.value.json();
+      if (l.status === 'fulfilled' && l.value.ok) {
+        const payload = await l.value.json();
         setLaborCosts(Array.isArray(payload.costs) ? payload.costs : []);
       }
 
       setLoading(false);
     };
 
-    fetchDashboardData();
+    fetchData();
   }, []);
 
+  /* =======================
+   * Derived Data
+   * ======================= */
   const agentUpdates = useMemo<AgentUpdate[]>(() => {
     const topTasks = [...taskBaselines]
       .sort((a, b) => toTaskCost(b) - toTaskCost(a) || toTaskTime(b) - toTaskTime(a))
@@ -189,28 +159,21 @@ const PortalDashboardHome: React.FC = () => {
       if (metrics.pending_requests >= Math.max(20, Math.round(metrics.total_requests * 0.15))) {
         result.push({
           title: '대기열 증가',
-          detail: `현재 대기 ${metrics.pending_requests.toLocaleString()}건으로 모니터링이 필요합니다.`
-        });
-      }
-
-      if (metrics.user_coverage_pct < 70) {
-        result.push({
-          title: '커버리지 확장 필요',
-          detail: `사용자 커버리지 ${metrics.user_coverage_pct.toFixed(1)}%로 확장 여지가 있습니다.`
+          detail: `현재 대기 ${metrics.pending_requests.toLocaleString()}건`
         });
       }
     }
 
     if (!taskBaselines.length) {
-      result.push({ title: 'Task 기준값 없음', detail: 'task-baseline 데이터가 없어 일부 ROI 계산이 추정치로 표시됩니다.' });
+      result.push({ title: 'Task 기준값 없음', detail: 'baseline 데이터가 없습니다.' });
     }
 
     if (!laborCosts.length) {
-      result.push({ title: '인건비 기준값 없음', detail: 'labor-cost 데이터가 없어 비용 절감 추정이 제한됩니다.' });
+      result.push({ title: '인건비 기준값 없음', detail: 'labor-cost 데이터가 없습니다.' });
     }
 
     return result.slice(0, 3);
-  }, [laborCosts.length, metrics, taskBaselines.length]);
+  }, [metrics, taskBaselines.length, laborCosts.length]);
 
   const heroStats = useMemo(() => {
     if (!metrics) {
@@ -223,12 +186,16 @@ const PortalDashboardHome: React.FC = () => {
     }
 
     return [
-      { label: '주간 요청', value: `${metrics.total_requests.toLocaleString()}`, delta: `${metrics.growth_rate_pct.toFixed(1)}%` },
+      { label: '주간 요청', value: metrics.total_requests.toLocaleString(), delta: `${metrics.growth_rate_pct.toFixed(1)}%` },
       { label: '자동화 성공률', value: `${metrics.task_success_rate_pct.toFixed(1)}%`, delta: `${metrics.sla_compliance_pct.toFixed(1)}% SLA` },
       { label: '평균 응답', value: `${((metrics.avg_latency_ms + metrics.avg_queue_time_ms) / 1000).toFixed(1)}s`, delta: `${metrics.pending_requests}건 대기` },
       { label: 'ROI', value: `${metrics.savings.roi_ratio_pct.toFixed(1)}%`, delta: `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` }
     ];
   }, [metrics]);
+
+  /* =======================
+   * Widget Renderer (SAFE)
+   * ======================= */
 
   const renderWidget = (widget: DashboardWidgetConfig) => {
     switch (widget.type) {
@@ -237,36 +204,32 @@ const PortalDashboardHome: React.FC = () => {
           <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
             <div className="ear-stat-grid">
               <StatTile label="완료 요청" value={`${metrics?.completed_requests ?? 18}`} delta={`/${metrics?.total_requests ?? 24}`} highlight />
-              <StatTile label="성공률" value={`${(metrics?.task_success_rate_pct ?? 98.4).toFixed(1)}%`} delta={`품질 ${(metrics?.quality_score ?? 4.8).toFixed(1)}/5`} />
-              <StatTile label="SLA 준수율" value={`${(metrics?.sla_compliance_pct ?? 96.2).toFixed(1)}%`} delta={`안정성 ${(metrics?.stability_score ?? 98.7).toFixed(1)}%`} />
-              <StatTile label="사용자 커버리지" value={`${(metrics?.user_coverage_pct ?? 62).toFixed(1)}%`} delta={`${baselines.length}개 baseline`} />
-            </div>
-          </WidgetCard>
-        );
-        
-      case 'chart': {
-        const autoPercent = metrics ? Math.max(0, Math.min(100, metrics.task_success_rate_pct)) : 72;
-        const reviewPercent = metrics ? Math.max(0, Math.min(100, 100 - metrics.sla_compliance_pct)) : 18;
-        const exceptionPercent = metrics ? Math.max(0, Math.min(100, metrics.error_rate_pct * 4)) : 10;
-
-        return (
-          <WidgetCard
-            key={widget.id}
-            title={widget.title}
-            description={widget.description}
-            size={widget.size}
-            actions={<span className="ear-pill ear-pill--neutral">실시간 집계</span>}
-          >
-            <ChartPlaceholder label="처리량" summary={metrics ? `전주 대비 ${metrics.growth_rate_pct.toFixed(1)}%` : '주간 12% 증가'} />
-            <div className="ear-progress-group">
-              <ProgressRow label="자동 처리" value={`${autoPercent.toFixed(1)}%`} percent={autoPercent} />
-              <ProgressRow label="검토 필요" value={`${reviewPercent.toFixed(1)}%`} percent={reviewPercent} />
-              <ProgressRow label="예외 처리" value={`${exceptionPercent.toFixed(1)}%`} percent={exceptionPercent} />
+              <StatTile label="성공률" value={`${(metrics?.task_success_rate_pct ?? 98.4).toFixed(1)}%`} />
+              <StatTile label="SLA 준수율" value={`${(metrics?.sla_compliance_pct ?? 96.2).toFixed(1)}%`} />
+              <StatTile label="사용자 커버리지" value={`${(metrics?.user_coverage_pct ?? 62).toFixed(1)}%`} delta={`${baselines.length} baseline`} />
             </div>
           </WidgetCard>
         );
       }
-      case 'list':
+
+      case 'chart': {
+        const auto = metrics ? Math.max(0, Math.min(100, metrics.task_success_rate_pct)) : 72;
+        const review = metrics ? Math.max(0, Math.min(100, 100 - metrics.sla_compliance_pct)) : 18;
+        const exception = metrics ? Math.max(0, Math.min(100, metrics.error_rate_pct * 4)) : 10;
+
+        return (
+          <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
+            <ChartPlaceholder label="처리량" summary={metrics ? `${metrics.growth_rate_pct.toFixed(1)}% 증가` : '주간 증가'} />
+            <div className="ear-progress-group">
+              <ProgressRow label="자동 처리" value={`${auto.toFixed(1)}%`} percent={auto} />
+              <ProgressRow label="검토 필요" value={`${review.toFixed(1)}%`} percent={review} />
+              <ProgressRow label="예외 처리" value={`${exception.toFixed(1)}%`} percent={exception} />
+            </div>
+          </WidgetCard>
+        );
+      }
+
+      case 'list': {
         return (
           <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
             <div className="ear-list">
@@ -282,118 +245,46 @@ const PortalDashboardHome: React.FC = () => {
             </div>
           </WidgetCard>
         );
-      case 'insight': {
-        const topRole = [...laborCosts].sort((a, b) => toNumber(b.hourly_cost ?? b.hourlyCost) - toNumber(a.hourly_cost ?? a.hourlyCost))[0];
-        const topRoleCost = topRole ? toNumber(topRole.hourly_cost ?? topRole.hourlyCost) : 0;
-
-        return (
-          <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
-            <div className="ear-insight">
-              <div>
-                <strong>예상 절감 시간</strong>
-                <span>{metrics ? `${Math.round(metrics.savings.time_savings_minutes / 60)}h` : '312h'}</span>
-              </div>
-              <div>
-                <strong>비용 절감 추정</strong>
-                <span>{metrics ? `₩${Math.round(metrics.savings.cost_savings).toLocaleString()}` : '₩84M'}</span>
-              </div>
-              <div>
-                <strong>최고 단가 Role</strong>
-                <span>{topRole ? `${topRole.role} ${topRole.currency || 'KRW'} ${topRoleCost.toLocaleString()}/h` : '미등록'}</span>
-              </div>
-            </div>
-          </WidgetCard>
-        );
       }
-      case 'timeline': {
-        const timeline = [
-          {
-            time: 'Now',
-            title: '주간 메트릭 동기화',
-            detail: metrics ? `요청 ${metrics.total_requests.toLocaleString()}건 집계 완료` : '메트릭 집계 대기 중'
-          },
-          {
-            time: 'T+1',
-            title: 'Task Baseline 점검',
-            detail: `${taskBaselines.length.toLocaleString()}개 Task baseline 반영`
-          },
-          {
-            time: 'T+2',
-            title: '인건비 단가 리프레시',
-            detail: `${laborCosts.length.toLocaleString()}개 Role 단가 반영`
-          }
-        ];
 
-        return (
-          <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
-            <ul className="ear-timeline">
-              {timeline.map((item) => (
-                <li key={item.title}>
-                  <span>{item.time}</span>
-                  <div>
-                    <strong>{item.title}</strong>
-                    <p>{item.detail}</p>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          </WidgetCard>
-        );
-      }
-      case 'activity':
+      case 'activity': {
         return (
           <WidgetCard key={widget.id} title={widget.title} description={widget.description} size={widget.size}>
             <div className="ear-activity">
-              {alerts.map((alert) => (
-                <div key={alert.title}>
-                  <strong>{alert.title}</strong>
-                  <span>{alert.detail}</span>
+              {alerts.map((a) => (
+                <div key={a.title}>
+                  <strong>{a.title}</strong>
+                  <span>{a.detail}</span>
                 </div>
               </div>
             </div>
           </WidgetCard>
         );
+      }
+
       default:
         return null;
     }
   };
 
-  const headerActions = (
-    <div className="ear-header__actions">
-      <button className="ear-secondary">내보내기</button>
-      <button className="ear-primary">리포트 생성</button>
-    </div>
-  );
 
+  /* =======================
+   * Render
+   * ======================= */
   return (
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
-      subtitle="운영 현황/성과 지표/리스크를 확인합니다."
-      actions={headerActions}
+      subtitle="운영 현황 / 성과 지표 / 리스크"
     >
-      <section className="ear-hero ear-hero--portal">
-        <div>
-          <span className="ear-pill ear-pill--info">이번 주 핵심 지표</span>
-          <h2>운영 안정성 {metrics ? metrics.stability_score.toFixed(1) : '98.7'}% 유지</h2>
-          <p>
-            {loading
-              ? '지표를 집계 중입니다.'
-              : `Baselines ${baselines.length.toLocaleString()}건 · Task ${taskBaselines.length.toLocaleString()}건 · Labor ${laborCosts.length.toLocaleString()}건 반영`}
-          </p>
-        </div>
+      <section className="ear-hero">
         <div className="ear-hero__stats ear-hero__stats--four">
-          {heroStats.map((item) => (
-            <StatTile
-              key={item.label}
-              label={item.label}
-              value={item.value}
-              delta={item.delta}
-              highlight={item.label === 'ROI'}
-            />
+          {heroStats.map((s) => (
+            <StatTile key={s.label} label={s.label} value={s.value} delta={s.delta} highlight={s.label === 'ROI'} />
           ))}
         </div>
       </section>
-      <div className="ear-grid">{enabledWidgets.map((widget) => renderWidget(widget))}</div>
+      <div className="ear-grid">{enabledWidgets.map(renderWidget)}</div>
+
     </PortalDashboardLayout>
   );
 };
