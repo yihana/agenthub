@@ -45,6 +45,7 @@ import MainPrototype5 from './pages/MainPrototype5';
 import MainPrototype6 from './pages/MainPrototype6';
 import PortalDashboardHome from './pages/portal/PortalDashboardHome';
 import PortalAgentListPage from './pages/portal/PortalAgentListPage';
+import PortalTaskManagementPage from './pages/portal/PortalTaskManagementPage';
 import PortalUsageImpactPage from './pages/portal/PortalUsageImpactPage';
 import PortalRoadmapPage from './pages/portal/PortalRoadmapPage';
 import PortalLoginPage from './pages/portal/PortalLoginPage';
@@ -655,6 +656,8 @@ function App() {
         <Route path="/agents/monitoring" element={<Navigate to="/agent-monitoring" replace />} />
         <Route path="/portal-dashboard" element={<PortalDashboardHome />} />
         <Route path="/portal-agents" element={<PortalAgentListPage />} />
+        <Route path="/portal-agents/:agentId" element={<PortalAgentListPage />} />
+        <Route path="/portal-tasks" element={<PortalTaskManagementPage />} />
         <Route path="/portal-usage" element={<PortalUsageImpactPage />} />
         <Route path="/portal-roadmap" element={<PortalRoadmapPage />} />
         <Route path="/portal-settings" element={<PortalSettingsPage />} />
