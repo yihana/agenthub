@@ -1,35 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
-import WidgetCard from '../../components/portal-dashboard/WidgetCard';
-import StatTile from '../../components/portal-dashboard/StatTile';
 import TagPill from '../../components/portal-dashboard/TagPill';
-import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
-import ProgressRow from '../../components/portal-dashboard/ProgressRow';
-import { usePortalDashboardConfig } from '../../hooks/usePortalDashboardConfig';
-import { DashboardWidgetConfig } from '../../data/portalDashboardConfig';
 
-interface PortalMetrics {
-  total_requests: number;
-  prev_total_requests: number;
-  growth_rate_pct: number;
-  completed_requests: number;
-  pending_requests: number;
-  avg_latency_ms: number;
-  avg_queue_time_ms: number;
-  error_rate_pct: number;
-  quality_score: number;
-  stability_score: number;
-  task_success_rate_pct: number;
-  sla_compliance_pct: number;
-  user_coverage_pct: number;
-  requests_processed: number;
-  savings: {
-    baseline_minutes_per_request: number;
-    avg_response_minutes: number;
-    time_savings_minutes: number;
-    cost_savings: number;
-    roi_ratio_pct: number;
-  };
+
+interface BaselineEntry {
+  metric_key?: string;
+  metricKey?: string;
+  value?: number | string;
+  unit?: string;
+  description?: string;
 }
 
 interface BaselineEntry {
@@ -96,6 +75,7 @@ const PortalDashboardHome: React.FC = () => {
         const payload = await baselineResult.value.json();
         setBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
       }
+
 
       if (taskBaselineResult.status === 'fulfilled' && taskBaselineResult.value.ok) {
         const payload = await taskBaselineResult.value.json();
@@ -314,7 +294,7 @@ const PortalDashboardHome: React.FC = () => {
                   <strong>{alert.title}</strong>
                   <span>{alert.detail}</span>
                 </div>
-              ))}
+              </div>
             </div>
           </WidgetCard>
         );
@@ -333,7 +313,7 @@ const PortalDashboardHome: React.FC = () => {
   return (
     <PortalDashboardLayout
       title="Agent Portal 관리 대시보드"
-      subtitle="피그마 시안 기준의 정보 구조로 운영 현황/성과 지표/리스크를 한 화면에서 확인합니다."
+      subtitle="운영 현황/성과 지표/리스크를 확인합니다."
       actions={headerActions}
     >
       <section className="ear-hero ear-hero--portal">
