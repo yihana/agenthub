@@ -37,6 +37,41 @@ interface LaborCostEntry {
   currency?: string;
 }
 
+interface BaselineEntry {
+  metric_key?: string;
+  metricKey?: string;
+  value?: number | string;
+  unit?: string;
+  description?: string;
+}
+
+interface TaskBaseline {
+  task_code?: string;
+  taskCode?: string;
+  domain?: string;
+  before_time_min?: number | string;
+  beforeTimeMin?: number | string;
+  before_cost?: number | string;
+  beforeCost?: number | string;
+  description?: string;
+}
+
+interface LaborCostEntry {
+  role?: string;
+  hourly_cost?: number | string;
+  hourlyCost?: number | string;
+  currency?: string;
+}
+
+type AgentUpdateTone = 'success' | 'warning' | 'info';
+
+interface AgentUpdate {
+  name: string;
+  owner: string;
+  status: string;
+  tone: AgentUpdateTone;
+}
+
 const toNumber = (value: unknown, fallback = 0): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
@@ -76,7 +111,6 @@ const PortalDashboardHome: React.FC = () => {
         setBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
       }
 
-
       if (taskBaselineResult.status === 'fulfilled' && taskBaselineResult.value.ok) {
         const payload = await taskBaselineResult.value.json();
         setTaskBaselines(Array.isArray(payload.baselines) ? payload.baselines : []);
@@ -93,7 +127,8 @@ const PortalDashboardHome: React.FC = () => {
     fetchDashboardData();
   }, []);
 
-  const agentUpdates = useMemo(() => {
+dashboard-metrics-n0hj51
+  const agentUpdates = useMemo<AgentUpdate[]>(() => {
     const topTasks = [...taskBaselines]
       .sort((a, b) => toTaskCost(b) - toTaskCost(a) || toTaskTime(b) - toTaskTime(a))
       .slice(0, 3);
@@ -109,7 +144,7 @@ const PortalDashboardHome: React.FC = () => {
     return topTasks.map((task) => {
       const minutes = toTaskTime(task);
       const status = minutes >= 90 ? '집중 관리' : minutes >= 45 ? '최적화 중' : '안정';
-      const tone = minutes >= 90 ? 'warning' : minutes >= 45 ? 'info' : 'success';
+      const tone: AgentUpdateTone = minutes >= 90 ? 'warning' : minutes >= 45 ? 'info' : 'success';
 
       return {
         name: toTaskCode(task),
