@@ -68,3 +68,30 @@ export interface WorkerHeartbeatRecord {
   last_seen_at: string;
   meta?: Record<string, unknown>;
 }
+
+export interface EarSubflowRunRequest {
+  mode?: 'local' | 'ear';
+  agent_id: string;
+  request_id?: string;
+  conversation_id?: string;
+  user_id?: string;
+  channel?: string;
+  input_payload?: Record<string, unknown>;
+  step_name: string;
+  step_type?: string;
+  target_system?: string;
+  target_name?: string;
+  request_payload?: Record<string, unknown>;
+  auto_end_execution?: boolean;
+  ear?: {
+    destination_name?: string;
+    base_url?: string;
+    pre_path?: string;
+    main_path: string;
+    post_path?: string;
+    method?: 'get' | 'post' | 'put' | 'delete' | 'patch';
+    timeout_ms?: number;
+    headers?: Record<string, string>;
+  };
+}
+

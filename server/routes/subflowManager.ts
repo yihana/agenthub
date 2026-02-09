@@ -128,6 +128,41 @@ router.get('/v1/executions/:executionId', (req, res) => {
   return res.json(detail);
 });
 
+router.post('/v1/ear/execute', async (req, res) => {
+  try {
+    const body = req.body ?? {};
+
+    if (!body.agent_id || !body.step_name) {
+      return res.status(400).json({ error: 'agent_id and step_name are required' });
+    }
+
+    if (body.mode === 'ear' && !body.ear?.main_path) {
+      return res.status(400).json({ error: 'ear.main_path is required when mode is ear' });
+    }
+
+    const result = await subflowManager.executeEarSubflow({
+      mode: body.mode ?? 'local',
+      agent_id: body.agent_id,
+      request_id: body.request_id,
+      conversation_id: body.conversation_id,
+      user_id: body.user_id,
+      channel: body.channel,
+      input_payload: body.input_payload,
+      step_name: body.step_name,
+      step_type: body.step_type,
+      target_system: body.target_system,
+      target_name: body.target_name,
+      request_payload: body.request_payload,
+      auto_end_execution: body.auto_end_execution,
+      ear: body.ear
+    });
+
+    return res.status(201).json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'failed to execute ear subflow' });
+  }
+});
+
 router.post('/v1/workers/heartbeat', (req, res) => {
   const { worker_id, host, env, meta } = req.body ?? {};
 
