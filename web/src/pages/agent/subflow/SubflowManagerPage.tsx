@@ -38,7 +38,6 @@ const SubflowManagerPage = () => {
     return data;
   };
 
-
   const runStep = async (execution_id: string, stepSeq: number, stepName: string) => {
     const started = await request(`/api/subflow-manager/v1/executions/${execution_id}/steps`, {
       method: 'POST',
