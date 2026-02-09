@@ -38,6 +38,79 @@ const SubflowManagerPage = () => {
     return data;
   };
 
+  const runStep = async (execution_id: string, stepSeq: number, stepName: string) => {
+    const started = await request(`/api/subflow-manager/v1/executions/${execution_id}/steps`, {
+      method: 'POST',
+      body: JSON.stringify({
+        step_seq: stepSeq,
+        step_name: stepName,
+        step_type: 'RFC',
+        target_system: 'SAP',
+        target_name: 'RFC_DEST_EAR_DEV',
+        request_payload: {
+          IV_KOKRS: defaultInput.kokrs,
+          IV_BUKRS: defaultInput.bukrs,
+          IV_GJAHR: defaultInput.gjahr,
+          IV_AUFNR: defaultInput.aufnr,
+          IV_USER: defaultInput.user
+        },
+        idempotency_key: `${execution_id}:${stepSeq}`
+      })
+    });
+
+    const ended = await request(`/api/subflow-manager/v1/steps/${started.step_id}/end`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        status: 'SUCCEEDED',
+        response_payload: { EV_R_CD: 'S', EV_MESSAGE: `${stepName} success` },
+        metrics: { source: 'subflow-ui', step_seq: stepSeq }
+      })
+    });
+
+    return { started, ended };
+  };
+
+  const handleRunTwoStepScenario = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const execution = await request('/api/subflow-manager/v1/executions', {
+        method: 'POST',
+        body: JSON.stringify({
+          agent_id: 'subflow-manager',
+          user_id: 'demo-user',
+          channel: 'portal',
+          input_payload: defaultInput,
+          meta: { source: 'subflow-ui-2step' }
+        })
+      });
+
+      setExecutionId(execution.execution_id);
+
+      const step1 = await runStep(execution.execution_id, 1, 'ZCO_EAR_CHK_AFE_AUTH');
+      const step2 = await runStep(execution.execution_id, 2, 'ZCO_EAR_GET_BUDGET');
+      setStepId(step2.started.step_id);
+
+      const endExecution = await request(`/api/subflow-manager/v1/executions/${execution.execution_id}/end`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'SUCCEEDED',
+          output_payload: {
+            summary: '2-step scenario completed',
+            steps: [step1.ended.step_name, step2.ended.step_name]
+          }
+        })
+      });
+
+      const detail = await request(`/api/subflow-manager/v1/executions/${execution.execution_id}`);
+      setResult({ execution, step1, step2, endExecution, detail });
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleCreateExecution = async () => {
     setLoading(true);
     setError('');
@@ -189,8 +262,8 @@ const SubflowManagerPage = () => {
           <h2>테스트 시나리오</h2>
           <ol>
             <li>Execution 생성</li>
-            <li>Step 시작</li>
-            <li>Step 종료 (성공/실패)</li>
+            <li>Step1 시작/종료</li>
+            <li>Step2 시작/종료</li>
             <li>Execution 종료</li>
             <li>Execution 상세 조회</li>
           </ol>
@@ -204,6 +277,7 @@ const SubflowManagerPage = () => {
           <h2>실행</h2>
           <div className="subflow-actions">
             <button disabled={loading} onClick={handleCreateExecution}>1) Create Execution</button>
+            <button disabled={loading} onClick={handleRunTwoStepScenario}>🚀 Run 2-Step Scenario</button>
             <button disabled={loading} onClick={handleStartStep}>2) Start Step</button>
             <button disabled={loading} onClick={() => handleEndStep('SUCCEEDED')}>3) End Step Success</button>
             <button disabled={loading} onClick={() => handleEndStep('FAILED')}>3) End Step Failed</button>
