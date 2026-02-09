@@ -37,6 +37,7 @@ import AgentListPage from './pages/AgentListPage';
 import AgentDetailPage from './pages/AgentDetailPage';
 import AgentFormPage from './pages/AgentFormPage';
 import AgentMonitoringPage from './pages/AgentMonitoringPage';
+import SubflowManagerPage from './pages/agent/subflow/SubflowManagerPage';
 import MainPrototype1 from './pages/MainPrototype1';
 import MainPrototype2 from './pages/MainPrototype2';
 import MainPrototype3 from './pages/MainPrototype3';
@@ -652,6 +653,7 @@ function App() {
         <Route path="/agent-management/:id" element={<RouteGuard><AgentDetailPage /></RouteGuard>} />
         <Route path="/agent-management/:id/edit" element={<RouteGuard><AgentFormPage /></RouteGuard>} />
         <Route path="/agent-monitoring" element={<RouteGuard><AgentMonitoringPage /></RouteGuard>} />
+        <Route path="/agent/subflow" element={<RouteGuard><SubflowManagerPage /></RouteGuard>} />
         <Route path="/agents" element={<Navigate to="/agent-management" replace />} />
         <Route path="/agents/monitoring" element={<Navigate to="/agent-monitoring" replace />} />
         <Route path="/portal-dashboard" element={<PortalDashboardHome />} />
