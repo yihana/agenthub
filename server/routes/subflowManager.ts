@@ -128,7 +128,6 @@ router.get('/v1/executions/:executionId', (req, res) => {
   return res.json(detail);
 });
 
-
 router.post('/v1/ear/execute', async (req, res) => {
   try {
     const body = req.body ?? {};

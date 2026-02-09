@@ -11,6 +11,7 @@ import {
 } from './store';
 import { EarSubflowRunRequest } from './types';
 
+
 registerAgent({
   agent_id: 'subflow-manager',
   agent_name: 'Subflow Manager Agent',
@@ -163,6 +164,7 @@ const executeEarSubflow = async (input: EarSubflowRunRequest) => {
     detail: getExecutionDetail(execution.execution_id)
   };
 };
+
 
 export const subflowManager = {
   registerAgent,
