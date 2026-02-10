@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import '../../../styles/subflow-manager.css';
 
 type JsonValue = Record<string, unknown>;
-
 type RunMode = 'local' | 'ear';
 
 const defaultInput = {

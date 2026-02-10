@@ -69,7 +69,6 @@ export interface WorkerHeartbeatRecord {
   meta?: Record<string, unknown>;
 }
 
-
 export interface EarSubflowRunRequest {
   mode?: 'local' | 'ear';
   agent_id: string;
@@ -95,3 +94,4 @@ export interface EarSubflowRunRequest {
     headers?: Record<string, string>;
   };
 }
+

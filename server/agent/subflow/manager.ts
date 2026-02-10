@@ -11,6 +11,7 @@ import {
 } from './store';
 import { EarSubflowRunRequest } from './types';
 
+
 registerAgent({
   agent_id: 'subflow-manager',
   agent_name: 'Subflow Manager Agent',
@@ -143,7 +144,6 @@ const executeEarSubflow = async (input: EarSubflowRunRequest) => {
   });
 
   const runResult = await runEarIntegratedStep(execution.execution_id, input);
-
   const autoEnd = input.auto_end_execution ?? true;
   const endedExecution = autoEnd
     ? endExecution(
@@ -163,6 +163,7 @@ const executeEarSubflow = async (input: EarSubflowRunRequest) => {
     detail: getExecutionDetail(execution.execution_id)
   };
 };
+
 
 export const subflowManager = {
   registerAgent,
