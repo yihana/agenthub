@@ -144,7 +144,6 @@ const executeEarSubflow = async (input: EarSubflowRunRequest) => {
   });
 
   const runResult = await runEarIntegratedStep(execution.execution_id, input);
-
   const autoEnd = input.auto_end_execution ?? true;
   const endedExecution = autoEnd
     ? endExecution(

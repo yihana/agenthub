@@ -4,7 +4,6 @@ import '../../../styles/subflow-manager.css';
 type JsonValue = Record<string, unknown>;
 type RunMode = 'local' | 'ear';
 
-
 const defaultInput = {
   kokrs: '1000',
   bukrs: '1000',
@@ -25,7 +24,6 @@ const SubflowManagerPage = () => {
   const [destinationName, setDestinationName] = useState('EAR_RFC_DEST');
   const [mainPath, setMainPath] = useState('/rfc/execute');
 
-
   const idempotencyKey = useMemo(() => `${executionId || 'pending'}:1`, [executionId]);
 
   const request = async (url: string, init?: RequestInit) => {
@@ -43,7 +41,6 @@ const SubflowManagerPage = () => {
     }
     return data;
   };
-
 
   const handleCreateExecution = async () => {
     setLoading(true);
