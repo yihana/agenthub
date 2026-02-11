@@ -128,16 +128,35 @@ router.get('/v1/executions/:executionId', (req, res) => {
   return res.json(detail);
 });
 
+
 router.post('/v1/ear/execute', async (req, res) => {
   try {
     const body = req.body ?? {};
 
-    if (!body.agent_id || !body.step_name) {
-      return res.status(400).json({ error: 'agent_id and step_name are required' });
+    if (!body.agent_id) {
+      return res.status(400).json({ error: 'agent_id is required' });
+    }
+
+    if (!Array.isArray(body.steps) || body.steps.length === 0) {
+      return res.status(400).json({ error: 'steps is required and must be a non-empty array' });
+
     }
 
     if (body.mode === 'ear' && !body.ear?.main_path) {
       return res.status(400).json({ error: 'ear.main_path is required when mode is ear' });
+    }
+
+    const normalizedSteps = body.steps.map((step: any, index: number) => ({
+      seq: Number(step.seq ?? index + 1),
+      name: String(step.name ?? `step-${index + 1}`),
+      rfcName: String(step.rfcName ?? step.rfc_name ?? ''),
+      targetSystem: String(step.targetSystem ?? step.target_system ?? 'EAR'),
+      targetName: String(step.targetName ?? step.target_name ?? 'RFC_DEST_EAR_DEV'),
+      parallelWith: step.parallelWith ?? step.parallel_with
+    }));
+
+    if (normalizedSteps.some((step: any) => !step.rfcName)) {
+      return res.status(400).json({ error: 'each step requires rfcName' });
     }
 
     const result = await subflowManager.executeEarSubflow({
@@ -148,11 +167,7 @@ router.post('/v1/ear/execute', async (req, res) => {
       user_id: body.user_id,
       channel: body.channel,
       input_payload: body.input_payload,
-      step_name: body.step_name,
-      step_type: body.step_type,
-      target_system: body.target_system,
-      target_name: body.target_name,
-      request_payload: body.request_payload,
+      steps: normalizedSteps,
       auto_end_execution: body.auto_end_execution,
       ear: body.ear
     });

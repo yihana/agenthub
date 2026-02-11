@@ -69,6 +69,15 @@ export interface WorkerHeartbeatRecord {
   meta?: Record<string, unknown>;
 }
 
+export interface RfcStep {
+  seq: number;
+  name: string;
+  rfcName: string;
+  targetSystem: string;
+  targetName: string;
+  parallelWith?: string;
+}
+
 export interface EarSubflowRunRequest {
   mode?: 'local' | 'ear';
   agent_id: string;
@@ -77,11 +86,7 @@ export interface EarSubflowRunRequest {
   user_id?: string;
   channel?: string;
   input_payload?: Record<string, unknown>;
-  step_name: string;
-  step_type?: string;
-  target_system?: string;
-  target_name?: string;
-  request_payload?: Record<string, unknown>;
+  steps: RfcStep[];
   auto_end_execution?: boolean;
   ear?: {
     destination_name?: string;
