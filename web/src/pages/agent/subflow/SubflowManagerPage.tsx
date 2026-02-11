@@ -20,6 +20,7 @@ const RFC_OPTIONS = [
   'ZCO_EAR_VALIDATE_BUDGET'
 ];
 
+
 const defaultInput = {
   kokrs: '1000',
   bukrs: '1000',
@@ -27,6 +28,7 @@ const defaultInput = {
   aufnr: '50001234',
   user: 'PM_USER'
 };
+
 
 const createStep = (seq: number): RfcStep => ({
   id: `${Date.now()}-${seq}-${Math.random().toString(36).slice(2, 7)}`,
@@ -50,6 +52,7 @@ const SubflowManagerPage = () => {
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState('');
 
+
   const request = async (url: string, init?: RequestInit) => {
     const response = await fetch(url, {
       ...init,
@@ -65,6 +68,7 @@ const SubflowManagerPage = () => {
     }
     return data;
   };
+
 
   const updateStep = (id: string, patch: Partial<RfcStep>) => {
     setSteps((prev) => prev.map((step) => (step.id === id ? { ...step, ...patch } : step)));
@@ -96,6 +100,7 @@ const SubflowManagerPage = () => {
   const runSubflow = async () => {
     if (steps.length === 0) {
       setError('최소 1개 이상의 스텝이 필요합니다.');
+
       return;
     }
 
@@ -137,6 +142,7 @@ const SubflowManagerPage = () => {
         method: 'POST',
         body: JSON.stringify(body)
       });
+
 
       setResult(data);
     } catch (e: any) {
@@ -234,6 +240,7 @@ const SubflowManagerPage = () => {
         </div>
         {error && <p className="subflow-error">{error}</p>}
       </section>
+
 
       <section className="subflow-card">
         <h2>API Result</h2>

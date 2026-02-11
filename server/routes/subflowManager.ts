@@ -139,6 +139,7 @@ router.post('/v1/ear/execute', async (req, res) => {
 
     if (!Array.isArray(body.steps) || body.steps.length === 0) {
       return res.status(400).json({ error: 'steps is required and must be a non-empty array' });
+
     }
 
     if (body.mode === 'ear' && !body.ear?.main_path) {

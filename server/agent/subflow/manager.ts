@@ -9,7 +9,9 @@ import {
   registerAgent,
   upsertHeartbeat
 } from './store';
+
 import { EarSubflowRunRequest, ExecutionStepRecord, RfcStep } from './types';
+
 
 registerAgent({
   agent_id: 'subflow-manager',
@@ -19,10 +21,12 @@ registerAgent({
   tags: ['subflow', 'node-red', 'execution-tracking']
 });
 
+
 const buildLocalMockResult = (requestPayload?: Record<string, unknown>, rfcName?: string) => ({
   EV_R_CD: 'S',
   EV_MESSAGE: 'LOCAL_MOCK_SUCCESS',
   rfc_name: rfcName,
+
   echo: requestPayload ?? {}
 });
 
@@ -256,6 +260,7 @@ const executeEarSubflow = async (input: EarSubflowRunRequest) => {
     detail: getExecutionDetail(execution.execution_id)
   };
 };
+
 
 export const subflowManager = {
   registerAgent,

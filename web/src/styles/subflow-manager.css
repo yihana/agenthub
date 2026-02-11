@@ -54,6 +54,7 @@
   gap: 8px;
 }
 
+
 .subflow-actions button,
 .subflow-steps-header button,
 .subflow-inline-actions button {
@@ -64,6 +65,7 @@
   cursor: pointer;
 }
 
+ager-agent-proposal
 .subflow-actions button:hover,
 .subflow-steps-header button:hover,
 .subflow-inline-actions button:hover {
@@ -76,6 +78,7 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
 
 .subflow-error {
   color: #b91c1c;
@@ -91,6 +94,7 @@
   max-height: 360px;
 }
 
+
 .subflow-steps-header {
   display: flex;
   justify-content: space-between;
@@ -100,9 +104,11 @@
 
 .subflow-steps-list {
   display: grid;
+
   gap: 10px;
   margin-bottom: 12px;
 }
+
 
 .subflow-step-item {
   border: 1px solid #dbe3ee;
@@ -121,4 +127,5 @@
 .subflow-inline-actions {
   display: flex;
   gap: 6px;
+
 }
