@@ -1,0 +1,124 @@
+.subflow-page {
+  padding: 24px;
+  color: #1f2937;
+}
+
+.subflow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.subflow-card {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  padding: 16px;
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  margin-bottom: 16px;
+}
+
+.subflow-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.subflow-form-grid label {
+  display: flex;
+  flex-direction: column;
+  font-size: 13px;
+  gap: 6px;
+}
+
+.subflow-form-grid input,
+.subflow-form-grid select,
+.subflow-textarea-label textarea {
+  border: 1px solid #becce3;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+.subflow-textarea-label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.subflow-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.subflow-actions button,
+.subflow-steps-header button,
+.subflow-inline-actions button {
+  border: 1px solid #becce3;
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.subflow-actions button:hover,
+.subflow-steps-header button:hover,
+.subflow-inline-actions button:hover {
+  background: #e8eef8;
+}
+
+.subflow-actions button:disabled,
+.subflow-steps-header button:disabled,
+.subflow-inline-actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.subflow-error {
+  color: #b91c1c;
+  margin-top: 12px;
+}
+
+.subflow-card pre {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  overflow: auto;
+  max-height: 360px;
+}
+
+.subflow-steps-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.subflow-steps-list {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.subflow-step-item {
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.subflow-step-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.subflow-inline-actions {
+  display: flex;
+  gap: 6px;
+}
