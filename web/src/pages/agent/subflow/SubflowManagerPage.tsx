@@ -148,10 +148,10 @@ const SubflowManagerPage = () => {
 
   return (
     <div className="subflow-page">
-      <h1>Subflow Manager Agent</h1>
-      <p>동적 RFC 스텝 + 병렬 그룹(parallelWith) 기반으로 EAR/로컬 실행을 테스트합니다.</p>
+      <h1>Subflow JSON 생성/실행 Agent</h1>
+      <p>동적 RFC 스텝 JSON을 생성하고 실행 테스트합니다. (Node-RED 배포 JSON과는 별도 목적)</p>
       <div className="subflow-tab-strip">
-        <Link to="/agent/subflow"><button className="active">Flow 생성/실행</button></Link>
+        <Link to="/agent/subflow"><button className="active">Subflow JSON 생성/실행</button></Link>
         <Link to="/agent/subflow/deploy"><button>개발/배포</button></Link>
       </div>
 
@@ -233,14 +233,17 @@ const SubflowManagerPage = () => {
           ))}
         </div>
 
+        <p style={{ marginBottom: 10 }}>
+          ※ 이 화면은 실행 시뮬레이션용입니다. Node-RED 플로우 배포는 "개발/배포" 탭에서 진행하세요.
+        </p>
         <div className="subflow-actions">
-          <button disabled={loading} onClick={runSubflow}>Run Dynamic Subflow</button>
+          <button disabled={loading} onClick={runSubflow}>Run Subflow Simulation (실행 테스트)</button>
         </div>
         {error && <p className="subflow-error">{error}</p>}
       </section>
 
       <section className="subflow-card">
-        <h2>API Result</h2>
+        <h2>실행 결과(API Result)</h2>
         <pre>{result ? pretty(result) : '아직 실행 결과가 없습니다.'}</pre>
       </section>
     </div>

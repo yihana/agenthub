@@ -14,6 +14,14 @@ export interface NodeRedDeployOptions {
   flowJson?: unknown;
 }
 
+export interface NodeRedFlowValidationResult {
+  valid: boolean;
+  errors: string[];
+  node_count: number;
+  tab_count: number;
+  has_rev: boolean;
+}
+
 const findExistingPath = async (candidates: string[]) => {
   for (const candidate of candidates) {
     try {
@@ -106,6 +114,56 @@ const resolveFlowJson = async (options: NodeRedDeployOptions) => {
   };
 };
 
+const toFlowArray = (flowJson: unknown): { flows: any[]; hasRev: boolean; errors: string[] } => {
+  if (Array.isArray(flowJson)) {
+    return { flows: flowJson, hasRev: false, errors: [] };
+  }
+
+  if (flowJson && typeof flowJson === 'object') {
+    const envelope = flowJson as any;
+    if (Array.isArray(envelope.flows)) {
+      return { flows: envelope.flows, hasRev: typeof envelope.rev === 'string', errors: [] };
+    }
+    return { flows: [], hasRev: false, errors: ['flow json object must include a flows array'] };
+  }
+
+  return { flows: [], hasRev: false, errors: ['flow json must be an array or an object with flows'] };
+};
+
+export const validateNodeRedFlowJson = (flowJson: unknown): NodeRedFlowValidationResult => {
+  const normalized = toFlowArray(flowJson);
+  const errors = [...normalized.errors];
+
+  normalized.flows.forEach((node: any, index: number) => {
+    if (!node || typeof node !== 'object') {
+      errors.push(`flows[${index}] must be an object`);
+      return;
+    }
+
+    if (typeof node.id !== 'string' || !node.id.trim()) {
+      errors.push(`flows[${index}].id is required`);
+    }
+
+    if (typeof node.type !== 'string' || !node.type.trim()) {
+      errors.push(`flows[${index}].type is required`);
+    }
+
+    if (node.z != null && typeof node.z !== 'string') {
+      errors.push(`flows[${index}].z must be a string when provided`);
+    }
+  });
+
+  const tabCount = normalized.flows.filter((node: any) => node?.type === 'tab').length;
+
+  return {
+    valid: errors.length === 0,
+    errors,
+    node_count: normalized.flows.length,
+    tab_count: tabCount,
+    has_rev: normalized.hasRev
+  };
+};
+
 export const fetchNodeRedFlows = async (adminUrl: string, token?: string) => {
   const normalizedUrl = adminUrl.replace(/\/$/, '');
   const response = await axios.get(`${normalizedUrl}/flows`, {
@@ -135,7 +193,6 @@ export const readNodeRedFlowsFile = async (flowsFilePath?: string) => {
     data: json
   };
 };
-
 
 export const saveFlowJsonToFile = async (targetFilePath: string, flowJson: unknown) => {
   const resolvedPath = path.isAbsolute(targetFilePath)

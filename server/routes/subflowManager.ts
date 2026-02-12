@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
-import { deployFlowByAdminApi, deployFlowByCli, exportNodeRedFlowsToFile, fetchNodeRedFlows, loadNodeRedFlowTemplate, readNodeRedFlowsFile } from '../agent/subflow/deploy';
+import { deployFlowByAdminApi, deployFlowByCli, exportNodeRedFlowsToFile, fetchNodeRedFlows, loadNodeRedFlowTemplate, readNodeRedFlowsFile, validateNodeRedFlowJson } from '../agent/subflow/deploy';
 
 
 const router = Router();
@@ -260,6 +260,19 @@ router.post('/v1/node-red/deploy/admin-api', async (req, res) => {
     return res.status(500).json({ error: error.message || 'admin api deploy failed' });
   }
 });
+
+
+router.post('/v1/node-red/validate', (req, res) => {
+  const { flow_json } = req.body ?? {};
+  const validation = validateNodeRedFlowJson(flow_json);
+
+  if (!validation.valid) {
+    return res.status(400).json(validation);
+  }
+
+  return res.json(validation);
+});
+
 
 router.post('/v1/node-red/deploy/cli', async (req, res) => {
   try {

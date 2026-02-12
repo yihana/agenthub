@@ -17,30 +17,46 @@ type NodeRedNode = {
   [key: string]: unknown;
 };
 
+
+type FlowEnvelope = {
+  rev?: string;
+  flows: NodeRedNode[];
+};
+
 const isNodeArray = (value: unknown): value is NodeRedNode[] => Array.isArray(value);
 
-const extractFlowNodes = (data: any): NodeRedNode[] => {
-  if (isNodeArray(data)) {
-    return data;
+const extractFlowEnvelope = (data: any): FlowEnvelope | null => {
+  const payload = data?.data?.flows
+    ? data.data
+    : data?.flows
+      ? data
+      : data?.data
+        ? data.data
+        : data;
+
+  if (isNodeArray(payload)) {
+    return { flows: payload };
   }
 
-  if (isNodeArray(data?.flows)) {
-    return data.flows;
+  if (payload && typeof payload === 'object' && isNodeArray(payload.flows)) {
+    return { rev: typeof payload.rev === 'string' ? payload.rev : undefined, flows: payload.flows };
   }
 
-  if (isNodeArray(data?.data)) {
-    return data.data;
-  }
+  return null;
+};
 
-  if (isNodeArray(data?.data?.flows)) {
-    return data.data.flows;
-  }
+const mergeTabNodesIntoEnvelope = (envelope: FlowEnvelope, tabId: string, updatedTabNodes: NodeRedNode[]): FlowEnvelope => {
+  const untouched = envelope.flows.filter((node) => node.z !== tabId && node.id !== tabId);
+  const mergedFlows = [...untouched, ...updatedTabNodes];
 
-  return [];
+  return {
+    ...(envelope.rev ? { rev: envelope.rev } : {}),
+    flows: mergedFlows
+  };
 };
 
 const SubflowDeployPage = () => {
-  const [tab, setTab] = useState<DeployTab>('deploy');
+  const [tab, setTab] = useState<DeployTab>('flows');
   const [flowSource, setFlowSource] = useState<FlowSource>('admin-api');
   const [adminUrl, setAdminUrl] = useState('http://localhost:1880');
   const [flowFilePath, setFlowFilePath] = useState('agent/subflow/node-red-2step-flow.json');
@@ -49,6 +65,8 @@ const SubflowDeployPage = () => {
   const [token, setToken] = useState('');
   const [flowJsonText, setFlowJsonText] = useState('');
   const [selectedTabId, setSelectedTabId] = useState<string>('');
+  const [selectedTabEditText, setSelectedTabEditText] = useState('');
+  const [validationMessage, setValidationMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState('');
@@ -64,7 +82,7 @@ const SubflowDeployPage = () => {
 
     const data = await response.json();
     if (!response.ok) {
-      throw new Error(data.error || '요청에 실패했습니다.');
+      throw new Error(data.error || (Array.isArray(data.errors) ? data.errors.join('\n') : '요청에 실패했습니다.'));
     }
 
     return data;
@@ -130,7 +148,18 @@ const SubflowDeployPage = () => {
     })
   }));
 
-  const nodes = useMemo(() => extractFlowNodes(result), [result]);
+  const copyToClipboard = async (text: string) => {
+    await navigator.clipboard.writeText(text);
+  };
+
+  const flowEnvelope = useMemo(() => extractFlowEnvelope(result), [result]);
+  const nodes = flowEnvelope?.flows ?? [];
+
+  useEffect(() => {
+    if (tab === 'flows' && !result && !loading) {
+      fetchRegisteredFlows();
+    }
+  }, [tab]);
 
   const flowTabs = useMemo(() => {
     return nodes.filter((node) => node.type === 'tab').map((node) => ({
@@ -158,6 +187,71 @@ const SubflowDeployPage = () => {
     return nodes.filter((node) => node.z === selectedTabId || node.id === selectedTabId);
   }, [nodes, selectedTabId]);
 
+  useEffect(() => {
+    setSelectedTabEditText(selectedTabNodes.length > 0 ? pretty(selectedTabNodes) : '[]');
+    setValidationMessage('');
+  }, [selectedTabId, result]);
+
+  const buildPatchedPayload = () => {
+    if (!flowEnvelope || !selectedTabId) {
+      throw new Error('조회 결과와 선택 탭이 필요합니다.');
+    }
+
+    const updatedTabNodes = JSON.parse(selectedTabEditText);
+    if (!Array.isArray(updatedTabNodes)) {
+      throw new Error('선택 탭 편집 JSON은 배열이어야 합니다.');
+    }
+
+    return mergeTabNodesIntoEnvelope(flowEnvelope, selectedTabId, updatedTabNodes as NodeRedNode[]);
+  };
+
+  const validatePatchedFlow = async () => run(async () => {
+    const payload = buildPatchedPayload();
+    const data = await request('/api/subflow-manager/v1/node-red/validate', {
+      method: 'POST',
+      body: JSON.stringify({ flow_json: payload })
+    });
+    setValidationMessage(`검증 성공: nodes=${data.node_count}, tabs=${data.tab_count}, rev=${data.has_rev ? '있음' : '없음'}`);
+    return data;
+  });
+
+  const deployPatchedFlow = async () => run(async () => {
+    const payload = buildPatchedPayload();
+    const validation = await request('/api/subflow-manager/v1/node-red/validate', {
+      method: 'POST',
+      body: JSON.stringify({ flow_json: payload })
+    });
+
+    const deployResult = await request('/api/subflow-manager/v1/node-red/deploy/admin-api', {
+      method: 'POST',
+      body: JSON.stringify({
+        admin_url: adminUrl,
+        token: token || undefined,
+        flow_json: payload
+      })
+    });
+
+    setValidationMessage(`검증 후 배포 완료: nodes=${validation.node_count}, tabs=${validation.tab_count}`);
+    setFlowJsonText(pretty(payload));
+    setTab('deploy');
+
+    return {
+      validation,
+      deploy: deployResult
+    };
+  });
+
+  const movePatchedFlowToDeployEditor = () => {
+    try {
+      const payload = buildPatchedPayload();
+      setFlowJsonText(pretty(payload));
+      setTab('deploy');
+    } catch (e: any) {
+      setError(e.message || '편집본 이동에 실패했습니다.');
+    }
+  };
+
+
   const flowEdges = useMemo(() => {
     const edges: Array<{ from: string; to: string }> = [];
     selectedTabNodes.forEach((node) => {
@@ -178,7 +272,7 @@ const SubflowDeployPage = () => {
   return (
     <div className="subflow-page">
       <h1>Subflow 개발/배포 (Node-RED 자동 반영)</h1>
-      <p>RFC step 테스트 화면과 분리된 배포 전용 화면입니다. <Link to="/agent/subflow">Flow 생성/실행 화면으로 이동</Link></p>
+      <p>첫 화면은 현재 Node-RED 플로우 조회입니다. 탭별로 확인 후 필요하면 배포/반영 탭에서 JSON을 수정/배포하세요. <Link to="/agent/subflow">Flow 생성/실행 화면으로 이동</Link></p>
 
       <div className="subflow-tab-strip">
         <button className={tab === 'deploy' ? 'active' : ''} onClick={() => setTab('deploy')}>배포/반영</button>
@@ -253,8 +347,10 @@ const SubflowDeployPage = () => {
             <div className="subflow-actions">
               <button disabled={loading} onClick={exportFlowsToFile}>조회 결과를 파일로 Export</button>
             </div>
-            <p style={{ marginTop: 10 }}>탭 단위로 선택하고, 선택 탭의 노드 흐름(연결) + JSON 상세를 동시에 볼 수 있습니다.</p>
+
+            <p style={{ marginTop: 10 }}>탭 단위로 선택 후 전체 Flow 구조를 유지한 상태에서 부분 편집/검증/배포를 수행할 수 있습니다.</p>
             {error && <p className="subflow-error">{error}</p>}
+            {validationMessage && <p style={{ color: '#2e7d32' }}>{validationMessage}</p>}
           </section>
 
           <section className="subflow-card">
@@ -288,8 +384,20 @@ const SubflowDeployPage = () => {
           </section>
 
           <section className="subflow-card">
-            <h2>선택 탭 JSON 상세</h2>
-            <pre>{selectedTabNodes.length > 0 ? pretty(selectedTabNodes) : '탭을 선택하고 조회를 실행하세요.'}</pre>
+            <h2>선택 탭 부분 편집(JSON) - 전체 Flow 구조 유지</h2>
+            <div className="subflow-actions" style={{ marginBottom: 10 }}>
+              <button
+                disabled={selectedTabNodes.length === 0}
+                onClick={() => copyToClipboard(pretty(selectedTabNodes))}
+              >
+                선택 탭 JSON 복사
+              </button>
+              <button disabled={!result || !selectedTabId} onClick={validatePatchedFlow}>스키마 검증</button>
+              <button disabled={!result || !selectedTabId} onClick={deployPatchedFlow}>검증 후 즉시 배포</button>
+              <button disabled={!result || !selectedTabId} onClick={movePatchedFlowToDeployEditor}>배포 JSON 편집기로 보내기</button>
+            </div>
+            <p style={{ marginBottom: 8 }}>※ 아래는 선택 탭 노드 배열만 편집합니다. 실제 배포 시에는 시스템이 전체 Flow JSON(rev/다른 탭 포함) 구조로 자동 병합하여 반영합니다.</p>
+            <textarea value={selectedTabEditText} onChange={(e) => setSelectedTabEditText(e.target.value)} rows={12} />
           </section>
         </>
       )}
