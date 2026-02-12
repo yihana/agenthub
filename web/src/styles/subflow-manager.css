@@ -8,10 +8,13 @@
   display: flex;
   align-items: flex-start;
   min-height: calc(100vh - 120px);
+  position: relative;
 }
 
 .subflow-sidebar {
   width: 220px;
+  min-width: 220px;
+  flex: 0 0 220px;
   position: sticky;
   top: 12px;
   padding: 18px 14px;
@@ -44,6 +47,50 @@
   background: #dbeafe;
   border-color: #93c5fd;
   color: #1e3a8a;
+}
+
+
+.subflow-sidebar.collapsed {
+  display: none;
+}
+
+.subflow-sidebar-toggle {
+  position: fixed;
+  left: 10px;
+  top: 96px;
+  z-index: 20;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(51, 65, 85, 0.55);
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.subflow-sidebar-toggle:hover {
+  background: rgba(148, 163, 184, 0.12);
+  color: rgba(30, 41, 59, 0.7);
+}
+
+@media (max-width: 1099px) {
+  .subflow-layout {
+    min-height: auto;
+  }
+
+  .subflow-sidebar {
+    position: fixed;
+    left: 0;
+    top: 72px;
+    height: calc(100vh - 72px);
+    z-index: 15;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+  }
+
+  .subflow-page {
+    width: 100%;
+    padding-left: 24px;
+  }
 }
 
 .subflow-grid {

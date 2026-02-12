@@ -112,8 +112,9 @@ const splitConnectedFlows = (tabNodes: NodeRedNode[]) => {
   return groups;
 };
 
-
 const SubflowDeployPage = () => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileView, setMobileView] = useState(false);
   const [tab, setTab] = useState<DeployTab>('flows');
   const [flowSource, setFlowSource] = useState<FlowSource>('admin-api');
   const [adminUrl, setAdminUrl] = useState('http://localhost:1880');
@@ -130,6 +131,20 @@ const SubflowDeployPage = () => {
   const [sourceResult, setSourceResult] = useState<unknown>(null);
   const [actionResult, setActionResult] = useState<unknown>(null);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onResize = () => {
+      const isMobile = window.innerWidth < 1100;
+      setMobileView(isMobile);
+      if (!isMobile) {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
 
   const request = async (url: string, init?: RequestInit) => {
     const response = await fetch(url, {
@@ -375,7 +390,7 @@ const SubflowDeployPage = () => {
 
   return (
     <div className="subflow-layout">
-      <aside className="subflow-sidebar">
+      <aside className={`subflow-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <h2>Subflow 메뉴</h2>
         <nav>
           <Link to="/agent/subflow">생성/실행</Link>
@@ -383,6 +398,15 @@ const SubflowDeployPage = () => {
         </nav>
       </aside>
 
+      {mobileView && (
+        <button
+          className="subflow-sidebar-toggle"
+          onClick={() => setSidebarCollapsed((prev) => !prev)}
+          aria-label="사이드바 접기"
+        >
+          {sidebarCollapsed ? '펼치기' : '접기'}
+        </button>
+      )}
       <div className="subflow-page">
         <h1>Subflow 배포/반영</h1>
 
@@ -412,11 +436,11 @@ const SubflowDeployPage = () => {
         {tab === 'deploy' && (
           <section className="subflow-card">
             <h2>배포/반영</h2>
-            <p>※ "Flow 템플릿 미리보기"는 로컬 샘플 파일을 불러옵니다. 조회/편집한 현재 운영 플로우는 '배포 JSON 편집기로 보내기'로 옮겨서 배포하세요.</p>
+            <p>※ "샘플 Flow 템플릿 미리보기"는 로컬 샘플 파일입니다. 조회/편집한 현재 운영 플로우는 '배포 JSON 편집기로 보내기'로 옮겨서 배포하세요.</p>
             <div className="subflow-actions">
-              <button disabled={isLoading} onClick={loadTemplate}>1) Flow 템플릿 미리보기</button>
-              <button disabled={isLoading} onClick={deployByAdminApi}>2) Admin API로 반영</button>
-              <button disabled={isLoading} onClick={deployByCli}>3) CLI로 반영</button>
+              <button disabled={isLoading} onClick={loadTemplate}>샘플 Flow 템플릿 미리보기</button>
+              <button disabled={isLoading} onClick={deployByAdminApi}>1) Admin API로 반영</button>
+              <button disabled={isLoading} onClick={deployByCli}>2) CLI로 반영</button>
             </div>
             <label className="subflow-textarea-label" style={{ marginTop: 12 }}>
               Flow JSON (선택: 편집 후 Admin API 반영)

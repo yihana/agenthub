@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../../../styles/subflow-manager.css';
 
@@ -42,6 +42,8 @@ const createStep = (seq: number): RfcStep => ({
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 const SubflowManagerPage = () => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileView, setMobileView] = useState(false);
   const [runMode, setRunMode] = useState<RunMode>('local');
   const [destinationName, setDestinationName] = useState('EAR_RFC_DEST');
   const [mainPath, setMainPath] = useState('/rfc/execute');
@@ -49,7 +51,23 @@ const SubflowManagerPage = () => {
   const [steps, setSteps] = useState<RfcStep[]>([createStep(1), createStep(2)]);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<unknown>(null);
+  const [deployFlowJsonText, setDeployFlowJsonText] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const onResize = () => {
+      const isMobile = window.innerWidth < 1100;
+      setMobileView(isMobile);
+      if (!isMobile) {
+        setSidebarCollapsed(false);
+      }
+    };
+
+    onResize();
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const request = async (url: string, init?: RequestInit) => {
     const response = await fetch(url, {
       ...init,
@@ -139,6 +157,10 @@ const SubflowManagerPage = () => {
       });
 
       setResult(data);
+
+      // 실행 결과 이후, Node-RED 배포 화면에 바로 붙여넣을 수 있도록 샘플 flow JSON 생성
+      const template = await request('/api/subflow-manager/v1/node-red/flow-template');
+      setDeployFlowJsonText(pretty(template.flow_json));
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -146,15 +168,35 @@ const SubflowManagerPage = () => {
     }
   };
 
+
+  const copyDeployJson = async () => {
+    if (!deployFlowJsonText.trim()) {
+      setError('먼저 실행 테스트를 수행해 배포 JSON을 생성하세요.');
+      return;
+    }
+
+    await navigator.clipboard.writeText(deployFlowJsonText);
+  };
+
   return (
     <div className="subflow-layout">
-      <aside className="subflow-sidebar">
+      <aside className={`subflow-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
         <h2>Subflow 메뉴</h2>
         <nav>
           <Link className="active" to="/agent/subflow">생성/실행</Link>
           <Link to="/agent/subflow/deploy">배포/반영</Link>
         </nav>
       </aside>
+
+      {mobileView && (
+        <button
+          className="subflow-sidebar-toggle"
+          onClick={() => setSidebarCollapsed((prev) => !prev)}
+          aria-label="사이드바 접기"
+        >
+          {sidebarCollapsed ? '펼치기' : '접기'}
+        </button>
+      )}
 
       <div className="subflow-page">
         <h1>Subflow 생성/실행</h1>
@@ -247,6 +289,14 @@ const SubflowManagerPage = () => {
         <section className="subflow-card">
           <h2>실행 결과(API Result)</h2>
           <pre>{result ? pretty(result) : '아직 실행 결과가 없습니다.'}</pre>
+        </section>
+
+        <section className="subflow-card">
+          <h2>Node-RED 배포반영용 JSON (복사해서 Admin API 반영에 붙여넣기)</h2>
+          <div className="subflow-actions" style={{ marginBottom: 8 }}>
+            <button disabled={!deployFlowJsonText} onClick={copyDeployJson}>배포 JSON 복사</button>
+          </div>
+          <pre>{deployFlowJsonText || 'Run Subflow Simulation 실행 후 자동 생성됩니다.'}</pre>
         </section>
       </div>
     </div>
