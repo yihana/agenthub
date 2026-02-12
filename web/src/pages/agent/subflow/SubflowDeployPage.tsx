@@ -5,6 +5,7 @@ import '../../../styles/subflow-manager.css';
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 type DeployTab = 'deploy' | 'flows';
+
 type FlowSource = 'admin-api' | 'flows-file';
 
 type NodeRedNode = {
@@ -15,6 +16,7 @@ type NodeRedNode = {
   wires?: string[][];
   [key: string]: unknown;
 };
+
 
 type FlowEnvelope = {
   rev?: string;
@@ -249,6 +251,7 @@ const SubflowDeployPage = () => {
     }
   };
 
+
   const flowEdges = useMemo(() => {
     const edges: Array<{ from: string; to: string }> = [];
     selectedTabNodes.forEach((node) => {
@@ -344,6 +347,7 @@ const SubflowDeployPage = () => {
             <div className="subflow-actions">
               <button disabled={loading} onClick={exportFlowsToFile}>조회 결과를 파일로 Export</button>
             </div>
+
             <p style={{ marginTop: 10 }}>탭 단위로 선택 후 전체 Flow 구조를 유지한 상태에서 부분 편집/검증/배포를 수행할 수 있습니다.</p>
             {error && <p className="subflow-error">{error}</p>}
             {validationMessage && <p style={{ color: '#2e7d32' }}>{validationMessage}</p>}

@@ -50,7 +50,6 @@ const SubflowManagerPage = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<unknown>(null);
   const [error, setError] = useState('');
-
   const request = async (url: string, init?: RequestInit) => {
     const response = await fetch(url, {
       ...init,
