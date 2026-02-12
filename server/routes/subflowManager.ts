@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
-import { deployFlowByAdminApi, deployFlowByCli, fetchNodeRedFlows, loadNodeRedFlowTemplate, readNodeRedFlowsFile } from '../agent/subflow/deploy';
+import { deployFlowByAdminApi, deployFlowByCli, exportNodeRedFlowsToFile, fetchNodeRedFlows, loadNodeRedFlowTemplate, readNodeRedFlowsFile } from '../agent/subflow/deploy';
 
 
 const router = Router();
@@ -209,6 +209,7 @@ router.get('/v1/node-red/flows', async (req, res) => {
   }
 });
 
+
 router.get('/v1/node-red/flows-file', async (req, res) => {
   try {
     const flowsFilePath = req.query.flows_file_path as string | undefined;
@@ -216,6 +217,26 @@ router.get('/v1/node-red/flows-file', async (req, res) => {
     return res.json(result);
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'failed to read node-red flows file' });
+  }
+});
+
+
+router.post('/v1/node-red/export-file', async (req, res) => {
+  try {
+    const { admin_url, token, target_file_path } = req.body ?? {};
+
+    if (!admin_url) {
+      return res.status(400).json({ error: 'admin_url is required' });
+    }
+
+    if (!target_file_path) {
+      return res.status(400).json({ error: 'target_file_path is required' });
+    }
+
+    const result = await exportNodeRedFlowsToFile(admin_url, target_file_path, token);
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'failed to export node-red flows to file' });
   }
 });
 

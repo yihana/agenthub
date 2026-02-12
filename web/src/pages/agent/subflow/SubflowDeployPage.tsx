@@ -45,6 +45,7 @@ const SubflowDeployPage = () => {
   const [adminUrl, setAdminUrl] = useState('http://localhost:1880');
   const [flowFilePath, setFlowFilePath] = useState('agent/subflow/node-red-2step-flow.json');
   const [flowsFilePath, setFlowsFilePath] = useState('');
+  const [targetExportPath, setTargetExportPath] = useState('node-red/flows/flows.dev.json');
   const [token, setToken] = useState('');
   const [flowJsonText, setFlowJsonText] = useState('');
   const [selectedTabId, setSelectedTabId] = useState<string>('');
@@ -79,7 +80,6 @@ const SubflowDeployPage = () => {
     } catch (e: any) {
       setError(e.message || '오류가 발생했습니다.');
       return null;
-
     } finally {
       setLoading(false);
     }
@@ -113,7 +113,6 @@ const SubflowDeployPage = () => {
     body: JSON.stringify({ admin_url: adminUrl, flow_file_path: flowFilePath })
   }));
 
-
   const fetchRegisteredFlows = async () => run(() => {
     if (flowSource === 'admin-api') {
       return request(`/api/subflow-manager/v1/node-red/flows?admin_url=${encodeURIComponent(adminUrl)}${token ? `&token=${encodeURIComponent(token)}` : ''}`);
@@ -121,6 +120,15 @@ const SubflowDeployPage = () => {
 
     return request(`/api/subflow-manager/v1/node-red/flows-file${flowsFilePath ? `?flows_file_path=${encodeURIComponent(flowsFilePath)}` : ''}`);
   });
+
+  const exportFlowsToFile = async () => run(() => request('/api/subflow-manager/v1/node-red/export-file', {
+    method: 'POST',
+    body: JSON.stringify({
+      admin_url: adminUrl,
+      token: token || undefined,
+      target_file_path: targetExportPath
+    })
+  }));
 
   const nodes = useMemo(() => extractFlowNodes(result), [result]);
 
@@ -233,6 +241,17 @@ const SubflowDeployPage = () => {
 
             <div className="subflow-actions">
               <button disabled={loading} onClick={fetchRegisteredFlows}>조회 실행</button>
+            </div>
+            <label className="subflow-textarea-label" style={{ marginTop: 10 }}>
+              Git 저장용 Export 파일 경로
+              <input
+                value={targetExportPath}
+                onChange={(e) => setTargetExportPath(e.target.value)}
+                placeholder="node-red/flows/flows.dev.json"
+              />
+            </label>
+            <div className="subflow-actions">
+              <button disabled={loading} onClick={exportFlowsToFile}>조회 결과를 파일로 Export</button>
             </div>
             <p style={{ marginTop: 10 }}>탭 단위로 선택하고, 선택 탭의 노드 흐름(연결) + JSON 상세를 동시에 볼 수 있습니다.</p>
             {error && <p className="subflow-error">{error}</p>}

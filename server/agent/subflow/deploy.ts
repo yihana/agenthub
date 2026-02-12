@@ -58,6 +58,7 @@ const resolveFlowFilePath = async (flowFilePath?: string) => {
   return path.resolve(cwd, normalized);
 };
 
+
 const resolveGenericPath = async (filePath: string) => {
   if (path.isAbsolute(filePath)) {
     return filePath;
@@ -132,6 +133,32 @@ export const readNodeRedFlowsFile = async (flowsFilePath?: string) => {
     flows_file_path: resolvedPath,
     node_count: Array.isArray(json) ? json.length : Array.isArray(json?.flows) ? json.flows.length : 0,
     data: json
+  };
+};
+
+
+export const saveFlowJsonToFile = async (targetFilePath: string, flowJson: unknown) => {
+  const resolvedPath = path.isAbsolute(targetFilePath)
+    ? targetFilePath
+    : path.resolve(process.cwd(), targetFilePath);
+
+  await fs.mkdir(path.dirname(resolvedPath), { recursive: true });
+  await fs.writeFile(resolvedPath, JSON.stringify(flowJson, null, 2), 'utf-8');
+
+  return {
+    target_file_path: resolvedPath
+  };
+};
+
+export const exportNodeRedFlowsToFile = async (adminUrl: string, targetFilePath: string, token?: string) => {
+  const flows = await fetchNodeRedFlows(adminUrl, token);
+  const saved = await saveFlowJsonToFile(targetFilePath, flows.data);
+
+  return {
+    admin_url: flows.admin_url,
+    status: flows.status,
+    ...saved,
+    node_count: Array.isArray(flows.data) ? flows.data.length : Array.isArray((flows.data as any)?.flows) ? (flows.data as any).flows.length : 0
   };
 };
 
