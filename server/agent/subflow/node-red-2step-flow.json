@@ -1,0 +1,88 @@
+[
+  {
+    "id": "subflow-dynamic-tab",
+    "type": "tab",
+    "label": "Subflow Dynamic Runner",
+    "disabled": false,
+    "info": "Dynamic steps + parallelWith group execution"
+  },
+  {
+    "id": "http-in-subflow-dynamic",
+    "type": "http in",
+    "z": "subflow-dynamic-tab",
+    "name": "POST /subflow-exec-dynamic",
+    "url": "/subflow-exec-dynamic",
+    "method": "post",
+    "upload": false,
+    "swaggerDoc": "",
+    "x": 170,
+    "y": 140,
+    "wires": [["fn-init-dynamic"]]
+  },
+  {
+    "id": "fn-init-dynamic",
+    "type": "function",
+    "z": "subflow-dynamic-tab",
+    "name": "fn_init",
+    "func": "msg.earCore = msg.payload.earCore || 'http://localhost:8787/api/subflow-manager';\nmsg.agent_id = msg.payload.agent_id || 'subflow-manager';\nmsg.user_id = msg.payload.user_id || 'demo-user';\nmsg.channel = msg.payload.channel || 'portal';\nmsg.input_payload = msg.payload.input_payload || {};\n\nif (!Array.isArray(msg.payload.steps) || msg.payload.steps.length === 0) {\n    node.error('steps is required', msg);\n    return null;\n}\n\nmsg.steps = msg.payload.steps.map((step, idx) => ({\n    seq: Number(step.seq ?? idx + 1),\n    name: step.name || `step-${idx + 1}`,\n    rfcName: step.rfcName || step.rfc_name,\n    targetSystem: step.targetSystem || step.target_system || 'EAR',\n    targetName: step.targetName || step.target_name || 'RFC_DEST_EAR_DEV',\n    parallelWith: step.parallelWith || step.parallel_with || ''\n})).sort((a,b) => a.seq - b.seq);\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 390,
+    "y": 140,
+    "wires": [["fn-build-request-dynamic"]]
+  },
+  {
+    "id": "fn-build-request-dynamic",
+    "type": "function",
+    "z": "subflow-dynamic-tab",
+    "name": "fn_build_dynamic_request",
+    "func": "msg.url = `${msg.earCore}/v1/ear/execute`;\nmsg.method = 'POST';\nmsg.headers = { 'Content-Type': 'application/json' };\n\nmsg.payload = {\n    mode: msg.payload.mode || 'local',\n    agent_id: msg.agent_id,\n    user_id: msg.user_id,\n    channel: msg.channel,\n    input_payload: msg.input_payload,\n    steps: msg.steps,\n    ear: msg.payload.ear || undefined\n};\n\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 650,
+    "y": 140,
+    "wires": [["http-request-dynamic"]]
+  },
+  {
+    "id": "http-request-dynamic",
+    "type": "http request",
+    "z": "subflow-dynamic-tab",
+    "name": "POST /v1/ear/execute",
+    "method": "use",
+    "ret": "obj",
+    "paytoqs": "ignore",
+    "url": "",
+    "persist": false,
+    "proxy": "",
+    "insecureHTTPParser": false,
+    "authType": "",
+    "senderr": false,
+    "headers": [],
+    "x": 930,
+    "y": 140,
+    "wires": [["fn-format-response-dynamic"]]
+  },
+  {
+    "id": "fn-format-response-dynamic",
+    "type": "function",
+    "z": "subflow-dynamic-tab",
+    "name": "fn_format_response",
+    "func": "msg.statusCode = 200;\nmsg.payload = {\n    ok: true,\n    execution: msg.payload.execution,\n    steps: msg.payload.steps,\n    merged_payload: msg.payload.merged_payload,\n    detail: msg.payload.detail\n};\nreturn msg;",
+    "outputs": 1,
+    "noerr": 0,
+    "x": 1170,
+    "y": 140,
+    "wires": [["http-response-dynamic"]]
+  },
+  {
+    "id": "http-response-dynamic",
+    "type": "http response",
+    "z": "subflow-dynamic-tab",
+    "name": "HTTP 200",
+    "statusCode": "",
+    "headers": {},
+    "x": 1390,
+    "y": 140,
+    "wires": []
+  }
+]
