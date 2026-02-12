@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
 import { deployFlowByAdminApi, deployFlowByCli, loadNodeRedFlowTemplate } from '../agent/subflow/deploy';
 
+
 const router = Router();
 
 router.post('/v1/agents', (req, res) => {
@@ -177,7 +178,6 @@ router.post('/v1/ear/execute', async (req, res) => {
     return res.status(500).json({ error: error.message || 'failed to execute ear subflow' });
   }
 });
-
 
 router.get('/v1/node-red/flow-template', async (req, res) => {
   try {
