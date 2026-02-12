@@ -5,6 +5,7 @@ import '../../../styles/subflow-manager.css';
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 type DeployTab = 'deploy' | 'flows';
+
 type FlowSource = 'admin-api' | 'flows-file';
 
 type NodeRedNode = {
@@ -406,7 +407,6 @@ const SubflowDeployPage = () => {
           {sidebarCollapsed ? '펼치기' : '접기'}
         </button>
       )}
-
       <div className="subflow-page">
         <h1>Subflow 배포/반영</h1>
 
