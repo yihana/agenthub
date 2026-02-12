@@ -52,13 +52,13 @@
 }
 
 .ear-sidebar__toggle {
-  border: 1px solid rgba(148, 163, 184, 0.6);
-  background: #f59e0b;
-  color: #111827;
+  border: 1px solid transparent;
+  background: transparent;
+  color: rgba(249, 250, 251, 0.28);
   border-radius: 10px;
   padding: 8px 10px;
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 500;
   cursor: pointer;
   width: 100%;
   display: flex;
@@ -67,6 +67,12 @@
   position: sticky;
   top: 8px;
   z-index: 3;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+
+.ear-sidebar__toggle:hover {
+  color: rgba(249, 250, 251, 0.45);
+  background: rgba(255, 255, 255, 0.03);
 }
 
 .ear-sidebar--collapsed .ear-nav__item {
