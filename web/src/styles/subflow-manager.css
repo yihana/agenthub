@@ -142,3 +142,21 @@
   border-color: #93c5fd;
 }
 
+
+.subflow-flow-rows {
+  display: grid;
+  gap: 6px;
+}
+
+.subflow-flow-row {
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #f8fafc;
+}
+
+.subflow-actions button.active {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+

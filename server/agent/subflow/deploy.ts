@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import os from 'os';
 import path from 'path';
 import axios from 'axios';
 import { execFile } from 'child_process';
@@ -57,6 +58,28 @@ const resolveFlowFilePath = async (flowFilePath?: string) => {
   return path.resolve(cwd, normalized);
 };
 
+const resolveGenericPath = async (filePath: string) => {
+  if (path.isAbsolute(filePath)) {
+    return filePath;
+  }
+
+  const cwd = process.cwd();
+  const repoRoot = path.resolve(__dirname, '..', '..', '..');
+  const normalized = filePath.replace(/^\.\//, '');
+
+  const candidates = [
+    path.resolve(cwd, normalized),
+    path.resolve(cwd, '..', normalized),
+    path.resolve(repoRoot, normalized),
+    normalized.startsWith('server/')
+      ? path.resolve(repoRoot, normalized.replace(/^server\//, ''))
+      : ''
+  ].filter(Boolean) as string[];
+
+  const matched = await findExistingPath(candidates);
+  return matched ?? path.resolve(cwd, normalized);
+};
+
 export const loadNodeRedFlowTemplate = async (flowFilePath?: string) => {
   const resolvedPath = await resolveFlowFilePath(flowFilePath);
   const raw = await fs.readFile(resolvedPath, 'utf-8');
@@ -98,9 +121,23 @@ export const fetchNodeRedFlows = async (adminUrl: string, token?: string) => {
   };
 };
 
+export const readNodeRedFlowsFile = async (flowsFilePath?: string) => {
+  const defaultPath = path.resolve(os.homedir(), '.node-red', 'flows.json');
+  const resolvedPath = flowsFilePath ? await resolveGenericPath(flowsFilePath) : defaultPath;
+
+  const raw = await fs.readFile(resolvedPath, 'utf-8');
+  const json = JSON.parse(raw);
+
+  return {
+    flows_file_path: resolvedPath,
+    node_count: Array.isArray(json) ? json.length : Array.isArray(json?.flows) ? json.flows.length : 0,
+    data: json
+  };
+};
+
 export const deployFlowByAdminApi = async (options: NodeRedDeployOptions) => {
   const { path: resolvedPath, json } = await resolveFlowJson(options);
-  
+
   const adminUrl = options.adminUrl.replace(/\/$/, '');
 
   const response = await axios.post(`${adminUrl}/flows`, json, {

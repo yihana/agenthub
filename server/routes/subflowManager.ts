@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
-import { deployFlowByAdminApi, deployFlowByCli, fetchNodeRedFlows, loadNodeRedFlowTemplate } from '../agent/subflow/deploy';
+import { deployFlowByAdminApi, deployFlowByCli, fetchNodeRedFlows, loadNodeRedFlowTemplate, readNodeRedFlowsFile } from '../agent/subflow/deploy';
+
 
 const router = Router();
 
@@ -178,6 +179,7 @@ router.post('/v1/ear/execute', async (req, res) => {
   }
 });
 
+
 router.get('/v1/node-red/flow-template', async (req, res) => {
   try {
     const template = await loadNodeRedFlowTemplate(req.query.flow_file_path as string | undefined);
@@ -206,6 +208,17 @@ router.get('/v1/node-red/flows', async (req, res) => {
     return res.status(500).json({ error: error.message || 'failed to fetch node-red flows' });
   }
 });
+
+router.get('/v1/node-red/flows-file', async (req, res) => {
+  try {
+    const flowsFilePath = req.query.flows_file_path as string | undefined;
+    const result = await readNodeRedFlowsFile(flowsFilePath);
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'failed to read node-red flows file' });
+  }
+});
+
 
 router.post('/v1/node-red/deploy/admin-api', async (req, res) => {
   try {
