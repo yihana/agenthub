@@ -178,7 +178,6 @@ router.post('/v1/ear/execute', async (req, res) => {
   }
 });
 
-
 router.get('/v1/node-red/flow-template', async (req, res) => {
   try {
     const template = await loadNodeRedFlowTemplate(req.query.flow_file_path as string | undefined);

@@ -130,7 +130,6 @@ const SubflowDeployPage = () => {
           {error && <p className="subflow-error">{error}</p>}
         </section>
       )}
-
       <section className="subflow-card">
         <h2>결과</h2>
         <pre>{result ? pretty(result) : '아직 실행 결과가 없습니다.'}</pre>
