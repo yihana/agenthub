@@ -150,7 +150,10 @@ const SubflowManagerPage = () => {
     <div className="subflow-page">
       <h1>Subflow Manager Agent</h1>
       <p>동적 RFC 스텝 + 병렬 그룹(parallelWith) 기반으로 EAR/로컬 실행을 테스트합니다.</p>
-      <p><Link to="/agent/subflow/deploy">개발/배포 화면( Node-RED 자동 반영 )으로 이동</Link></p>
+      <div className="subflow-tab-strip">
+        <Link to="/agent/subflow"><button className="active">Flow 생성/실행</button></Link>
+        <Link to="/agent/subflow/deploy"><button>개발/배포</button></Link>
+      </div>
 
       <section className="subflow-card">
         <h2>실행 설정</h2>

@@ -122,3 +122,23 @@
   display: flex;
   gap: 6px;
 }
+
+.subflow-tab-strip {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.subflow-tab-strip button {
+  border: 1px solid #becce3;
+  background: #f8fafc;
+  border-radius: 999px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+.subflow-tab-strip button.active {
+  background: #dbeafe;
+  border-color: #93c5fd;
+}
+

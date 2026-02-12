@@ -1,7 +1,6 @@
 import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
-import { deployFlowByAdminApi, deployFlowByCli, loadNodeRedFlowTemplate } from '../agent/subflow/deploy';
-
+import { deployFlowByAdminApi, deployFlowByCli, fetchNodeRedFlows, loadNodeRedFlowTemplate } from '../agent/subflow/deploy';
 
 const router = Router();
 
@@ -192,9 +191,25 @@ router.get('/v1/node-red/flow-template', async (req, res) => {
   }
 });
 
+router.get('/v1/node-red/flows', async (req, res) => {
+  try {
+    const adminUrl = req.query.admin_url as string;
+    const token = req.query.token as string | undefined;
+
+    if (!adminUrl) {
+      return res.status(400).json({ error: 'admin_url is required' });
+    }
+
+    const result = await fetchNodeRedFlows(adminUrl, token);
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'failed to fetch node-red flows' });
+  }
+});
+
 router.post('/v1/node-red/deploy/admin-api', async (req, res) => {
   try {
-    const { admin_url, flow_file_path, token } = req.body ?? {};
+    const { admin_url, flow_file_path, token, flow_json } = req.body ?? {};
     if (!admin_url) {
       return res.status(400).json({ error: 'admin_url is required' });
     }
@@ -202,7 +217,8 @@ router.post('/v1/node-red/deploy/admin-api', async (req, res) => {
     const result = await deployFlowByAdminApi({
       adminUrl: admin_url,
       flowFilePath: flow_file_path,
-      token
+      token,
+      flowJson: flow_json
     });
 
     return res.json(result);
