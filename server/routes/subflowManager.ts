@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { subflowManager } from '../agent/subflow';
+import { deployFlowByAdminApi, deployFlowByCli, loadNodeRedFlowTemplate } from '../agent/subflow/deploy';
+
 
 const router = Router();
 
@@ -139,7 +141,6 @@ router.post('/v1/ear/execute', async (req, res) => {
 
     if (!Array.isArray(body.steps) || body.steps.length === 0) {
       return res.status(400).json({ error: 'steps is required and must be a non-empty array' });
-
     }
 
     if (body.mode === 'ear' && !body.ear?.main_path) {
@@ -175,6 +176,56 @@ router.post('/v1/ear/execute', async (req, res) => {
     return res.status(201).json(result);
   } catch (error: any) {
     return res.status(500).json({ error: error.message || 'failed to execute ear subflow' });
+  }
+});
+
+router.get('/v1/node-red/flow-template', async (req, res) => {
+  try {
+    const template = await loadNodeRedFlowTemplate(req.query.flow_file_path as string | undefined);
+    return res.json({
+      flow_path: template.path,
+      node_count: Array.isArray(template.json) ? template.json.length : 0,
+      flow_json: template.json
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'failed to load node-red flow template' });
+  }
+});
+
+router.post('/v1/node-red/deploy/admin-api', async (req, res) => {
+  try {
+    const { admin_url, flow_file_path, token } = req.body ?? {};
+    if (!admin_url) {
+      return res.status(400).json({ error: 'admin_url is required' });
+    }
+
+    const result = await deployFlowByAdminApi({
+      adminUrl: admin_url,
+      flowFilePath: flow_file_path,
+      token
+    });
+
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'admin api deploy failed' });
+  }
+});
+
+router.post('/v1/node-red/deploy/cli', async (req, res) => {
+  try {
+    const { admin_url, flow_file_path } = req.body ?? {};
+    if (!admin_url) {
+      return res.status(400).json({ error: 'admin_url is required' });
+    }
+
+    const result = await deployFlowByCli({
+      adminUrl: admin_url,
+      flowFilePath: flow_file_path
+    });
+
+    return res.json(result);
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message || 'cli deploy failed' });
   }
 });
 
