@@ -5,6 +5,7 @@ import '../../../styles/subflow-manager.css';
 const pretty = (value: unknown) => JSON.stringify(value, null, 2);
 
 type DeployTab = 'deploy' | 'flows';
+
 type FlowSource = 'admin-api' | 'flows-file';
 
 type NodeRedNode = {

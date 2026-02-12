@@ -219,7 +219,6 @@
   gap: 6px;
 }
 
-
 .subflow-tab-strip {
   display: flex;
   gap: 8px;
@@ -256,3 +255,4 @@
   background: #dbeafe;
   border-color: #93c5fd;
 }
+

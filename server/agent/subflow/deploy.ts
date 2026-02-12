@@ -195,7 +195,6 @@ export const readNodeRedFlowsFile = async (flowsFilePath?: string) => {
 };
 
 
-
 export const saveFlowJsonToFile = async (targetFilePath: string, flowJson: unknown) => {
   const resolvedPath = path.isAbsolute(targetFilePath)
     ? targetFilePath
@@ -222,7 +221,8 @@ export const exportNodeRedFlowsToFile = async (adminUrl: string, targetFilePath:
 };
 
 export const deployFlowByAdminApi = async (options: NodeRedDeployOptions) => {
-  const { path: resolvedPath, json } = await resolveFlowJson(options);
+  const { path: resolvedPath, json } = await resolveFlowJson(options)
+  
   const adminUrl = options.adminUrl.replace(/\/$/, '');
 
   const response = await axios.post(`${adminUrl}/flows`, json, {
