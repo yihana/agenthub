@@ -1,7 +1,10 @@
 .subflow-page {
   flex: 1;
+  width: 100%;
+  min-width: 0;
   padding: 24px;
   color: #1f2937;
+  box-sizing: border-box;
 }
 
 .subflow-layout {
@@ -9,6 +12,9 @@
   align-items: flex-start;
   min-height: calc(100vh - 120px);
   position: relative;
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
 }
 
 .subflow-sidebar {
@@ -49,7 +55,6 @@
   color: #1e3a8a;
 }
 
-
 .subflow-sidebar.collapsed {
   display: none;
 }
@@ -89,6 +94,7 @@
 
   .subflow-page {
     width: 100%;
+    min-width: 0;
     padding-left: 24px;
   }
 }
