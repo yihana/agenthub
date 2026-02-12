@@ -1,6 +1,49 @@
 .subflow-page {
+  flex: 1;
   padding: 24px;
   color: #1f2937;
+}
+
+.subflow-layout {
+  display: flex;
+  align-items: flex-start;
+  min-height: calc(100vh - 120px);
+}
+
+.subflow-sidebar {
+  width: 220px;
+  position: sticky;
+  top: 12px;
+  padding: 18px 14px;
+  border-right: 1px solid #dbe3ee;
+  background: #f8fafc;
+  min-height: calc(100vh - 120px);
+}
+
+.subflow-sidebar h2 {
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.subflow-sidebar nav {
+  display: grid;
+  gap: 6px;
+}
+
+.subflow-sidebar a {
+  text-decoration: none;
+  color: #334155;
+  border: 1px solid #dbe3ee;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.subflow-sidebar a.active {
+  background: #dbeafe;
+  border-color: #93c5fd;
+  color: #1e3a8a;
 }
 
 .subflow-grid {

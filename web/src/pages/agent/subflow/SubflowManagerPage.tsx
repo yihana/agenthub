@@ -147,105 +147,108 @@ const SubflowManagerPage = () => {
   };
 
   return (
-    <div className="subflow-page">
-      <h1>Subflow JSON 생성/실행 Agent</h1>
-      <p>동적 RFC 스텝 JSON을 생성하고 실행 테스트합니다. (Node-RED 배포 JSON과는 별도 목적)</p>
-      <div className="subflow-tab-strip">
-        <Link to="/agent/subflow"><button className="active">Subflow JSON 생성/실행</button></Link>
-        <Link to="/agent/subflow/deploy"><button>개발/배포</button></Link>
-      </div>
+    <div className="subflow-layout">
+      <aside className="subflow-sidebar">
+        <h2>Subflow 메뉴</h2>
+        <nav>
+          <Link className="active" to="/agent/subflow">생성/실행</Link>
+          <Link to="/agent/subflow/deploy">배포/반영</Link>
+        </nav>
+      </aside>
 
-      <section className="subflow-card">
-        <h2>실행 설정</h2>
-        <div className="subflow-form-grid">
-          <label>
-            Mode
-            <select value={runMode} onChange={(e) => setRunMode(e.target.value as RunMode)}>
-              <option value="local">local (목업)</option>
-              <option value="ear">ear (실제 연동)</option>
-            </select>
+      <div className="subflow-page">
+        <h1>Subflow 생성/실행</h1>
+        <p>동적 RFC 스텝 JSON 실행 테스트 화면입니다.</p>
+
+        <section className="subflow-card">
+          <h2>실행 설정</h2>
+          <div className="subflow-form-grid">
+            <label>
+              Mode
+              <select value={runMode} onChange={(e) => setRunMode(e.target.value as RunMode)}>
+                <option value="local">local (목업)</option>
+                <option value="ear">ear (실제 연동)</option>
+              </select>
+            </label>
+            <label>
+              Destination Name
+              <input value={destinationName} onChange={(e) => setDestinationName(e.target.value)} disabled={runMode !== 'ear'} />
+            </label>
+            <label>
+              EAR Main Path
+              <input value={mainPath} onChange={(e) => setMainPath(e.target.value)} disabled={runMode !== 'ear'} />
+            </label>
+          </div>
+
+          <label className="subflow-textarea-label">
+            Input Payload(JSON)
+            <textarea value={inputPayloadText} onChange={(e) => setInputPayloadText(e.target.value)} rows={8} />
           </label>
-          <label>
-            Destination Name
-            <input value={destinationName} onChange={(e) => setDestinationName(e.target.value)} disabled={runMode !== 'ear'} />
-          </label>
-          <label>
-            EAR Main Path
-            <input value={mainPath} onChange={(e) => setMainPath(e.target.value)} disabled={runMode !== 'ear'} />
-          </label>
-        </div>
+        </section>
 
-        <label className="subflow-textarea-label">
-          Input Payload(JSON)
-          <textarea value={inputPayloadText} onChange={(e) => setInputPayloadText(e.target.value)} rows={8} />
-        </label>
-      </section>
+        <section className="subflow-card">
+          <div className="subflow-steps-header">
+            <h2>RFC Steps</h2>
+            <button disabled={loading} onClick={addStep}>+ Add Step</button>
+          </div>
 
-      <section className="subflow-card">
-        <div className="subflow-steps-header">
-          <h2>RFC Steps</h2>
-          <button disabled={loading} onClick={addStep}>+ Add Step</button>
-        </div>
+          <div className="subflow-steps-list">
+            {steps.map((step, index) => (
+              <div key={step.id} className="subflow-step-item">
+                <div className="subflow-step-top">
+                  <strong>#{index + 1}</strong>
+                  <div className="subflow-inline-actions">
+                    <button disabled={loading || index === 0} onClick={() => moveStep(index, -1)}>↑</button>
+                    <button disabled={loading || index === steps.length - 1} onClick={() => moveStep(index, 1)}>↓</button>
+                    <button disabled={loading} onClick={() => removeStep(step.id)}>삭제</button>
+                  </div>
+                </div>
 
-        <div className="subflow-steps-list">
-          {steps.map((step, index) => (
-            <div key={step.id} className="subflow-step-item">
-              <div className="subflow-step-top">
-                <strong>#{index + 1}</strong>
-                <div className="subflow-inline-actions">
-                  <button disabled={loading || index === 0} onClick={() => moveStep(index, -1)}>↑</button>
-                  <button disabled={loading || index === steps.length - 1} onClick={() => moveStep(index, 1)}>↓</button>
-                  <button disabled={loading} onClick={() => removeStep(step.id)}>삭제</button>
+                <div className="subflow-form-grid">
+                  <label>
+                    Name
+                    <input value={step.name} onChange={(e) => updateStep(step.id, { name: e.target.value })} />
+                  </label>
+                  <label>
+                    RFC Name
+                    <select value={step.rfcName} onChange={(e) => updateStep(step.id, { rfcName: e.target.value })}>
+                      {RFC_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Target System
+                    <input value={step.targetSystem} onChange={(e) => updateStep(step.id, { targetSystem: e.target.value })} />
+                  </label>
+                  <label>
+                    Target Name
+                    <input value={step.targetName} onChange={(e) => updateStep(step.id, { targetName: e.target.value })} />
+                  </label>
+                  <label>
+                    Parallel Group
+                    <input
+                      placeholder="예: g1 (같으면 병렬 실행)"
+                      value={step.parallelWith || ''}
+                      onChange={(e) => updateStep(step.id, { parallelWith: e.target.value })}
+                    />
+                  </label>
                 </div>
               </div>
+            ))}
+          </div>
 
-              <div className="subflow-form-grid">
-                <label>
-                  Name
-                  <input value={step.name} onChange={(e) => updateStep(step.id, { name: e.target.value })} />
-                </label>
-                <label>
-                  RFC Name
-                  <select value={step.rfcName} onChange={(e) => updateStep(step.id, { rfcName: e.target.value })}>
-                    {RFC_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Target System
-                  <input value={step.targetSystem} onChange={(e) => updateStep(step.id, { targetSystem: e.target.value })} />
-                </label>
-                <label>
-                  Target Name
-                  <input value={step.targetName} onChange={(e) => updateStep(step.id, { targetName: e.target.value })} />
-                </label>
-                <label>
-                  Parallel Group
-                  <input
-                    placeholder="예: g1 (같으면 병렬 실행)"
-                    value={step.parallelWith || ''}
-                    onChange={(e) => updateStep(step.id, { parallelWith: e.target.value })}
-                  />
-                </label>
-              </div>
-            </div>
-          ))}
-        </div>
+          <div className="subflow-actions">
+            <button disabled={loading} onClick={runSubflow}>Run Subflow Simulation (실행 테스트)</button>
+          </div>
+          {error && <p className="subflow-error">{error}</p>}
+        </section>
 
-        <p style={{ marginBottom: 10 }}>
-          ※ 이 화면은 실행 시뮬레이션용입니다. Node-RED 플로우 배포는 "개발/배포" 탭에서 진행하세요.
-        </p>
-        <div className="subflow-actions">
-          <button disabled={loading} onClick={runSubflow}>Run Subflow Simulation (실행 테스트)</button>
-        </div>
-        {error && <p className="subflow-error">{error}</p>}
-      </section>
-
-      <section className="subflow-card">
-        <h2>실행 결과(API Result)</h2>
-        <pre>{result ? pretty(result) : '아직 실행 결과가 없습니다.'}</pre>
-      </section>
+        <section className="subflow-card">
+          <h2>실행 결과(API Result)</h2>
+          <pre>{result ? pretty(result) : '아직 실행 결과가 없습니다.'}</pre>
+        </section>
+      </div>
     </div>
   );
 };
