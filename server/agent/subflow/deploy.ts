@@ -58,7 +58,6 @@ const resolveFlowFilePath = async (flowFilePath?: string) => {
   return path.resolve(cwd, normalized);
 };
 
-
 const resolveGenericPath = async (filePath: string) => {
   if (path.isAbsolute(filePath)) {
     return filePath;
@@ -138,6 +137,7 @@ export const readNodeRedFlowsFile = async (flowsFilePath?: string) => {
 
 export const deployFlowByAdminApi = async (options: NodeRedDeployOptions) => {
   const { path: resolvedPath, json } = await resolveFlowJson(options);
+
   const adminUrl = options.adminUrl.replace(/\/$/, '');
 
   const response = await axios.post(`${adminUrl}/flows`, json, {
