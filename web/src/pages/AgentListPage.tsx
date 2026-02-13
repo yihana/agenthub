@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, RefreshCw, AlertCircle } from 'lucide-react';
 import AppHeader from '../components/AppHeader';
@@ -19,15 +19,58 @@ interface AgentItem {
   lastHeartbeat?: string;
 }
 
+interface Level2Item {
+  id: number;
+  code: string;
+  name: string;
+  agentCount: number;
+}
+
+interface ModuleItem {
+  id: number;
+  code: string;
+  name: string;
+  level2: Level2Item[];
+  agentCount: number;
+}
+
+const LEVEL1_E2E_LABELS: Record<string, string> = {
+  MM: 'Procure to Pay',
+  PP: 'Plan to Produce',
+  HR: 'Hire to Retire',
+  SD: 'Order to Cash',
+  FI: 'Record to Report',
+  CO: 'Plan to Perform',
+  BC: 'Basis to Operate'
+};
+
 const AgentListPage: React.FC = () => {
   const { user, handleLogin, handleLogout, isLoggedIn } = useAuth();
-  const { listAgents, deleteAgent } = useAgentManagementApi();
+  const { listAgents, deleteAgent, getAgentTaxonomy } = useAgentManagementApi();
   const navigate = useNavigate();
   const [agents, setAgents] = useState<AgentItem[]>([]);
+  const [modules, setModules] = useState<ModuleItem[]>([]);
+  const [selectedLevel1, setSelectedLevel1] = useState<number | null>(null);
+  const [selectedLevel2, setSelectedLevel2] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  const selectedModule = useMemo(() => modules.find((module) => module.id === selectedLevel1) || null, [modules, selectedLevel1]);
+
+  const loadTaxonomy = async () => {
+    try {
+      const data = await getAgentTaxonomy();
+      const apiModules = (data.modules || []) as ModuleItem[];
+      setModules(apiModules);
+      if (!selectedLevel1 && apiModules.length > 0) {
+        setSelectedLevel1(apiModules[0].id);
+      }
+    } catch (err: any) {
+      setError(err.message || '모듈 정보를 불러오지 못했습니다.');
+    }
+  };
 
   const loadAgents = async () => {
     const token = localStorage.getItem('token');
@@ -39,7 +82,13 @@ const AgentListPage: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const data = await listAgents({ search: searchTerm, status: statusFilter, limit: 50 });
+      const data = await listAgents({
+        search: searchTerm,
+        status: statusFilter,
+        level1Id: selectedLevel1 ?? undefined,
+        level2Id: selectedLevel2 ?? undefined,
+        limit: 50
+      });
       setAgents(data.agents || []);
     } catch (err: any) {
       setError(err.message || '에이전트 목록을 불러오지 못했습니다.');
@@ -50,8 +99,13 @@ const AgentListPage: React.FC = () => {
 
   useEffect(() => {
     if (!isLoggedIn) return;
-    loadAgents();
+    loadTaxonomy();
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    if (!isLoggedIn) return;
+    loadAgents();
+  }, [isLoggedIn, selectedLevel1, selectedLevel2]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,6 +117,7 @@ const AgentListPage: React.FC = () => {
     try {
       await deleteAgent(id);
       await loadAgents();
+      await loadTaxonomy();
     } catch (err: any) {
       setError(err.message || '비활성화 중 오류가 발생했습니다.');
     }
@@ -75,13 +130,54 @@ const AgentListPage: React.FC = () => {
         <div className="agent-page__header">
           <div>
             <h2>에이전트 목록</h2>
-            <p>등록된 에이전트를 검색하고 상태를 확인합니다.</p>
+            <p>SAP 모듈(Level1) 및 업무 영역(Level2) 기준으로 에이전트를 조회합니다.</p>
           </div>
           <button className="agent-primary" onClick={() => navigate('/agent-management/new')}>
             <Plus size={16} />
             신규 등록
           </button>
         </div>
+
+        <section className="agent-module-overview">
+          <div className="agent-module-tabs">
+            {modules.map((module) => (
+              <button
+                key={module.id}
+                type="button"
+                className={`agent-module-tab ${selectedLevel1 === module.id ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedLevel1(module.id);
+                  setSelectedLevel2(null);
+                }}
+              >
+                {module.code === 'COMMON'
+                  ? '통합'
+                  : (LEVEL1_E2E_LABELS[module.code] ? `${module.code} · ${LEVEL1_E2E_LABELS[module.code]}` : module.code)}
+                <span>{module.agentCount}</span>
+              </button>
+            ))}
+          </div>
+
+          <div className="agent-module-summary">
+            <h3>{selectedModule ? (selectedModule.code === 'COMMON' ? '> Level1 > Level2' : `> ${LEVEL1_E2E_LABELS[selectedModule.code] ? `${selectedModule.name} · ${LEVEL1_E2E_LABELS[selectedModule.code]}` : selectedModule.name} > Level2`) : '> Level1 > Level2'}</h3>
+            <strong>Agent Count: {selectedModule?.agentCount || 0}</strong>
+          </div>
+
+          <div className="agent-level2-grid">
+            {(selectedModule?.level2 || []).map((level2) => (
+              <button
+                key={level2.id}
+                type="button"
+                className={`agent-level2-card ${selectedLevel2 === level2.id ? 'active' : ''}`}
+                onClick={() => setSelectedLevel2((prev) => (prev === level2.id ? null : level2.id))}
+              >
+                <span>{level2.code}</span>
+                <strong>{level2.name}</strong>
+                <em>{level2.agentCount}</em>
+              </button>
+            ))}
+          </div>
+        </section>
 
         <form className="agent-filter" onSubmit={handleSearch}>
           <div className="agent-filter__field">

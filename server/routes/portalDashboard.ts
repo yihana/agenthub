@@ -1323,6 +1323,197 @@ router.post('/labor-costs', async (req, res) => {
   }
 });
 
+router.get('/processes', async (_req, res) => {
+  try {
+    if (DB_TYPE === 'postgres') {
+      const result = await query(
+        `SELECT d.id AS domain_id, d.domain_code, d.domain_name,
+                l1.id AS level1_id, l1.level1_code, l1.level1_name, l1.display_order AS level1_order,
+                l2.id AS level2_id, l2.level2_code, l2.level2_name, l2.display_order AS level2_order
+         FROM business_domains d
+         LEFT JOIN business_level1 l1 ON l1.domain_id = d.id AND l1.is_active = true
+         LEFT JOIN business_level2 l2 ON l2.level1_id = l1.id AND l2.is_active = true
+         WHERE d.is_active = true
+         ORDER BY d.domain_code, l1.display_order, l2.display_order`
+      );
+      return res.json({ rows: result.rows });
+    }
+
+    const hanaResult = await query(
+      `SELECT d.ID AS DOMAIN_ID, d.DOMAIN_CODE, d.DOMAIN_NAME,
+              l1.ID AS LEVEL1_ID, l1.LEVEL1_CODE, l1.LEVEL1_NAME, l1.DISPLAY_ORDER AS LEVEL1_ORDER,
+              l2.ID AS LEVEL2_ID, l2.LEVEL2_CODE, l2.LEVEL2_NAME, l2.DISPLAY_ORDER AS LEVEL2_ORDER
+       FROM EAR.business_domains d
+       LEFT JOIN EAR.business_level1 l1 ON l1.DOMAIN_ID = d.ID AND l1.IS_ACTIVE = true
+       LEFT JOIN EAR.business_level2 l2 ON l2.LEVEL1_ID = l1.ID AND l2.IS_ACTIVE = true
+       WHERE d.IS_ACTIVE = true
+       ORDER BY d.DOMAIN_CODE, l1.DISPLAY_ORDER, l2.DISPLAY_ORDER`
+    );
+    return res.json({ rows: hanaResult.rows || hanaResult });
+  } catch (error) {
+    console.error('Process fetch error:', error);
+    return res.status(500).json({ error: '프로세스 정보를 불러오지 못했습니다.' });
+  }
+});
+
+
+router.post('/processes/domain', async (req, res) => {
+  try {
+    const { domain_code, domain_name, description } = req.body || {};
+    if (!domain_code || !domain_name) {
+      return res.status(400).json({ error: 'domain_code, domain_name은 필수입니다.' });
+    }
+
+    if (DB_TYPE === 'postgres') {
+      await query(
+        `INSERT INTO business_domains (domain_code, domain_name, description, is_active)
+         VALUES ($1, $2, $3, true)
+         ON CONFLICT (domain_code)
+         DO UPDATE SET domain_name = EXCLUDED.domain_name, description = EXCLUDED.description, is_active = true, updated_at = CURRENT_TIMESTAMP`,
+        [domain_code, domain_name, description || null]
+      );
+      return res.json({ success: true });
+    }
+
+    await query(
+      `MERGE INTO EAR.business_domains AS target
+       USING (SELECT ? AS DOMAIN_CODE, ? AS DOMAIN_NAME, ? AS DESCRIPTION FROM DUMMY) AS source
+       ON (target.DOMAIN_CODE = source.DOMAIN_CODE)
+       WHEN MATCHED THEN
+         UPDATE SET DOMAIN_NAME = source.DOMAIN_NAME, DESCRIPTION = source.DESCRIPTION, IS_ACTIVE = true, UPDATED_AT = CURRENT_TIMESTAMP
+       WHEN NOT MATCHED THEN
+         INSERT (DOMAIN_CODE, DOMAIN_NAME, DESCRIPTION, IS_ACTIVE, CREATED_AT, UPDATED_AT)
+         VALUES (source.DOMAIN_CODE, source.DOMAIN_NAME, source.DESCRIPTION, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+      [domain_code, domain_name, description || null]
+    );
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Domain save error:', error);
+    return res.status(500).json({ error: '도메인 저장에 실패했습니다.' });
+  }
+});
+
+router.delete('/processes/domain/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (DB_TYPE === 'postgres') {
+      await query('DELETE FROM business_domains WHERE id = $1', [id]);
+    } else {
+      await query('DELETE FROM EAR.business_domains WHERE ID = ?', [id]);
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Domain delete error:', error);
+    return res.status(500).json({ error: '도메인 삭제에 실패했습니다.' });
+  }
+});
+
+router.post('/processes/level1', async (req, res) => {
+  try {
+    const { domain_code, level1_code, level1_name, display_order = 0 } = req.body || {};
+    if (!domain_code || !level1_code || !level1_name) {
+      return res.status(400).json({ error: 'domain_code, level1_code, level1_name은 필수입니다.' });
+    }
+
+    if (DB_TYPE === 'postgres') {
+      await query(
+        `INSERT INTO business_level1 (domain_id, level1_code, level1_name, menu_code, display_order)
+         SELECT id, $2, $3, 'agent-management', $4 FROM business_domains WHERE domain_code = $1
+         ON CONFLICT (domain_id, level1_code)
+         DO UPDATE SET level1_name = EXCLUDED.level1_name, display_order = EXCLUDED.display_order, updated_at = CURRENT_TIMESTAMP`,
+        [domain_code, level1_code, level1_name, display_order]
+      );
+      return res.json({ success: true });
+    }
+
+    await query(
+      `MERGE INTO EAR.business_level1 AS target
+       USING (
+         SELECT d.ID AS DOMAIN_ID, ? AS LEVEL1_CODE, ? AS LEVEL1_NAME, ? AS DISPLAY_ORDER
+         FROM EAR.business_domains d WHERE d.DOMAIN_CODE = ?
+       ) AS source
+       ON (target.DOMAIN_ID = source.DOMAIN_ID AND target.LEVEL1_CODE = source.LEVEL1_CODE)
+       WHEN MATCHED THEN
+         UPDATE SET LEVEL1_NAME = source.LEVEL1_NAME, DISPLAY_ORDER = source.DISPLAY_ORDER, UPDATED_AT = CURRENT_TIMESTAMP
+       WHEN NOT MATCHED THEN
+         INSERT (DOMAIN_ID, LEVEL1_CODE, LEVEL1_NAME, MENU_CODE, DISPLAY_ORDER, IS_ACTIVE, CREATED_AT, UPDATED_AT)
+         VALUES (source.DOMAIN_ID, source.LEVEL1_CODE, source.LEVEL1_NAME, 'agent-management', source.DISPLAY_ORDER, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+      [level1_code, level1_name, display_order, domain_code]
+    );
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Level1 save error:', error);
+    return res.status(500).json({ error: 'Level1 저장에 실패했습니다.' });
+  }
+});
+
+router.delete('/processes/level1/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (DB_TYPE === 'postgres') {
+      await query('DELETE FROM business_level1 WHERE id = $1', [id]);
+    } else {
+      await query('DELETE FROM EAR.business_level1 WHERE ID = ?', [id]);
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Level1 delete error:', error);
+    return res.status(500).json({ error: 'Level1 삭제에 실패했습니다.' });
+  }
+});
+
+router.post('/processes/level2', async (req, res) => {
+  try {
+    const { level1_id, level2_code, level2_name, display_order = 0 } = req.body || {};
+    if (!level1_id || !level2_code || !level2_name) {
+      return res.status(400).json({ error: 'level1_id, level2_code, level2_name은 필수입니다.' });
+    }
+
+    if (DB_TYPE === 'postgres') {
+      await query(
+        `INSERT INTO business_level2 (level1_id, level2_code, level2_name, display_order)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT (level1_id, level2_code)
+         DO UPDATE SET level2_name = EXCLUDED.level2_name, display_order = EXCLUDED.display_order, updated_at = CURRENT_TIMESTAMP`,
+        [level1_id, level2_code, level2_name, display_order]
+      );
+      return res.json({ success: true });
+    }
+
+    await query(
+      `MERGE INTO EAR.business_level2 AS target
+       USING (SELECT ? AS LEVEL1_ID, ? AS LEVEL2_CODE, ? AS LEVEL2_NAME, ? AS DISPLAY_ORDER FROM DUMMY) AS source
+       ON (target.LEVEL1_ID = source.LEVEL1_ID AND target.LEVEL2_CODE = source.LEVEL2_CODE)
+       WHEN MATCHED THEN
+         UPDATE SET LEVEL2_NAME = source.LEVEL2_NAME, DISPLAY_ORDER = source.DISPLAY_ORDER, UPDATED_AT = CURRENT_TIMESTAMP
+       WHEN NOT MATCHED THEN
+         INSERT (LEVEL1_ID, LEVEL2_CODE, LEVEL2_NAME, DISPLAY_ORDER, IS_ACTIVE, CREATED_AT, UPDATED_AT)
+         VALUES (source.LEVEL1_ID, source.LEVEL2_CODE, source.LEVEL2_NAME, source.DISPLAY_ORDER, true, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);`,
+      [level1_id, level2_code, level2_name, display_order]
+    );
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Level2 save error:', error);
+    return res.status(500).json({ error: 'Level2 저장에 실패했습니다.' });
+  }
+});
+
+router.delete('/processes/level2/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (DB_TYPE === 'postgres') {
+      await query('DELETE FROM business_level2 WHERE id = $1', [id]);
+    } else {
+      await query('DELETE FROM EAR.business_level2 WHERE ID = ?', [id]);
+    }
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Level2 delete error:', error);
+    return res.status(500).json({ error: 'Level2 삭제에 실패했습니다.' });
+  }
+});
+
+
 router.post('/adoption-events', async (req, res) => {
   try {
     const { user_id, stage, business_type, agent_type, metadata } = req.body || {};
