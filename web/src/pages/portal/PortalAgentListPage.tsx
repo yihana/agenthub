@@ -1208,29 +1208,9 @@ const PortalAgentListPage: React.FC = () => {
     return count;
   }, [selectedLevel1, agents, processDomains]);
 
-  const processMetaById = useMemo(() => {
-    return new Map(
-      processDomains.flatMap((domain) =>
-        domain.level1.flatMap((module) =>
-          module.level2.map((level2) => {
-            const segments = level2.code.split('.');
-            const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
-            const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
-            return [
-              level2.code,
-              {
-                module: module.code,
-                processLevel1: `${processLevel1Code} ${processLevel1Name}`,
-                processLevel2: `${level2.code} ${level2.name}`,
-                processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
-              }
-            ];
-          })
-        )
-      )
-    );
-  }, [processDomains]);
 
+    return count;
+  }, [selectedLevel1, agents, processDomains]);
 
   const processNameById = useMemo(() => {
     return new Map(
@@ -1242,7 +1222,7 @@ const PortalAgentListPage: React.FC = () => {
     );
   }, [processDomains]);
 
-  const processMetaById = useMemo(() => {
+  const processMetaByIdMap = useMemo(() => {
     return new Map(
       processDomains.flatMap((domain) =>
         domain.level1.flatMap((module) =>
@@ -1264,6 +1244,7 @@ const PortalAgentListPage: React.FC = () => {
       )
     );
   }, [processDomains]);
+
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
@@ -1367,8 +1348,7 @@ const PortalAgentListPage: React.FC = () => {
       const detail = agentDetailById.get(agent.id);
       const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
       const usage = aggregateCustomerUsage(agent, detail);
-
-      const processMeta = processMetaById.get(agent.processId) || {
+      const processMeta = processMetaByIdMap.get(agent.processId) || {
         module: selectedLevel1?.code || '-',
         processLevel1: '-',
         processLevel2: `${agent.processId} -`,
@@ -1383,7 +1363,7 @@ const PortalAgentListPage: React.FC = () => {
         processMeta
       };
     });
-  }, [filteredAgents, agentDetailById, processNameById, processMetaById, selectedLevel1]);
+  }, [filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
 
   useEffect(() => {
     if (!agentId) {
@@ -1445,7 +1425,6 @@ const PortalAgentListPage: React.FC = () => {
             {isProcessCollapsed ? '펼치기' : '접기'}
           </button>
         </div>
-
         {!isProcessCollapsed && (
           <>
             <div className="ear-process-overview__section">
