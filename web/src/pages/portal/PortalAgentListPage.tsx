@@ -1017,17 +1017,6 @@ const PortalAgentListPage: React.FC = () => {
     return agents.filter((agent) => level2Codes.has(agent.processId)).length;
   }, [selectedLevel1, agents]);
 
-
-
-  const selectedModuleCards = useMemo(() => {
-    return SAP_PROCESS_CARDS.find((module) => module.moduleCode === selectedModuleCode) ?? SAP_PROCESS_CARDS[0];
-  }, [selectedModuleCode]);
-
-  const selectedModuleAgentCount = useMemo(() => {
-    return selectedModuleCards.items.reduce((sum, item) => sum + item.count, 0);
-  }, [selectedModuleCards]);
-
-
   const handleFormChange = (field: string, value: string) => {
     setFormValues((prev) => ({
       ...prev,
