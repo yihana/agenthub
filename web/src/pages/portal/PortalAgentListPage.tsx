@@ -893,7 +893,6 @@ const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
 
-
 const CAPABILITY_MAX_LENGTH = 200;
 const USAGE_WINDOW_DAYS = 30;
 
@@ -921,7 +920,9 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
 // 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
   const windowStart = new Date();
+
   windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
+
   const windowStartDate = toShortDate(windowStart);
 
   const recentEvents = AGENT_USAGE_EVENTS.filter(
@@ -1071,6 +1072,7 @@ const PortalAgentListPage: React.FC = () => {
         })
         .map((item) => item.code)
     );
+
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
@@ -1353,7 +1355,6 @@ const PortalAgentListPage: React.FC = () => {
       const detail = agentDetailById.get(agent.id);
       const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
       const usage = aggregateCustomerUsage(agent, detail);
-
       const processMeta = processMetaByIdMap.get(agent.processId) || {
         module: selectedLevel1?.code || '-',
         processLevel1: '-',
