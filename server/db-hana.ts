@@ -332,13 +332,13 @@ export async function initializeDatabase() {
     // 메뉴 초기화
     await initializeMenus();
 
+    await seedPortalBaselines();
+    await seedBusinessDomainHierarchy();
+
     // 에이전트 샘플 데이터 초기화 (옵션)
     if (SEED_AGENT_DATA) {
       await seedAgentData();
     }
-
-    await seedPortalBaselines();
-    await seedBusinessDomainHierarchy();
     
     // 입력보안 설정 초기화
     await initializeInputSecurity();
@@ -1722,38 +1722,44 @@ async function seedAgentData() {
 
   const agents = [
     {
-      name: 'Agent Alpha',
-      description: '검색 기반 응답 에이전트',
-      type: 'LLM',
-      status: 'active',
+      name: 'OrderBotcommerce',
+      description: 'SD 관련 프로세스 에이전트',
+      type: 'SD',
+      status: 'running',
       envConfig: JSON.stringify({ model: 'gpt-4o-mini', region: 'hana' }),
       maxConcurrency: 4,
-      tags: JSON.stringify(['search', 'rag'])
+      tags: JSON.stringify(['sd', 'ops']),
+      level2Code: 'SD.1.3'
     },
     {
-      name: 'Agent Beta',
-      description: '백오피스 자동화 에이전트',
-      type: 'Automation',
+      name: 'SupportGPTsupport',
+      description: 'BC 관련 프로세스 에이전트',
+      type: 'BC',
       status: 'running',
       envConfig: JSON.stringify({ runtime: 'node', retries: 2 }),
       maxConcurrency: 2,
-      tags: JSON.stringify(['automation'])
+      tags: JSON.stringify(['bc', 'support']),
+      level2Code: 'BC.1.3'
     },
     {
-      name: 'Agent Gamma',
-      description: '오류 감지 테스트 에이전트',
-      type: 'Monitor',
-      status: 'error',
+      name: 'PricingAIanalytics',
+      description: '통합 관련 프로세스 에이전트',
+      type: 'COMMON',
+      status: 'active',
       envConfig: JSON.stringify({ threshold: 0.2 }),
       maxConcurrency: 1,
-      tags: JSON.stringify(['monitoring', 'ops'])
+      tags: JSON.stringify(['common', 'analytics']),
+      level2Code: 'CM.1.1'
     }
   ];
 
   for (const agent of agents) {
+    const level2 = await query('SELECT TOP 1 ID FROM EAR.business_level2 WHERE LEVEL2_CODE = ?', [agent.level2Code]);
+    const level2Id = (level2.rows || level2 || [])[0]?.id || (level2.rows || level2 || [])[0]?.ID || null;
+
     await query(
-      `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE)
-       VALUES (?, ?, ?, ?, ?, ?, ?, true)`,
+      `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE, BUSINESS_LEVEL2_ID)
+       VALUES (?, ?, ?, ?, ?, ?, ?, true, ?)`,
       [
         agent.name,
         agent.description,
@@ -1761,7 +1767,8 @@ async function seedAgentData() {
         agent.status,
         agent.envConfig,
         agent.maxConcurrency,
-        agent.tags
+        agent.tags,
+        level2Id
       ]
     );
   }

@@ -34,6 +34,16 @@ interface ModuleItem {
   agentCount: number;
 }
 
+const LEVEL1_E2E_LABELS: Record<string, string> = {
+  MM: 'Procure to Pay',
+  PP: 'Plan to Produce',
+  HR: 'Hire to Retire',
+  SD: 'Order to Cash',
+  FI: 'Record to Report',
+  CO: 'Plan to Perform',
+  BC: 'Basis to Operate'
+};
+
 const AgentListPage: React.FC = () => {
   const { user, handleLogin, handleLogout, isLoggedIn } = useAuth();
   const { listAgents, deleteAgent, getAgentTaxonomy } = useAgentManagementApi();
@@ -140,14 +150,16 @@ const AgentListPage: React.FC = () => {
                   setSelectedLevel2(null);
                 }}
               >
-                {module.code}
+                {module.code === 'COMMON'
+                  ? '통합'
+                  : (LEVEL1_E2E_LABELS[module.code] ? `${module.code} · ${LEVEL1_E2E_LABELS[module.code]}` : module.code)}
                 <span>{module.agentCount}</span>
               </button>
             ))}
           </div>
 
           <div className="agent-module-summary">
-            <h3>{selectedModule?.name || '모듈 선택'}</h3>
+            <h3>{selectedModule ? (selectedModule.code === 'COMMON' ? '> Level1 > Level2' : `> ${LEVEL1_E2E_LABELS[selectedModule.code] ? `${selectedModule.name} · ${LEVEL1_E2E_LABELS[selectedModule.code]}` : selectedModule.name} > Level2`) : '> Level1 > Level2'}</h3>
             <strong>Agent Count: {selectedModule?.agentCount || 0}</strong>
           </div>
 

@@ -51,7 +51,7 @@ const PortalRoadmapPage: React.FC = () => {
   const { role } = usePortalRole();
   const canEditRoadmap = role === 'operator_admin';
   const canManageMetrics = role === 'operator_admin' || role === 'system_admin';
-  const [activeTab, setActiveTab] = useState<'roadmap' | 'metrics'>('roadmap');
+  const [activeTab, setActiveTab] = useState<'roadmap' | 'metrics' | 'process'>('roadmap');
   const [isEditing, setIsEditing] = useState(false);
   const [roadmapStages, setRoadmapStages] = useState(initialRoadmapStages);
   const [milestones, setMilestones] = useState(initialMilestones);
@@ -80,6 +80,11 @@ const PortalRoadmapPage: React.FC = () => {
     business_type: ''
   });
   const [catalogStatus, setCatalogStatus] = useState('');
+  const [processStatus, setProcessStatus] = useState('');
+  const [processRows, setProcessRows] = useState<any[]>([]);
+  const [domainForm, setDomainForm] = useState({ domain_code: 'SAP', domain_name: 'SAP', description: '' });
+  const [level1Form, setLevel1Form] = useState({ domain_code: 'SAP', level1_code: '', level1_name: '', display_order: '10' });
+  const [level2Form, setLevel2Form] = useState({ level1_id: '', level2_code: '', level2_name: '', display_order: '10' });
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {
     setRoadmapStages((prev) =>
       prev.map((stage, stageIndex) => {
@@ -143,6 +148,22 @@ const PortalRoadmapPage: React.FC = () => {
 
     fetchBaselines();
   }, []);
+
+  const fetchProcesses = async () => {
+    try {
+      const response = await fetch('/api/portal-dashboard/processes');
+      if (!response.ok) throw new Error('Failed to load processes');
+      const data = await response.json();
+      setProcessRows(data.rows || []);
+    } catch (error) {
+      console.error('Process fetch error:', error);
+    }
+  };
+
+  useEffect(() => {
+    fetchProcesses();
+  }, []);
+
 
   const handleBaselineChange = (field: string, value: string) => {
     setBaselineValues((prev) => ({
@@ -253,7 +274,91 @@ const PortalRoadmapPage: React.FC = () => {
     }
   };
 
-  const handleTabChange = (nextTab: 'roadmap' | 'metrics') => {
+
+  const handleAddDomain = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canEditRoadmap) return;
+    setProcessStatus('저장 중...');
+    try {
+      const response = await fetch('/api/portal-dashboard/processes/domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(domainForm)
+      });
+      if (!response.ok) throw new Error('save failed');
+      setProcessStatus('저장 완료');
+      await fetchProcesses();
+    } catch (error) {
+      console.error(error);
+      setProcessStatus('저장 실패');
+    }
+  };
+
+  const handleAddLevel1 = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canEditRoadmap) return;
+    setProcessStatus('저장 중...');
+    try {
+      const response = await fetch('/api/portal-dashboard/processes/level1', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          domain_code: level1Form.domain_code,
+          level1_code: level1Form.level1_code,
+          level1_name: level1Form.level1_name,
+          display_order: Number(level1Form.display_order || 0)
+        })
+      });
+      if (!response.ok) throw new Error('save failed');
+      setLevel1Form({ domain_code: 'SAP', level1_code: '', level1_name: '', display_order: '10' });
+      setProcessStatus('저장 완료');
+      await fetchProcesses();
+    } catch (error) {
+      console.error(error);
+      setProcessStatus('저장 실패');
+    }
+  };
+
+  const handleAddLevel2 = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!canEditRoadmap) return;
+    setProcessStatus('저장 중...');
+    try {
+      const response = await fetch('/api/portal-dashboard/processes/level2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          level1_id: Number(level2Form.level1_id),
+          level2_code: level2Form.level2_code,
+          level2_name: level2Form.level2_name,
+          display_order: Number(level2Form.display_order || 0)
+        })
+      });
+      if (!response.ok) throw new Error('save failed');
+      setLevel2Form({ level1_id: '', level2_code: '', level2_name: '', display_order: '10' });
+      setProcessStatus('저장 완료');
+      await fetchProcesses();
+    } catch (error) {
+      console.error(error);
+      setProcessStatus('저장 실패');
+    }
+  };
+
+  const handleDeleteLevel1 = async (id: number) => {
+    if (!canEditRoadmap) return;
+    if (!window.confirm('Level1을 삭제할까요?')) return;
+    await fetch(`/api/portal-dashboard/processes/level1/${id}`, { method: 'DELETE' });
+    await fetchProcesses();
+  };
+
+  const handleDeleteLevel2 = async (id: number) => {
+    if (!canEditRoadmap) return;
+    if (!window.confirm('Level2를 삭제할까요?')) return;
+    await fetch(`/api/portal-dashboard/processes/level2/${id}`, { method: 'DELETE' });
+    await fetchProcesses();
+  };
+
+  const handleTabChange = (nextTab: 'roadmap' | 'metrics' | 'process') => {
     setActiveTab(nextTab);
     setIsEditing(false);
   };
@@ -287,6 +392,13 @@ const PortalRoadmapPage: React.FC = () => {
           onClick={() => handleTabChange('metrics')}
         >
           지표 관리
+        </button>
+        <button
+          type="button"
+          className={activeTab === 'process' ? 'ear-tab ear-tab--active' : 'ear-tab'}
+          onClick={() => handleTabChange('process')}
+        >
+          프로세스 관리
         </button>
       </div>
       <div className="ear-grid">
@@ -449,6 +561,71 @@ const PortalRoadmapPage: React.FC = () => {
               ) : (
                 <button className="ear-primary ear-full" disabled>마일스톤 추가</button>
               )}
+            </WidgetCard>
+          </>
+        ) : activeTab === 'process' ? (
+          <>
+            {!canEditRoadmap && (
+              <WidgetCard title="프로세스 권한" description={`현재 권한(${roleLabels[role]})은 프로세스를 조회만 할 수 있습니다.`}>
+                <p className="ear-muted">운영 관리자만 프로세스를 수정/추가/삭제할 수 있습니다.</p>
+              </WidgetCard>
+            )}
+            <WidgetCard title="프로세스 테이블" description="도메인 > Level1 > Level2 등록 정보">
+              <table className="ear-table ear-table--compact">
+                <thead>
+                  <tr>
+                    <th>Domain</th>
+                    <th>Level1</th>
+                    <th>Level2</th>
+                    <th>관리</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {processRows.map((row, index) => (
+                    <tr key={`${row.level2_id || row.level2Id || 'none'}-${index}`}>
+                      <td>{row.domain_name || row.domainName}</td>
+                      <td>{row.level1_code || row.level1Code} · {row.level1_name || row.level1Name}</td>
+                      <td>{row.level2_code || row.level2Code ? `${row.level2_code || row.level2Code} · ${row.level2_name || row.level2Name}` : '-'}</td>
+                      <td>
+                        {(row.level2_id || row.level2Id) ? (
+                          <button className="ear-ghost" disabled={!canEditRoadmap} onClick={() => handleDeleteLevel2(Number(row.level2_id || row.level2Id))}>Level2 삭제</button>
+                        ) : (row.level1_id || row.level1Id) ? (
+                          <button className="ear-ghost" disabled={!canEditRoadmap} onClick={() => handleDeleteLevel1(Number(row.level1_id || row.level1Id))}>Level1 삭제</button>
+                        ) : (
+                          <button className="ear-ghost" disabled={!canEditRoadmap} onClick={async () => { if (!window.confirm('Domain을 삭제할까요?')) return; await fetch(`/api/portal-dashboard/processes/domain/${row.domain_id || row.domainId}`, { method: 'DELETE' }); await fetchProcesses(); }}>Domain 삭제</button>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </WidgetCard>
+            <WidgetCard title="Domain 추가/수정" description="회사별/영역별 도메인 관리 (예: SAP, BTP)">
+              <form className="ear-form" onSubmit={handleAddDomain}>
+                <label>Domain Code<input className="ear-input" value={domainForm.domain_code} onChange={(e)=>setDomainForm((p)=>({...p, domain_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>Domain Name<input className="ear-input" value={domainForm.domain_name} onChange={(e)=>setDomainForm((p)=>({...p, domain_name:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>설명<input className="ear-input" value={domainForm.description} onChange={(e)=>setDomainForm((p)=>({...p, description:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <button type="submit" className="ear-primary" disabled={!canEditRoadmap}>Domain 저장</button>
+              </form>
+            </WidgetCard>
+            <WidgetCard title="Level1 추가/수정" description="모듈 탭에 표시되는 Level1 관리">
+              <form className="ear-form" onSubmit={handleAddLevel1}>
+                <label>Domain Code<input className="ear-input" value={level1Form.domain_code} onChange={(e)=>setLevel1Form((p)=>({...p, domain_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>Level1 Code<input className="ear-input" value={level1Form.level1_code} onChange={(e)=>setLevel1Form((p)=>({...p, level1_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>Level1 Name<input className="ear-input" value={level1Form.level1_name} onChange={(e)=>setLevel1Form((p)=>({...p, level1_name:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>정렬순서<input className="ear-input" type="number" value={level1Form.display_order} onChange={(e)=>setLevel1Form((p)=>({...p, display_order:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <button type="submit" className="ear-primary" disabled={!canEditRoadmap}>Level1 저장</button>
+              </form>
+            </WidgetCard>
+            <WidgetCard title="Level2 추가/수정" description="프로세스 카드(Level2) 관리">
+              <form className="ear-form" onSubmit={handleAddLevel2}>
+                <label>Level1 ID<input className="ear-input" type="number" value={level2Form.level1_id} onChange={(e)=>setLevel2Form((p)=>({...p, level1_id:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>Level2 Code<input className="ear-input" value={level2Form.level2_code} onChange={(e)=>setLevel2Form((p)=>({...p, level2_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>Level2 Name<input className="ear-input" value={level2Form.level2_name} onChange={(e)=>setLevel2Form((p)=>({...p, level2_name:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>정렬순서<input className="ear-input" type="number" value={level2Form.display_order} onChange={(e)=>setLevel2Form((p)=>({...p, display_order:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <button type="submit" className="ear-primary" disabled={!canEditRoadmap}>Level2 저장</button>
+                {processStatus && <span className="ear-muted">{processStatus}</span>}
+              </form>
             </WidgetCard>
           </>
         ) : (

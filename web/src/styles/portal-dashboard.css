@@ -1182,6 +1182,27 @@
   margin-bottom: 16px;
 }
 
+.ear-process-overview__domains {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.ear-process-domain {
+  border: 1px solid #cfd7e6;
+  border-radius: 10px;
+  background: #fff;
+  color: #1f2a44;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.ear-process-domain.active {
+  background: #1f2a44;
+  color: #fff;
+  border-color: #1f2a44;
+}
+
 .ear-process-overview__tabs {
   display: flex;
   flex-wrap: wrap;

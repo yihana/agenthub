@@ -54,14 +54,14 @@ export async function initializeDatabase() {
     // 메뉴 초기화
     await initializeMenus(client);
 
+    // 포털 기준값/분류 샘플 데이터
+    await seedPortalBaselines(client);
+    await seedBusinessDomainHierarchy(client);
+
     // 에이전트 샘플 데이터 초기화 (로컬 전용)
     if (LOCAL_ONLY) {
       await seedAgentData(client);
     }
-
-    // 포털 기준값 샘플 데이터
-    await seedPortalBaselines(client);
-    await seedBusinessDomainHierarchy(client);
     
     // 입력보안 설정 초기화
     await initializeInputSecurity(client);
@@ -1236,39 +1236,45 @@ async function seedAgentData(client: any) {
 
   const agents = [
     {
-      name: 'Agent Alpha',
-      description: '검색 기반 응답 에이전트',
-      type: 'LLM',
-      status: 'active',
+      name: 'OrderBotcommerce',
+      description: 'SD 관련 프로세스 에이전트',
+      type: 'SD',
+      status: 'running',
       env_config: { model: 'gpt-4o-mini', region: 'local' },
       max_concurrency: 4,
-      tags: ['search', 'rag']
+      tags: ['sd', 'ops'],
+      level2Code: 'SD.1.3'
     },
     {
-      name: 'Agent Beta',
-      description: '백오피스 자동화 에이전트',
-      type: 'Automation',
+      name: 'SupportGPTsupport',
+      description: 'BC 관련 프로세스 에이전트',
+      type: 'BC',
       status: 'running',
       env_config: { runtime: 'node', retries: 2 },
       max_concurrency: 2,
-      tags: ['automation']
+      tags: ['bc', 'support'],
+      level2Code: 'BC.1.3'
     },
     {
-      name: 'Agent Gamma',
-      description: '오류 감지 테스트 에이전트',
-      type: 'Monitor',
-      status: 'error',
+      name: 'PricingAIanalytics',
+      description: '통합 관련 프로세스 에이전트',
+      type: 'COMMON',
+      status: 'active',
       env_config: { threshold: 0.2 },
       max_concurrency: 1,
-      tags: ['monitoring', 'ops']
+      tags: ['common', 'analytics'],
+      level2Code: 'CM.1.1'
     }
   ];
 
   const agentIds: number[] = [];
   for (const agent of agents) {
+    const level2Result = await client.query('SELECT id FROM business_level2 WHERE level2_code = $1 LIMIT 1', [agent.level2Code]);
+    const businessLevel2Id = level2Result.rows?.[0]?.id || null;
+
     const result = await client.query(
-      `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, true)
+      `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active, business_level2_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, true, $8)
        RETURNING id`,
       [
         agent.name,
@@ -1277,7 +1283,8 @@ async function seedAgentData(client: any) {
         agent.status,
         JSON.stringify(agent.env_config),
         agent.max_concurrency,
-        JSON.stringify(agent.tags)
+        JSON.stringify(agent.tags),
+        businessLevel2Id
       ]
     );
     agentIds.push(result.rows[0].id);
