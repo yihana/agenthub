@@ -1192,9 +1192,14 @@ const PortalAgentListPage: React.FC = () => {
 
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
-    const knownProcessCodes = new Set(
-      processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
-    );
+    const knownProcessCodes = new Set<string>();
+    for (const domain of processDomains) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
+          knownProcessCodes.add(level2.code);
+        }
+      }
+    }
     const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
 
     let count = 0;
@@ -1208,43 +1213,45 @@ const PortalAgentListPage: React.FC = () => {
     return count;
   }, [selectedLevel1, agents, processDomains]);
 
-
-    return count;
-  }, [selectedLevel1, agents, processDomains]);
-
   const processNameById = useMemo(() => {
-    return new Map(
-      processDomains.flatMap((domain) =>
-        domain.level1.flatMap((level1) =>
-          level1.level2.map((level2) => [level2.code, `${level1.code} ${level1.name} > ${level2.code} ${level2.name}`])
-        )
-      )
-    );
+    const entries: Array<[string, string]> = [];
+    for (const domain of processDomains) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
+          entries.push([level2.code, `${level1.code} ${level1.name} > ${level2.code} ${level2.name}`]);
+        }
+      }
+    }
+    return new Map(entries);
   }, [processDomains]);
 
   const processMetaByIdMap = useMemo(() => {
-    return new Map(
-      processDomains.flatMap((domain) =>
-        domain.level1.flatMap((module) =>
-          module.level2.map((level2) => {
-            const segments = level2.code.split('.');
-            const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
-            const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
-            return [
-              level2.code,
-              {
-                module: module.code,
-                processLevel1: `${processLevel1Code} ${processLevel1Name}`,
-                processLevel2: `${level2.code} ${level2.name}`,
-                processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
-              }
-            ];
-          })
-        )
-      )
-    );
-  }, [processDomains]);
+    const entries: Array<[
+      string,
+      { module: string; processLevel1: string; processLevel2: string; processPath: string }
+    ]> = [];
 
+    for (const domain of processDomains) {
+      for (const module of domain.level1) {
+        for (const level2 of module.level2) {
+          const segments = level2.code.split('.');
+          const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
+          const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
+          entries.push([
+            level2.code,
+            {
+              module: module.code,
+              processLevel1: `${processLevel1Code} ${processLevel1Name}`,
+              processLevel2: `${level2.code} ${level2.name}`,
+              processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
+            }
+          ]);
+        }
+      }
+    }
+
+    return new Map(entries);
+  }, [processDomains]);
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
