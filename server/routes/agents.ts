@@ -121,9 +121,93 @@ router.get('/summary', authenticateToken, async (req, res) => {
   }
 });
 
+
+router.get('/taxonomy', authenticateToken, async (_req, res) => {
+  try {
+    if (DB_TYPE === 'postgres') {
+      const rows = await db.query(
+        `SELECT d.id AS domain_id, d.domain_code, d.domain_name,
+                l1.id AS level1_id, l1.level1_code, l1.level1_name, l1.display_order AS level1_order,
+                l2.id AS level2_id, l2.level2_code, l2.level2_name, l2.display_order AS level2_order,
+                COUNT(a.id)::int AS agent_count
+         FROM business_domains d
+         JOIN business_level1 l1 ON l1.domain_id = d.id AND l1.is_active = true
+         LEFT JOIN business_level2 l2 ON l2.level1_id = l1.id AND l2.is_active = true
+         LEFT JOIN agents a ON a.business_level2_id = l2.id AND a.is_active = true
+         WHERE d.is_active = true
+         GROUP BY d.id, d.domain_code, d.domain_name, l1.id, l1.level1_code, l1.level1_name, l1.display_order, l2.id, l2.level2_code, l2.level2_name, l2.display_order
+         ORDER BY l1.display_order, l2.display_order`
+      );
+
+      const moduleMap = new Map<string, any>();
+      for (const row of rows.rows) {
+        const key = String(row.level1_id);
+        if (!moduleMap.has(key)) {
+          moduleMap.set(key, {
+            id: row.level1_id,
+            code: row.level1_code,
+            name: row.level1_name,
+            domain: { id: row.domain_id, code: row.domain_code, name: row.domain_name },
+            level2: [],
+            agentCount: 0
+          });
+        }
+        const item = moduleMap.get(key);
+        if (row.level2_id) {
+          item.level2.push({ id: row.level2_id, code: row.level2_code, name: row.level2_name, agentCount: row.agent_count || 0 });
+          item.agentCount += row.agent_count || 0;
+        }
+      }
+      return res.json({ modules: Array.from(moduleMap.values()) });
+    }
+
+    const result = await db.query(
+      `SELECT d.ID AS domain_id, d.DOMAIN_CODE AS domain_code, d.DOMAIN_NAME AS domain_name,
+              l1.ID AS level1_id, l1.LEVEL1_CODE AS level1_code, l1.LEVEL1_NAME AS level1_name, l1.DISPLAY_ORDER AS level1_order,
+              l2.ID AS level2_id, l2.LEVEL2_CODE AS level2_code, l2.LEVEL2_NAME AS level2_name, l2.DISPLAY_ORDER AS level2_order,
+              COUNT(a.ID) AS agent_count
+       FROM EAR.business_domains d
+       JOIN EAR.business_level1 l1 ON l1.DOMAIN_ID = d.ID AND l1.IS_ACTIVE = true
+       LEFT JOIN EAR.business_level2 l2 ON l2.LEVEL1_ID = l1.ID AND l2.IS_ACTIVE = true
+       LEFT JOIN EAR.agents a ON a.BUSINESS_LEVEL2_ID = l2.ID AND a.IS_ACTIVE = true
+       WHERE d.IS_ACTIVE = true
+       GROUP BY d.ID, d.DOMAIN_CODE, d.DOMAIN_NAME, l1.ID, l1.LEVEL1_CODE, l1.LEVEL1_NAME, l1.DISPLAY_ORDER, l2.ID, l2.LEVEL2_CODE, l2.LEVEL2_NAME, l2.DISPLAY_ORDER
+       ORDER BY l1.DISPLAY_ORDER, l2.DISPLAY_ORDER`
+    );
+
+    const rows = result.rows || result;
+    const moduleMap = new Map<string, any>();
+    for (const row of rows) {
+      const key = String(row.LEVEL1_ID || row.level1_id);
+      if (!moduleMap.has(key)) {
+        moduleMap.set(key, {
+          id: row.LEVEL1_ID || row.level1_id,
+          code: row.LEVEL1_CODE || row.level1_code,
+          name: row.LEVEL1_NAME || row.level1_name,
+          domain: { id: row.DOMAIN_ID || row.domain_id, code: row.DOMAIN_CODE || row.domain_code, name: row.DOMAIN_NAME || row.domain_name },
+          level2: [],
+          agentCount: 0
+        });
+      }
+      const item = moduleMap.get(key);
+      const level2Id = row.LEVEL2_ID || row.level2_id;
+      const count = Number(row.AGENT_COUNT || row.agent_count || 0);
+      if (level2Id) {
+        item.level2.push({ id: level2Id, code: row.LEVEL2_CODE || row.level2_code, name: row.LEVEL2_NAME || row.level2_name, agentCount: count });
+        item.agentCount += count;
+      }
+    }
+
+    return res.json({ modules: Array.from(moduleMap.values()) });
+  } catch (error: any) {
+    console.error('에이전트 분류 조회 오류:', error);
+    return res.status(500).json({ error: '에이전트 분류 조회 중 오류가 발생했습니다.' });
+  }
+});
+
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { search = '', status, type, role, page = 1, limit = 20 } = req.query as any;
+    const { search = '', status, type, role, level1Id, level2Id, page = 1, limit = 20 } = req.query as any;
     const offset = (Number(page) - 1) * Number(limit);
 
     if (DB_TYPE === 'postgres') {
@@ -146,6 +230,14 @@ router.get('/', authenticateToken, async (req, res) => {
       if (role) {
         whereClauses.push(`ar.role_name = $${++paramIndex}`);
         params.push(role);
+      }
+      if (level1Id) {
+        whereClauses.push(`a.business_level2_id IN (SELECT id FROM business_level2 WHERE level1_id = $${++paramIndex})`);
+        params.push(level1Id);
+      }
+      if (level2Id) {
+        whereClauses.push(`a.business_level2_id = $${++paramIndex}`);
+        params.push(level2Id);
       }
 
       const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -170,7 +262,7 @@ router.get('/', authenticateToken, async (req, res) => {
       );
 
       const agents = dataResult.rows.map(normalizeAgentRow);
-      const agentIds = agents.map((agent) => agent.id);
+      const agentIds = agents.map((agent: any) => agent.id);
 
       let rolesMap: Record<string, string[]> = {};
       if (agentIds.length > 0) {
@@ -187,7 +279,7 @@ router.get('/', authenticateToken, async (req, res) => {
       }
 
       res.json({
-        agents: agents.map((agent) => ({
+        agents: agents.map((agent: any) => ({
           ...agent,
           roles: rolesMap[String(agent.id)] || []
         })),
@@ -218,6 +310,14 @@ router.get('/', authenticateToken, async (req, res) => {
         whereClauses.push('ar.ROLE_NAME = ?');
         params.push(role);
       }
+      if (level1Id) {
+        whereClauses.push('a.BUSINESS_LEVEL2_ID IN (SELECT ID FROM EAR.business_level2 WHERE LEVEL1_ID = ?)');
+        params.push(level1Id);
+      }
+      if (level2Id) {
+        whereClauses.push('a.BUSINESS_LEVEL2_ID = ?');
+        params.push(level2Id);
+      }
 
       const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
       const joinSql = role ? 'LEFT JOIN EAR.agent_roles ar ON a.ID = ar.AGENT_ID' : '';
@@ -241,7 +341,7 @@ router.get('/', authenticateToken, async (req, res) => {
       );
 
       const agents = (dataResult.rows || dataResult).map(normalizeAgentRow);
-      const agentIds = agents.map((agent) => agent.id);
+      const agentIds = agents.map((agent: any) => agent.id);
 
       let rolesMap: Record<string, string[]> = {};
       if (agentIds.length > 0) {
@@ -262,7 +362,7 @@ router.get('/', authenticateToken, async (req, res) => {
       const total = countResult.rows?.[0]?.TOTAL || countResult.rows?.[0]?.total || countResult[0]?.TOTAL || 0;
 
       res.json({
-        agents: agents.map((agent) => ({
+        agents: agents.map((agent: any) => ({
           ...agent,
           roles: rolesMap[String(agent.id)] || []
         })),

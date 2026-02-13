@@ -585,6 +585,94 @@ const defaultAgents: AgentRecord[] = baseAgentDetails.map((agent, index) => ({
   runtimeErrors: agent.errorStreak
 }));
 
+const SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items: { processId: string; title: string; count: number; }[] }[] = [
+  {
+    moduleCode: 'COMMON',
+    moduleName: '통합',
+    items: [
+      { processId: 'CM.1.1', title: '공통 운영 모니터링', count: 3 },
+      { processId: 'CM.1.2', title: '공통 정책/권한 관리', count: 2 }
+    ]
+  },
+  {
+    moduleCode: 'MM',
+    moduleName: 'MM',
+    items: [
+      { processId: 'MM.1.2', title: 'BP 티켓 자동접수·KYC 체크', count: 8 },
+      { processId: 'MM.1.3', title: '구매처 평가 근거 자동첨부', count: 3 },
+      { processId: 'MM.2.2', title: '선정 근거 문장 자동작성', count: 10 },
+      { processId: 'MM.3.4', title: '계획 변경·승인요청 자동생성', count: 3 },
+      { processId: 'MM.5.3', title: '3-way match 예외 분류·라우팅', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'PP',
+    moduleName: 'PP',
+    items: [
+      { processId: 'PP.2.1', title: '수요 이상치 탐지·보정 제안', count: 8 },
+      { processId: 'PP.3.1', title: 'MRP 예외 트리아지', count: 3 },
+      { processId: 'PP.3.2', title: '오더 사전검증(릴리즈 전)', count: 10 },
+      { processId: 'PP.4.2', title: '공정확인 편차 알림', count: 3 },
+      { processId: 'PP.5.3', title: '정산 차이 자동분해', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'HR',
+    moduleName: 'HR',
+    items: [
+      { processId: 'HR.2.2', title: '지원자 요약·매칭 스코어', count: 8 },
+      { processId: 'HR.2.4', title: '온보딩 티켓 자동생성', count: 3 },
+      { processId: 'HR.3.4', title: '근태 예외 자동라우팅', count: 10 },
+      { processId: 'HR.4.1', title: '급여 데이터 검증', count: 3 },
+      { processId: 'HR.5.1', title: '평가 코멘트 초안+편향체크', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'SD',
+    moduleName: 'SD',
+    items: [
+      { processId: 'SD.1.3', title: '신용 승인 근거+리스크 점수', count: 8 },
+      { processId: 'SD.2.3', title: 'ATP 대체안 추천', count: 3 },
+      { processId: 'SD.3.5', title: '클레임 자동분류·서류 안내', count: 10 },
+      { processId: 'SD.4.3', title: '청구 차이 자동설명', count: 3 },
+      { processId: 'SD.5.3', title: '독촉 우선순위+문구 생성', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'FI',
+    moduleName: 'FI',
+    items: [
+      { processId: 'FI.2.3', title: '전표 규칙 위반 탐지', count: 8 },
+      { processId: 'FI.3.1', title: '송장 캡처·전표 초안', count: 3 },
+      { processId: 'FI.3.2', title: '3-way match 예외 분류', count: 10 },
+      { processId: 'FI.4.2', title: '대사 후보 자동매칭', count: 3 },
+      { processId: 'FI.5.1', title: '결산 체크리스트 모니터', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'CO',
+    moduleName: 'CO',
+    items: [
+      { processId: 'CO.2.3', title: '계획 시나리오 비교', count: 8 },
+      { processId: 'CO.3.1', title: '실적전표 오류 탐지', count: 3 },
+      { processId: 'CO.4.1', title: '배부 실행 모니터', count: 10 },
+      { processId: 'CO.4.2', title: '정산 차이 자동설명', count: 3 },
+      { processId: 'CO.5.1', title: '수익성 내러티브 생성', count: 10 }
+    ]
+  },
+  {
+    moduleCode: 'BC',
+    moduleName: 'BC',
+    items: [
+      { processId: 'BC.2.2', title: '티켓 분류+필수정보 수집', count: 8 },
+      { processId: 'BC.1.3', title: 'SoD 리스크 스코어링', count: 3 },
+      { processId: 'BC.3.3', title: '로그 원인 후보·가이드', count: 10 },
+      { processId: 'BC.4.2', title: '릴리즈 영향도 요약', count: 3 },
+      { processId: 'BC.5.2', title: '취약점 조치안 플래닝', count: 10 }
+    ]
+  }
+];
+
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 
 const formatPercent = (value: number) => `${numberFormatter.format(value)}%`;
@@ -645,6 +733,8 @@ const PortalAgentListPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState('전체');
   const [riskFilter, setRiskFilter] = useState('전체');
   const [categoryFilter, setCategoryFilter] = useState('전체');
+  const [selectedModuleCode, setSelectedModuleCode] = useState('COMMON');
+  const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
   const [formValues, setFormValues] = useState({
@@ -674,6 +764,15 @@ const PortalAgentListPage: React.FC = () => {
       return matchesSearch && matchesStatus && matchesRisk && matchesCategory;
     });
   }, [agents, categoryFilter, riskFilter, search, statusFilter]);
+
+  const selectedModuleCards = useMemo(() => {
+    return SAP_PROCESS_CARDS.find((module) => module.moduleCode === selectedModuleCode) ?? SAP_PROCESS_CARDS[0];
+  }, [selectedModuleCode]);
+
+  const selectedModuleAgentCount = useMemo(() => {
+    return selectedModuleCards.items.reduce((sum, item) => sum + item.count, 0);
+  }, [selectedModuleCards]);
+
 
   const handleFormChange = (field: string, value: string) => {
     setFormValues((prev) => ({
@@ -768,6 +867,46 @@ const PortalAgentListPage: React.FC = () => {
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
       actions={<button className="ear-primary">에이전트 등록</button>}
     >
+      <section className="ear-card ear-card--panel ear-process-overview">
+        <div className="ear-process-overview__tabs">
+          {SAP_PROCESS_CARDS.map((module) => {
+            const moduleCount = module.items.reduce((sum, item) => sum + item.count, 0);
+            return (
+              <button
+                key={module.moduleCode}
+                type="button"
+                className={`ear-process-tab ${selectedModuleCode === module.moduleCode ? 'active' : ''}`}
+                onClick={() => {
+                  setSelectedModuleCode(module.moduleCode);
+                  setSelectedProcessId(null);
+                }}
+              >
+                <span>{module.moduleName}</span>
+                <em>{moduleCount}</em>
+              </button>
+            );
+          })}
+        </div>
+        <div className="ear-process-overview__summary">
+          <h3>{selectedModuleCards.moduleName} · 프로세스 카드</h3>
+          <strong>Agent Count {selectedModuleAgentCount}</strong>
+        </div>
+        <div className="ear-process-overview__cards">
+          {selectedModuleCards.items.map((item) => (
+            <button
+              key={item.processId}
+              type="button"
+              className={`ear-process-card ${selectedProcessId === item.processId ? 'active' : ''}`}
+              onClick={() => setSelectedProcessId((prev) => (prev === item.processId ? null : item.processId))}
+            >
+              <span>{item.processId}</span>
+              <strong>{item.title}</strong>
+              <em>{item.count}</em>
+            </button>
+          ))}
+        </div>
+      </section>
+
       <div className="ear-grid ear-grid--sidebar">
         <aside className="ear-filter">
           <h3>필터</h3>
