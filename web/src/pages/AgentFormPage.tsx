@@ -11,7 +11,7 @@ const AgentFormPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user, handleLogin, handleLogout, isLoggedIn } = useAuth();
-  const { getAgent, createAgent, updateAgent } = useAgentManagementApi();
+  const { getAgent, createAgent, updateAgent, createJob } = useAgentManagementApi();
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -24,6 +24,14 @@ const AgentFormPage: React.FC = () => {
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [taskForm, setTaskForm] = useState({
+    payload: '{"type":"manual"}',
+    priority: '3',
+    scheduledAt: ''
+  });
+  const [taskSaving, setTaskSaving] = useState(false);
 
   useEffect(() => {
     const loadAgent = async () => {
@@ -106,6 +114,38 @@ const AgentFormPage: React.FC = () => {
     }
   };
 
+  const handleTaskChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const { name, value } = event.target;
+    setTaskForm((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const handleOptionalTaskSubmit = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+    if (!id) {
+      setError('에이전트를 먼저 저장한 뒤 Task를 등록할 수 있습니다.');
+      return;
+    }
+
+    setTaskSaving(true);
+    try {
+      const parsedPayload = taskForm.payload.trim() ? JSON.parse(taskForm.payload) : {};
+      await createJob({
+        payload: parsedPayload,
+        priority: Number(taskForm.priority || 3),
+        scheduledAt: taskForm.scheduledAt || undefined,
+        assignedAgentId: Number(id)
+      });
+      setTaskForm({ payload: '{"type":"manual"}', priority: '3', scheduledAt: '' });
+      setTaskFormOpen(false);
+    } catch (err: any) {
+      setError(err.message || 'Task 등록 중 오류가 발생했습니다.');
+    } finally {
+      setTaskSaving(false);
+    }
+  };
+
+
   return (
     <div className="agent-page">
       <AppHeader user={user} onLogin={handleLogin} onLogout={handleLogout} isLoggedIn={isLoggedIn} />
@@ -180,6 +220,36 @@ const AgentFormPage: React.FC = () => {
             </button>
           </div>
         </form>
+
+        <section className="agent-panel">
+          <div className="agent-panel__header">
+            <h3>옵션 Task 등록</h3>
+            <button type="button" className="agent-secondary" onClick={() => setTaskFormOpen((prev) => !prev)}>
+              {taskFormOpen ? '접기' : 'Task 등록 열기'}
+            </button>
+          </div>
+          {taskFormOpen && (
+            <form className="agent-form" onSubmit={handleOptionalTaskSubmit}>
+              <label>
+                Payload (JSON)
+                <textarea name="payload" rows={4} value={taskForm.payload} onChange={handleTaskChange} />
+              </label>
+              <label>
+                Priority
+                <input type="number" name="priority" min={1} max={5} value={taskForm.priority} onChange={handleTaskChange} />
+              </label>
+              <label>
+                Scheduled At (선택)
+                <input type="datetime-local" name="scheduledAt" value={taskForm.scheduledAt} onChange={handleTaskChange} />
+              </label>
+              <div className="agent-form__actions">
+                <button type="submit" className="agent-primary" disabled={taskSaving}>
+                  {taskSaving ? 'Task 저장 중...' : 'Task 등록'}
+                </button>
+              </div>
+            </form>
+          )}
+        </section>
       </div>
       <AppBottom />
     </div>
