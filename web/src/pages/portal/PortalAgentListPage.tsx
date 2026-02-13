@@ -19,6 +19,15 @@ interface AgentRecord {
   calls30d: number;
 }
 
+
+interface AgentUsageEvent {
+  id: number;
+  agentId: string;
+  customerId: string;
+  requestedAt: string;
+  requestCount: number;
+}
+
 interface AgentTaskRecord {
   id: number;
   agentId: number;
@@ -704,11 +713,25 @@ const DEFAULT_SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items
     moduleCode: 'SD',
     moduleName: 'SD',
     items: [
-      { processId: 'SD.1.3', title: '신용 승인 근거+리스크 점수', count: 8 },
-      { processId: 'SD.2.3', title: 'ATP 대체안 추천', count: 3 },
-      { processId: 'SD.3.5', title: '클레임 자동분류·서류 안내', count: 10 },
-      { processId: 'SD.4.3', title: '청구 차이 자동설명', count: 3 },
-      { processId: 'SD.5.3', title: '독촉 우선순위+문구 생성', count: 10 }
+      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
+      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
+      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
+      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
+      { processId: 'SD.2.2', title: '판매오더', count: 7 },
+      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
+      { processId: 'SD.3.1', title: '납품생성', count: 6 },
+      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
+      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
+      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
+      { processId: 'SD.4.1', title: '청구문서', count: 7 },
+      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
+      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
+      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
+      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
+      { processId: 'SD.5.1', title: '수금', count: 8 },
+      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
+      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
+      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
     ]
   },
   {
@@ -792,11 +815,25 @@ const SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items: { proc
     moduleCode: 'SD',
     moduleName: 'SD',
     items: [
-      { processId: 'SD.1.3', title: '신용 승인 근거+리스크 점수', count: 8 },
-      { processId: 'SD.2.3', title: 'ATP 대체안 추천', count: 3 },
-      { processId: 'SD.3.5', title: '클레임 자동분류·서류 안내', count: 10 },
-      { processId: 'SD.4.3', title: '청구 차이 자동설명', count: 3 },
-      { processId: 'SD.5.3', title: '독촉 우선순위+문구 생성', count: 10 }
+      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
+      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
+      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
+      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
+      { processId: 'SD.2.2', title: '판매오더', count: 7 },
+      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
+      { processId: 'SD.3.1', title: '납품생성', count: 6 },
+      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
+      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
+      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
+      { processId: 'SD.4.1', title: '청구문서', count: 7 },
+      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
+      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
+      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
+      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
+      { processId: 'SD.5.1', title: '수금', count: 8 },
+      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
+      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
+      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
     ]
   },
   {
@@ -841,6 +878,63 @@ const formatNumber = (value: number) => numberFormatter.format(value);
 const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 
+
+const MAX_CAPABILITY_LENGTH = 200;
+const AGENT_USAGE_WINDOW_DAYS = 30;
+
+const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
+
+const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
+  { id: 1, agentId: '1', customerId: 'CUST-001', requestedAt: '2026-01-20', requestCount: 120 },
+  { id: 2, agentId: '1', customerId: 'CUST-002', requestedAt: '2026-01-18', requestCount: 84 },
+  { id: 3, agentId: '1', customerId: 'CUST-003', requestedAt: '2026-01-15', requestCount: 92 },
+  { id: 4, agentId: '2', customerId: 'CUST-001', requestedAt: '2026-01-19', requestCount: 310 },
+  { id: 5, agentId: '2', customerId: 'CUST-010', requestedAt: '2026-01-16', requestCount: 287 },
+  { id: 6, agentId: '3', customerId: 'CUST-011', requestedAt: '2026-01-20', requestCount: 201 }
+];
+
+const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) => {
+  const runtimeLabel =
+    agent.runtimeState === 'RUNNING' ? '실시간 운영' : agent.runtimeState === 'DEGRADED' ? '성능 저하 대응' : agent.runtimeState === 'ERROR' ? '장애 복구' : '대기';
+  const summary = `${agent.name}는 ${processLabel} 업무에서 ${agent.owner} 요청을 자동 분류·처리하고 ${runtimeLabel} 상태 모니터링으로 예외 전파를 줄입니다.`;
+  return summary.length > MAX_CAPABILITY_LENGTH ? `${summary.slice(0, MAX_CAPABILITY_LENGTH - 1)}…` : summary;
+};
+
+// 사용고객 집계 추천 흐름
+// 1) 30일 사용 이벤트(고객ID 단위)에서 우선 집계
+// 2) 이벤트가 없으면 Agent Metric의 totalUsers/requestsProcessed를 대체 소스로 사용
+// 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
+const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - AGENT_USAGE_WINDOW_DAYS);
+  const windowStartDate = toShortDate(windowStart);
+
+  const recentEvents = AGENT_USAGE_EVENTS.filter(
+    (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
+  );
+
+  if (recentEvents.length > 0) {
+    return {
+      customerCount: new Set(recentEvents.map((event) => event.customerId)).size,
+      calls30d: recentEvents.reduce((sum, event) => sum + event.requestCount, 0)
+    };
+  }
+
+  if (detail && detail.metrics.length > 0) {
+    const latestMetric = detail.metrics[detail.metrics.length - 1];
+    return {
+      customerCount: latestMetric.totalUsers || latestMetric.activeUsers || agent.customerCount,
+      calls30d: detail.metrics.reduce((sum, metric) => sum + metric.requestsProcessed, 0) || agent.calls30d
+    };
+  }
+
+  return {
+    customerCount: agent.customerCount,
+    calls30d: agent.calls30d
+  };
+};
+
+
 const LEVEL1_E2E_LABELS: Record<string, string> = {
   MM: 'Procure to Pay',
   PP: 'Plan to Produce',
@@ -850,6 +944,15 @@ const LEVEL1_E2E_LABELS: Record<string, string> = {
   CO: 'Plan to Perform',
   BC: 'Basis to Operate'
 };
+
+const PROCESS_LEVEL1_LABELS: Record<string, string> = {
+  'SD.1': '고객/가격 마스터',
+  'SD.2': '견적/주문 관리',
+  'SD.3': '납품/출고/물류(TD/LE 모듈)',
+  'SD.4': '청구/정산',
+  'SD.5': '수금/채권/신용'
+};
+
 
 const statusToneMap: Record<AgentRecord['status'], 'success' | 'warning' | 'neutral'> = {
   운영: 'success',
@@ -937,13 +1040,18 @@ const PortalAgentListPage: React.FC = () => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
     const selectedLevel1 = selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
+    const knownProcessCodes = new Set(
+      processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
+    );
+    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
 
     return agents.filter((agent) => {
       const matchesSearch = agent.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === '전체' || agent.status === statusFilter;
       const matchesRisk = riskFilter === '전체' || agent.risk === riskFilter;
       const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
-      const matchesLevel1 = level2Codes.size === 0 || level2Codes.has(agent.processId);
+      const isUnclassified = !knownProcessCodes.has(agent.processId);
+      const matchesLevel1 = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
       const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
       return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesLevel1 && matchesLevel2;
     });
@@ -1014,19 +1122,27 @@ const PortalAgentListPage: React.FC = () => {
 
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
-    return agents.filter((agent) => level2Codes.has(agent.processId)).length;
-  }, [selectedLevel1, agents]);
+    const knownProcessCodes = new Set(
+      processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
+    );
+    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
+
+    return agents.filter((agent) => {
+      const isUnclassified = !knownProcessCodes.has(agent.processId);
+      return level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
+    }).length;
+  }, [selectedLevel1, agents, processDomains]);
 
 
-
-  const selectedModuleCards = useMemo(() => {
-    return SAP_PROCESS_CARDS.find((module) => module.moduleCode === selectedModuleCode) ?? SAP_PROCESS_CARDS[0];
-  }, [selectedModuleCode]);
-
-  const selectedModuleAgentCount = useMemo(() => {
-    return selectedModuleCards.items.reduce((sum, item) => sum + item.count, 0);
-  }, [selectedModuleCards]);
-
+  const processNameById = useMemo(() => {
+    return new Map(
+      processDomains.flatMap((domain) =>
+        domain.level1.flatMap((level1) =>
+          level1.level2.map((level2) => [level2.code, `${level1.code} ${level1.name} > ${level2.code} ${level2.name}`])
+        )
+      )
+    );
+  }, [processDomains]);
 
   const handleFormChange = (field: string, value: string) => {
     setFormValues((prev) => ({
@@ -1043,8 +1159,10 @@ const PortalAgentListPage: React.FC = () => {
       return;
     }
 
-    const nextAgent: AgentRecord = {
-      id: `PORTAL-${Date.now().toString().slice(-4)}`,
+    const nextAgentId = `PORTAL-${Date.now().toString().slice(-4)}`;
+    const nextProcessId = formValues.processId || selectedProcessId || selectedLevel1?.level2?.[0]?.code || 'CM.1.1';
+    const nextAgentDraft: AgentRecord = {
+      id: nextAgentId,
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
@@ -1053,10 +1171,15 @@ const PortalAgentListPage: React.FC = () => {
       lastUpdated: new Date().toISOString().slice(0, 10),
       runtimeState: 'IDLE',
       runtimeErrors: 0,
-      processId: formValues.processId || selectedProcessId || selectedLevel1?.level2?.[0]?.code || 'CM.1.1',
-      capability: '설명',
+      processId: nextProcessId,
+      capability: '',
       customerCount: 0,
       calls30d: 0
+    };
+
+    const nextAgent: AgentRecord = {
+      ...nextAgentDraft,
+      capability: buildCapabilityDescription(nextAgentDraft, processNameById.get(nextProcessId) || '신규 업무')
     };
 
     persistAgents((prev) => [nextAgent, ...prev]);
@@ -1090,6 +1213,22 @@ const PortalAgentListPage: React.FC = () => {
   const agentDetailById = useMemo(() => {
     return new Map(agentDetails.map((agent) => [String(agent.id), agent]));
   }, [agentDetails]);
+
+
+  const displayAgents = useMemo(() => {
+    return filteredAgents.map((agent) => {
+      const detail = agentDetailById.get(agent.id);
+      const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
+      const usage = aggregateCustomerUsage(agent, detail);
+
+      return {
+        ...agent,
+        capability: buildCapabilityDescription(agent, processLabel),
+        customerCount: usage.customerCount,
+        calls30d: usage.calls30d
+      };
+    });
+  }, [filteredAgents, agentDetailById, processNameById]);
 
   useEffect(() => {
     if (!agentId) {
@@ -1163,7 +1302,7 @@ const PortalAgentListPage: React.FC = () => {
           })}
         </div>
         <div className="ear-process-overview__summary">
-          <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '> Level1 > Level2' : `> ${LEVEL1_E2E_LABELS[selectedLevel1.code] ? `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code]}` : selectedLevel1.name} > Level2`) : '> Level1 > Level2'}</h3>
+          <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
           <strong>Agent Count {selectedModuleAgentCount}</strong>
         </div>
         <div className="ear-process-overview__cards">
@@ -1174,8 +1313,13 @@ const PortalAgentListPage: React.FC = () => {
               className={`ear-process-card ${selectedProcessId === item.code ? 'active' : ''}`}
               onClick={() => setSelectedProcessId((prev) => (prev === item.code ? null : item.code))}
             >
-              <span>{item.code}</span>
-              <strong>{item.name}</strong>
+              <span>{(() => {
+                const segments = item.code.split('.');
+                const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
+                const level1Name = PROCESS_LEVEL1_LABELS[level1Code] || selectedLevel1?.name || '프로세스';
+                return `${level1Code} ${level1Name}`;
+              })()}</span>
+              <strong>{`${item.code} ${item.name}`}</strong>
               <em>{agents.filter((agent) => agent.processId === item.code).length}</em>
             </button>
           ))}
@@ -1297,7 +1441,8 @@ const PortalAgentListPage: React.FC = () => {
             <div className="ear-table-card__header">
               <div>
                 <h3>에이전트 목록</h3>
-              <p>총 {filteredAgents.length}개 에이전트</p>
+              <p>총 {displayAgents.length}개 에이전트</p>
+              <p className="ear-muted">사용고객 집계: 30일 이벤트 기준 → 메트릭 대체 → 저장값 폴백</p>
             </div>
             <div className="ear-table-card__actions">
               <button className="ear-ghost">CSV 내보내기</button>
@@ -1322,7 +1467,7 @@ const PortalAgentListPage: React.FC = () => {
               </tr>
             </thead>
             <tbody>
-              {filteredAgents.map((agent) => {
+              {displayAgents.map((agent) => {
                 const detail = agentDetailById.get(agent.id);
                 const isSelected = agent.id === selectedAgentId;
                 const isDrilldownOpen = drilldownAgentId === agent.id;
