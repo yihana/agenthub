@@ -46,6 +46,8 @@ export const useAgentManagementApi = () => {
     [request]
   );
 
+  const getAgentTaxonomy = useCallback(() => request('/api/agents/taxonomy'), [request]);
+
   const getAgent = useCallback((id: string | number) => request(`/api/agents/${id}`), [request]);
 
   const createAgent = useCallback((payload: AgentPayload) => {
@@ -88,6 +90,7 @@ export const useAgentManagementApi = () => {
   return {
     getSummary,
     listAgents,
+    getAgentTaxonomy,
     getAgent,
     createAgent,
     updateAgent,

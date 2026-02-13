@@ -61,6 +61,7 @@ export async function initializeDatabase() {
 
     // 포털 기준값 샘플 데이터
     await seedPortalBaselines(client);
+    await seedBusinessDomainHierarchy(client);
     
     // 입력보안 설정 초기화
     await initializeInputSecurity(client);
@@ -598,6 +599,47 @@ async function createTables(client: any) {
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
   `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS business_domains (
+      id SERIAL PRIMARY KEY,
+      domain_code VARCHAR(50) NOT NULL UNIQUE,
+      domain_name VARCHAR(200) NOT NULL,
+      description VARCHAR(500),
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS business_level1 (
+      id SERIAL PRIMARY KEY,
+      domain_id INTEGER NOT NULL REFERENCES business_domains(id) ON DELETE CASCADE,
+      level1_code VARCHAR(50) NOT NULL,
+      level1_name VARCHAR(200) NOT NULL,
+      menu_code VARCHAR(100),
+      display_order INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(domain_id, level1_code)
+    );
+  `);
+
+  await client.query(`
+    CREATE TABLE IF NOT EXISTS business_level2 (
+      id SERIAL PRIMARY KEY,
+      level1_id INTEGER NOT NULL REFERENCES business_level1(id) ON DELETE CASCADE,
+      level2_code VARCHAR(50) NOT NULL,
+      level2_name VARCHAR(200) NOT NULL,
+      display_order INTEGER DEFAULT 0,
+      is_active BOOLEAN DEFAULT true,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(level1_id, level2_code)
+    );
+  `);
   
   await client.query(`
     CREATE TABLE IF NOT EXISTS group_menu_mappings (
@@ -742,6 +784,8 @@ async function applyPortalDashboardMigrations(client: any) {
       `ALTER TABLE ${column.table} ADD COLUMN IF NOT EXISTS ${column.name} ${column.type};`
     );
   }
+
+  await client.query('ALTER TABLE agents ADD COLUMN IF NOT EXISTS business_level2_id INTEGER REFERENCES business_level2(id) ON DELETE SET NULL;');
 }
 
 async function seedPortalBaselines(client: any) {
@@ -760,6 +804,84 @@ async function seedPortalBaselines(client: any) {
      ON CONFLICT (metric_key, business_type, agent_type) DO NOTHING;`
   );
 }
+
+async function seedBusinessDomainHierarchy(client: any) {
+  await client.query(
+    `INSERT INTO business_domains (domain_code, domain_name, description)
+     VALUES ('SAP', 'SAP Domain', 'SAP 업무 모듈 체계')
+     ON CONFLICT (domain_code) DO NOTHING;`
+  );
+
+  await client.query(
+    `WITH sap_domain AS (
+      SELECT id FROM business_domains WHERE domain_code = 'SAP'
+    )
+    INSERT INTO business_level1 (domain_id, level1_code, level1_name, menu_code, display_order)
+    SELECT sap_domain.id, level1_code, level1_name, menu_code, display_order
+    FROM sap_domain
+    CROSS JOIN (
+      VALUES
+      ('COMMON', '통합', 'agent-management', 5),
+      ('MM', 'MM', 'agent-management', 10),
+      ('PP', 'PP', 'agent-management', 20),
+      ('HR', 'HR', 'agent-management', 30),
+      ('SD', 'SD', 'agent-management', 40),
+      ('FI', 'FI', 'agent-management', 50),
+      ('CO', 'CO', 'agent-management', 60),
+      ('BC', 'BC', 'agent-management', 70)
+    ) AS modules(level1_code, level1_name, menu_code, display_order)
+    ON CONFLICT (domain_id, level1_code) DO NOTHING;`
+  );
+
+  await client.query(
+    `INSERT INTO business_level2 (level1_id, level2_code, level2_name, display_order)
+     SELECT l1.id, v.level2_code, v.level2_name, v.display_order
+     FROM business_level1 l1
+     JOIN (
+       VALUES
+       ('COMMON', 'CM.1.1', '공통 운영 모니터링', 10),
+       ('COMMON', 'CM.1.2', '공통 정책/권한 관리', 20),
+       ('MM', 'MM.1.2', 'BP 티켓 자동접수·KYC 체크', 10),
+       ('MM', 'MM.1.3', '구매처 평가 근거 자동첨부', 20),
+       ('MM', 'MM.2.2', '선정 근거 문장 자동작성', 30),
+       ('MM', 'MM.3.4', '계획 변경·승인요청 자동생성', 40),
+       ('MM', 'MM.5.3', '3-way match 예외 분류·라우팅', 50),
+       ('PP', 'PP.2.1', '수요 이상치 탐지·보정 제안', 10),
+       ('PP', 'PP.3.1', 'MRP 예외 트리아지', 20),
+       ('PP', 'PP.3.2', '오더 사전검증(릴리즈 전)', 30),
+       ('PP', 'PP.4.2', '공정확인 편차 알림', 40),
+       ('PP', 'PP.5.3', '정산 차이 자동분해', 50),
+       ('HR', 'HR.2.2', '지원자 요약·매칭 스코어', 10),
+       ('HR', 'HR.2.4', '온보딩 티켓 자동생성', 20),
+       ('HR', 'HR.3.4', '근태 예외 자동라우팅', 30),
+       ('HR', 'HR.4.1', '급여 데이터 검증', 40),
+       ('HR', 'HR.5.1', '평가 코멘트 초안+편향체크', 50),
+       ('SD', 'SD.1.3', '신용 승인 근거+리스크 점수', 10),
+       ('SD', 'SD.2.3', 'ATP 대체안 추천', 20),
+       ('SD', 'SD.3.5', '클레임 자동분류·서류 안내', 30),
+       ('SD', 'SD.4.3', '청구 차이 자동설명', 40),
+       ('SD', 'SD.5.3', '독촉 우선순위+문구 생성', 50),
+       ('FI', 'FI.2.3', '전표 규칙 위반 탐지', 10),
+       ('FI', 'FI.3.1', '송장 캡처·전표 초안', 20),
+       ('FI', 'FI.3.2', '3-way match 예외 분류', 30),
+       ('FI', 'FI.4.2', '대사 후보 자동매칭', 40),
+       ('FI', 'FI.5.1', '결산 체크리스트 모니터', 50),
+       ('CO', 'CO.2.3', '계획 시나리오 비교', 10),
+       ('CO', 'CO.3.1', '실적전표 오류 탐지', 20),
+       ('CO', 'CO.4.1', '배부 실행 모니터', 30),
+       ('CO', 'CO.4.2', '정산 차이 자동설명', 40),
+       ('CO', 'CO.5.1', '수익성 내러티브 생성', 50),
+       ('BC', 'BC.2.2', '티켓 분류+필수정보 수집', 10),
+       ('BC', 'BC.1.3', 'SoD 리스크 스코어링', 20),
+       ('BC', 'BC.3.3', '로그 원인 후보·가이드', 30),
+       ('BC', 'BC.4.2', '릴리즈 영향도 요약', 40),
+       ('BC', 'BC.5.2', '취약점 조치안 플래닝', 50)
+     ) AS v(level1_code, level2_code, level2_name, display_order)
+       ON v.level1_code = l1.level1_code
+     ON CONFLICT (level1_id, level2_code) DO NOTHING;`
+  );
+}
+
 
 // 인덱스 생성
 async function createIndexes(client: any) {
