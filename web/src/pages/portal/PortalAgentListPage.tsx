@@ -128,7 +128,7 @@ interface ProcessRow {
 
 interface DynamicFilterRule {
   id: string;
-  field: 'name' | 'owner' | 'category' | 'status' | 'risk' | 'runtimeState' | 'processId';
+  field: string;
   value: string;
 }
 
@@ -1046,7 +1046,27 @@ const PortalAgentListPage: React.FC = () => {
   const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const [extraColumns, setExtraColumns] = useState<string[]>([]);
+  const tableColumnOptions = [
+    { key: 'processId', label: 'process ID', defaultVisible: true },
+    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+    { key: 'module', label: '모듈', defaultVisible: false },
+    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+    { key: 'agentId', label: 'agent ID', defaultVisible: true },
+    { key: 'name', label: '이름', defaultVisible: true },
+    { key: 'owner', label: '소유 조직', defaultVisible: true },
+    { key: 'status', label: '상태', defaultVisible: true },
+    { key: 'capability', label: '수행기능', defaultVisible: true },
+    { key: 'customerCount', label: '사용고객', defaultVisible: true },
+    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+    { key: 'risk', label: '리스크', defaultVisible: true },
+    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+  ] as const;
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
@@ -1087,13 +1107,9 @@ const PortalAgentListPage: React.FC = () => {
       const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
       const matchesProcessLevel1 = !selectedProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
       const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
-      const matchesDynamic = dynamicFilters.every((rule) => {
-        const target = String(agent[rule.field] ?? '').toLowerCase();
-        return !rule.value.trim() || target.includes(rule.value.toLowerCase());
-      });
-      return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2 && matchesDynamic;
+      return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
     });
-  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, selectedProcessLevel1Code, dynamicFilters]);
+  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, selectedProcessLevel1Code]);
 
   useEffect(() => {
     const loadProcesses = async () => {
@@ -1268,15 +1284,8 @@ const PortalAgentListPage: React.FC = () => {
     setDynamicFilters((prev) => prev.filter((rule) => rule.id !== id));
   };
 
-  const dynamicColumnOptions = [
-    { key: 'processPath', label: '프로세스 경로' },
-    { key: 'module', label: '모듈' },
-    { key: 'processLevel1', label: 'Level1' },
-    { key: 'processLevel2', label: 'Level2' }
-  ];
-
-  const toggleExtraColumn = (key: string) => {
-    setExtraColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  const toggleColumnVisibility = (key: string) => {
+    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
 
   const handleFormChange = (field: string, value: string) => {
@@ -1371,6 +1380,55 @@ const PortalAgentListPage: React.FC = () => {
       };
     });
   }, [filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
+
+  const getColumnValue = (agent: (typeof displayAgents)[number], field: string) => {
+    switch (field) {
+      case 'processId':
+        return agent.processId;
+      case 'processPath':
+        return agent.processMeta.processPath;
+      case 'module':
+        return agent.processMeta.module;
+      case 'processLevel1':
+        return agent.processMeta.processLevel1;
+      case 'processLevel2':
+        return agent.processMeta.processLevel2;
+      case 'agentId':
+        return agent.id;
+      case 'name':
+        return agent.name;
+      case 'owner':
+        return agent.owner;
+      case 'status':
+        return agent.status;
+      case 'capability':
+        return agent.capability;
+      case 'customerCount':
+        return String(agent.customerCount);
+      case 'calls30d':
+        return String(agent.calls30d);
+      case 'runtimeState':
+        return agent.runtimeState;
+      case 'runtimeErrors':
+        return String(agent.runtimeErrors);
+      case 'risk':
+        return agent.risk;
+      case 'lastUpdated':
+        return agent.lastUpdated;
+      default:
+        return String((agent as Record<string, unknown>)[field] ?? '');
+    }
+  };
+
+  const filteredDisplayAgents = useMemo(() => {
+    return displayAgents.filter((agent) =>
+      dynamicFilters.every((rule) => {
+        if (!rule.value.trim()) return true;
+        const target = getColumnValue(agent, rule.field).toLowerCase();
+        return target.includes(rule.value.toLowerCase());
+      })
+    );
+  }, [displayAgents, dynamicFilters]);
 
   useEffect(() => {
     if (!agentId) {
@@ -1553,13 +1611,9 @@ const PortalAgentListPage: React.FC = () => {
                 value={rule.field}
                 onChange={(event) => updateDynamicFilter(rule.id, { field: event.target.value as DynamicFilterRule['field'] })}
               >
-                <option value="name">이름</option>
-                <option value="owner">소유 조직</option>
-                <option value="category">유형</option>
-                <option value="status">상태</option>
-                <option value="risk">리스크</option>
-                <option value="runtimeState">런타임 상태</option>
-                <option value="processId">Process ID</option>
+                {tableColumnOptions.map((option) => (
+                  <option key={option.key} value={option.key}>{option.label}</option>
+                ))}
               </select>
               <input
                 type="text"
@@ -1578,7 +1632,7 @@ const PortalAgentListPage: React.FC = () => {
             <div className="ear-table-card__header">
               <div>
                 <h3>에이전트 목록</h3>
-              <p>총 {displayAgents.length}개 에이전트</p>
+              <p>총 {filteredDisplayAgents.length}개 에이전트</p>
               <p className="ear-muted">사용고객 집계: 30일 이벤트 기준 → 메트릭 대체 → 저장값 폴백</p>
             </div>
             <div className="ear-table-card__actions">
@@ -1587,12 +1641,12 @@ const PortalAgentListPage: React.FC = () => {
               <details>
                 <summary>열 추가</summary>
                 <div className="ear-column-picker">
-                  {dynamicColumnOptions.map((option) => (
+                  {tableColumnOptions.map((option) => (
                     <label key={option.key}>
                       <input
                         type="checkbox"
-                        checked={extraColumns.includes(option.key)}
-                        onChange={() => toggleExtraColumn(option.key)}
+                        checked={visibleColumns.includes(option.key)}
+                        onChange={() => toggleColumnVisibility(option.key)}
                       />
                       {option.label}
                     </label>
@@ -1673,26 +1727,13 @@ const PortalAgentListPage: React.FC = () => {
           <table className="ear-table">
             <thead>
               <tr>
-                <th>process ID</th>
-                {extraColumns.includes('processPath') && <th>프로세스 경로</th>}
-                {extraColumns.includes('module') && <th>모듈</th>}
-                {extraColumns.includes('processLevel1') && <th>Level1</th>}
-                {extraColumns.includes('processLevel2') && <th>Level2</th>}
-                <th>agent ID</th>
-                <th>이름</th>
-                <th>소유 조직</th>
-                <th>상태</th>
-                <th>수행기능</th>
-                <th>사용고객</th>
-                <th>최근 30일 호출</th>
-                <th>런타임 상태</th>
-                <th>런타임 에러</th>
-                <th>리스크</th>
-                <th>최근 업데이트</th>
+                {tableColumnOptions.filter((option) => visibleColumns.includes(option.key)).map((option) => (
+                  <th key={option.key}>{option.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {displayAgents.map((agent) => {
+              {filteredDisplayAgents.map((agent) => {
                 const detail = agentDetailById.get(agent.id);
                 const isSelected = agent.id === selectedAgentId;
                 const isDrilldownOpen = drilldownAgentId === agent.id;
@@ -1721,35 +1762,26 @@ const PortalAgentListPage: React.FC = () => {
                         }
                       }}
                     >
-                      <td>{agent.processId}</td>
-                      {extraColumns.includes('processPath') && <td>{agent.processMeta.processPath}</td>}
-                      {extraColumns.includes('module') && <td>{agent.processMeta.module}</td>}
-                      {extraColumns.includes('processLevel1') && <td>{agent.processMeta.processLevel1}</td>}
-                      {extraColumns.includes('processLevel2') && <td>{agent.processMeta.processLevel2}</td>}
-                      <td>{agent.id}</td>
-                      <td>
-                        <strong>{agent.name}</strong>
-                        <span className="ear-muted">{agent.category}</span>
-                      </td>
-                      <td>{agent.owner}</td>
-                      <td>
-                        <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
-                      </td>
-                      <td>{truncateText(agent.capability, 30)}</td>
-                      <td>{agent.customerCount}</td>
-                      <td>{agent.calls30d}</td>
-                      <td>
-                        <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
-                      </td>
-                      <td>{agent.runtimeErrors}</td>
-                      <td>
-                        <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
-                      </td>
-                      <td>{agent.lastUpdated}</td>
+                      {visibleColumns.includes('processId') && <td>{agent.processId}</td>}
+                      {visibleColumns.includes('processPath') && <td>{agent.processMeta.processPath}</td>}
+                      {visibleColumns.includes('module') && <td>{agent.processMeta.module}</td>}
+                      {visibleColumns.includes('processLevel1') && <td>{agent.processMeta.processLevel1}</td>}
+                      {visibleColumns.includes('processLevel2') && <td>{agent.processMeta.processLevel2}</td>}
+                      {visibleColumns.includes('agentId') && <td>{agent.id}</td>}
+                      {visibleColumns.includes('name') && <td><strong>{agent.name}</strong><span className="ear-muted">{agent.category}</span></td>}
+                      {visibleColumns.includes('owner') && <td>{agent.owner}</td>}
+                      {visibleColumns.includes('status') && <td><TagPill label={agent.status} tone={statusToneMap[agent.status]} /></td>}
+                      {visibleColumns.includes('capability') && <td>{truncateText(agent.capability, 30)}</td>}
+                      {visibleColumns.includes('customerCount') && <td>{agent.customerCount}</td>}
+                      {visibleColumns.includes('calls30d') && <td>{agent.calls30d}</td>}
+                      {visibleColumns.includes('runtimeState') && <td><TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} /></td>}
+                      {visibleColumns.includes('runtimeErrors') && <td>{agent.runtimeErrors}</td>}
+                      {visibleColumns.includes('risk') && <td><TagPill label={agent.risk} tone={riskToneMap[agent.risk]} /></td>}
+                      {visibleColumns.includes('lastUpdated') && <td>{agent.lastUpdated}</td>}
                     </tr>
                     {isDrilldownOpen && (
                       <tr className="ear-table__row ear-table__row--drilldown">
-                        <td colSpan={12 + extraColumns.length}>
+                        <td colSpan={Math.max(visibleColumns.length, 1)}>
                           <div className="ear-drilldown">
                             <div>
                               <strong>Task 드릴다운</strong>
