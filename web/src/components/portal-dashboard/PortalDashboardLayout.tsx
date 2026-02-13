@@ -53,7 +53,7 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
           className="ear-sidebar__toggle"
           onClick={() => setIsSidebarCollapsed((prev) => !prev)}
         >
-          {isSidebarCollapsed ? '▶' : '◀'} {isSidebarCollapsed ? '열기' : '접기'}
+          {isSidebarCollapsed ? '▶' : '◀ 접기'}
         </button>
         <nav className="ear-nav">
           {filteredNavItems.map((item) => {
