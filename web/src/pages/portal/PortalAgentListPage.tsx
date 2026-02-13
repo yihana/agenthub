@@ -893,7 +893,6 @@ const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
 
-
 const CAPABILITY_MAX_LENGTH = 200;
 const USAGE_WINDOW_DAYS = 30;
 
@@ -923,7 +922,6 @@ const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) 
   const windowStart = new Date();
   windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
   const windowStartDate = toShortDate(windowStart);
-
   const recentEvents = AGENT_USAGE_EVENTS.filter(
     (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
   );
@@ -1057,8 +1055,8 @@ const PortalAgentListPage: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
     tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
   );
-  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
 
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
       const nextAgents = updater(prev);
@@ -1314,7 +1312,6 @@ const PortalAgentListPage: React.FC = () => {
       const detail = agentDetailById.get(agent.id);
       const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
       const usage = aggregateCustomerUsage(agent, detail);
-
       const processMeta = processMetaByIdMap.get(agent.processId) || {
         module: selectedLevel1?.code || '-',
         processLevel1: '-',
@@ -1331,7 +1328,6 @@ const PortalAgentListPage: React.FC = () => {
       };
     });
   }, [filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
-
 
   const getColumnValue = (agent: (typeof displayAgents)[number], field: string) => {
     switch (field) {
@@ -1604,6 +1600,75 @@ const PortalAgentListPage: React.FC = () => {
               )}
             </div>
           </div>
+          {showAddAgentForm && (
+            <form className="ear-form" onSubmit={handleAddAgent}>
+              <h3>에이전트 등록</h3>
+              <label>
+                에이전트 이름
+                <input
+                  type="text"
+                  placeholder="예: Finance Insight"
+                  value={formValues.name}
+                  onChange={(event) => handleFormChange('name', event.target.value)}
+                />
+              </label>
+              <label>
+                담당 조직
+                <input
+                  type="text"
+                  placeholder="예: 재무팀"
+                  value={formValues.owner}
+                  onChange={(event) => handleFormChange('owner', event.target.value)}
+                />
+              </label>
+              <label>
+                상태
+                <select
+                  value={formValues.status}
+                  onChange={(event) => handleFormChange('status', event.target.value)}
+                >
+                  <option value="운영">운영</option>
+                  <option value="점검">점검</option>
+                  <option value="보류">보류</option>
+                </select>
+              </label>
+              <label>
+                리스크
+                <select
+                  value={formValues.risk}
+                  onChange={(event) => handleFormChange('risk', event.target.value)}
+                >
+                  <option value="낮음">낮음</option>
+                  <option value="중간">중간</option>
+                  <option value="높음">높음</option>
+                </select>
+              </label>
+              <label>
+                유형
+                <select
+                  value={formValues.category}
+                  onChange={(event) => handleFormChange('category', event.target.value)}
+                >
+                  <option value="COMMON">통합</option>
+                  <option value="SD">SD</option>
+                  <option value="BC">BC</option>
+                  <option value="MM">MM</option>
+                </select>
+              </label>
+              <label>
+                Process ID
+                <select
+                  value={formValues.processId}
+                  onChange={(event) => handleFormChange('processId', event.target.value)}
+                >
+                  {visibleLevel2Items.map((item) => (
+                    <option key={item.id} value={item.code}>{item.code}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className="ear-primary">등록 저장</button>
+            </form>
+          )}
           <table className="ear-table">
             <thead>
               <tr>
