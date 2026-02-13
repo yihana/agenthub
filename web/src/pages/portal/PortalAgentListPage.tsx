@@ -920,11 +920,8 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
 // 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
   const windowStart = new Date();
-
   windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
-
   const windowStartDate = toShortDate(windowStart);
-
   const recentEvents = AGENT_USAGE_EVENTS.filter(
     (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
   );
@@ -1059,32 +1056,7 @@ const PortalAgentListPage: React.FC = () => {
     tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
   );
 
-  const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
-  const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
-  const [showAddAgentForm, setShowAddAgentForm] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const tableColumnOptions = [
-    { key: 'processId', label: 'process ID', defaultVisible: true },
-    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
-    { key: 'module', label: '모듈', defaultVisible: false },
-    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
-    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
-    { key: 'agentId', label: 'agent ID', defaultVisible: true },
-    { key: 'name', label: '이름', defaultVisible: true },
-    { key: 'owner', label: '소유 조직', defaultVisible: true },
-    { key: 'status', label: '상태', defaultVisible: true },
-    { key: 'capability', label: '수행기능', defaultVisible: true },
-    { key: 'customerCount', label: '사용고객', defaultVisible: true },
-    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
-    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
-    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
-    { key: 'risk', label: '리스크', defaultVisible: true },
-    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
-  ] as const;
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
-    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
-  );
-
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
       const nextAgents = updater(prev);
@@ -1098,7 +1070,7 @@ const PortalAgentListPage: React.FC = () => {
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
     const selectedLevel1 = selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
-    const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
+    const level2Codes = new Set(visibleLevel2Items.map((item) => item.code));
     const level2CodesInSelectedProcessLevel1 = new Set(
       (selectedLevel1?.level2 || [])
         .filter((item) => {
@@ -1109,7 +1081,6 @@ const PortalAgentListPage: React.FC = () => {
         })
         .map((item) => item.code)
     );
-
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
@@ -1192,9 +1163,16 @@ const PortalAgentListPage: React.FC = () => {
     return selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
   }, [selectedDomain, selectedLevel1Code]);
 
+  const level2Source = useMemo(() => {
+    if (selectedLevel1?.code === 'COMMON') {
+      return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
+    }
+    return selectedLevel1?.level2 || [];
+  }, [selectedDomain, selectedLevel1]);
+
   const processLevel1Groups = useMemo<ProcessLevel1Group[]>(() => {
     const map = new Map<string, ProcessLevel1Group>();
-    (selectedLevel1?.level2 || []).forEach((item) => {
+    level2Source.forEach((item) => {
       const segments = item.code.split('.');
       const groupCode = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
       const groupName = PROCESS_LEVEL1_LABELS[groupCode] || groupCode;
@@ -1204,14 +1182,14 @@ const PortalAgentListPage: React.FC = () => {
       map.get(groupCode)!.items.push(item);
     });
     return Array.from(map.values());
-  }, [selectedLevel1]);
+  }, [level2Source]);
 
   const selectedProcessLevel1Group = useMemo(() => {
     if (!processLevel1Groups.length) return undefined;
     return processLevel1Groups.find((group) => group.code === selectedProcessLevel1Code) || processLevel1Groups[0];
   }, [processLevel1Groups, selectedProcessLevel1Code]);
 
-  const visibleLevel2Items = selectedProcessLevel1Group?.items || selectedLevel1?.level2 || [];
+  const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
 
   useEffect(() => {
     if (!processLevel1Groups.length) {
@@ -1244,7 +1222,7 @@ const PortalAgentListPage: React.FC = () => {
     }
 
     return count;
-  }, [selectedLevel1, agents, processDomains]);
+  }, [visibleLevel2Items, selectedLevel1, agents, processDomains]);
 
   const processNameById = useMemo(() => {
     const entries: Array<[string, string]> = [];
@@ -1571,7 +1549,7 @@ const PortalAgentListPage: React.FC = () => {
               <option value="MM">MM</option>
             </select>
           </label>
-          <button type="button" className="ear-secondary" onClick={addDynamicFilter}>동적 필터 추가</button>
+          <button type="button" className="ear-secondary" onClick={addDynamicFilter}>편집</button>
           {dynamicFilters.map((rule) => (
             <div key={rule.id} className="ear-filter__dynamic-row">
               <select
@@ -1605,8 +1583,8 @@ const PortalAgentListPage: React.FC = () => {
             <div className="ear-table-card__actions">
               <button className="ear-ghost">CSV 내보내기</button>
               <button className="ear-secondary">정렬</button>
-              <details>
-                <summary>열 추가</summary>
+              <button type="button" className="ear-secondary" onClick={() => setIsColumnEditorOpen((prev) => !prev)}>편집</button>
+              {isColumnEditorOpen && (
                 <div className="ear-column-picker">
                   {tableColumnOptions.map((option) => (
                     <label key={option.key}>
@@ -1619,7 +1597,7 @@ const PortalAgentListPage: React.FC = () => {
                     </label>
                   ))}
                 </div>
-              </details>
+              )}
             </div>
           </div>
           {showAddAgentForm && (

@@ -826,6 +826,14 @@
   color: var(--ear-muted);
 }
 
+.ear-table-card__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  position: relative;
+  flex-wrap: nowrap;
+}
+
 .ear-table {
   width: 100%;
   border-collapse: collapse;
@@ -1323,5 +1331,7 @@
   border-radius: 8px;
   background: #fff;
   position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
   z-index: 2;
 }
