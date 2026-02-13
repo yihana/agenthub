@@ -892,11 +892,8 @@ const formatNumber = (value: number) => numberFormatter.format(value);
 const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
-
-
-const MAX_CAPABILITY_LENGTH = 200;
-const AGENT_USAGE_WINDOW_DAYS = 30;
-
+const CAPABILITY_MAX_LENGTH = 200;
+const USAGE_WINDOW_DAYS = 30;
 const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
 
 const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
@@ -912,7 +909,7 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
   const runtimeLabel =
     agent.runtimeState === 'RUNNING' ? '실시간 운영' : agent.runtimeState === 'DEGRADED' ? '성능 저하 대응' : agent.runtimeState === 'ERROR' ? '장애 복구' : '대기';
   const summary = `${agent.name}는 ${processLabel} 업무에서 ${agent.owner} 요청을 자동 분류·처리하고 ${runtimeLabel} 상태 모니터링으로 예외 전파를 줄입니다.`;
-  return summary.length > MAX_CAPABILITY_LENGTH ? `${summary.slice(0, MAX_CAPABILITY_LENGTH - 1)}…` : summary;
+  return summary.length > CAPABILITY_MAX_LENGTH ? `${summary.slice(0, CAPABILITY_MAX_LENGTH - 1)}…` : summary;
 };
 
 // 사용고객 집계 추천 흐름
@@ -921,64 +918,9 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
 // 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
   const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - AGENT_USAGE_WINDOW_DAYS);
-  const windowStartDate = toShortDate(windowStart);
 
-  const recentEvents = AGENT_USAGE_EVENTS.filter(
-    (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
-  );
+  windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
 
-  if (recentEvents.length > 0) {
-    return {
-      customerCount: new Set(recentEvents.map((event) => event.customerId)).size,
-      calls30d: recentEvents.reduce((sum, event) => sum + event.requestCount, 0)
-    };
-  }
-
-  if (detail && detail.metrics.length > 0) {
-    const latestMetric = detail.metrics[detail.metrics.length - 1];
-    return {
-      customerCount: latestMetric.totalUsers || latestMetric.activeUsers || agent.customerCount,
-      calls30d: detail.metrics.reduce((sum, metric) => sum + metric.requestsProcessed, 0) || agent.calls30d
-    };
-  }
-
-  return {
-    customerCount: agent.customerCount,
-    calls30d: agent.calls30d
-  };
-};
-
-
-
-const MAX_CAPABILITY_LENGTH = 200;
-const AGENT_USAGE_WINDOW_DAYS = 30;
-
-const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
-
-const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
-  { id: 1, agentId: '1', customerId: 'CUST-001', requestedAt: '2026-01-20', requestCount: 120 },
-  { id: 2, agentId: '1', customerId: 'CUST-002', requestedAt: '2026-01-18', requestCount: 84 },
-  { id: 3, agentId: '1', customerId: 'CUST-003', requestedAt: '2026-01-15', requestCount: 92 },
-  { id: 4, agentId: '2', customerId: 'CUST-001', requestedAt: '2026-01-19', requestCount: 310 },
-  { id: 5, agentId: '2', customerId: 'CUST-010', requestedAt: '2026-01-16', requestCount: 287 },
-  { id: 6, agentId: '3', customerId: 'CUST-011', requestedAt: '2026-01-20', requestCount: 201 }
-];
-
-const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) => {
-  const runtimeLabel =
-    agent.runtimeState === 'RUNNING' ? '실시간 운영' : agent.runtimeState === 'DEGRADED' ? '성능 저하 대응' : agent.runtimeState === 'ERROR' ? '장애 복구' : '대기';
-  const summary = `${agent.name}는 ${processLabel} 업무에서 ${agent.owner} 요청을 자동 분류·처리하고 ${runtimeLabel} 상태 모니터링으로 예외 전파를 줄입니다.`;
-  return summary.length > MAX_CAPABILITY_LENGTH ? `${summary.slice(0, MAX_CAPABILITY_LENGTH - 1)}…` : summary;
-};
-
-// 사용고객 집계 추천 흐름
-// 1) 30일 사용 이벤트(고객ID 단위)에서 우선 집계
-// 2) 이벤트가 없으면 Agent Metric의 totalUsers/requestsProcessed를 대체 소스로 사용
-// 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
-const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
-  const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - AGENT_USAGE_WINDOW_DAYS);
   const windowStartDate = toShortDate(windowStart);
 
   const recentEvents = AGENT_USAGE_EVENTS.filter(
@@ -1408,7 +1350,6 @@ const PortalAgentListPage: React.FC = () => {
         processLevel2: `${agent.processId} -`,
         processPath: '-'
       };
-
 
       return {
         ...agent,
