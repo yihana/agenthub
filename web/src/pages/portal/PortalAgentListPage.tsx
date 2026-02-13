@@ -1055,6 +1055,32 @@ const PortalAgentListPage: React.FC = () => {
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
     tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
   );
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+
+  const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
+  const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const tableColumnOptions = [
+    { key: 'processId', label: 'process ID', defaultVisible: true },
+    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+    { key: 'module', label: '모듈', defaultVisible: false },
+    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+    { key: 'agentId', label: 'agent ID', defaultVisible: true },
+    { key: 'name', label: '이름', defaultVisible: true },
+    { key: 'owner', label: '소유 조직', defaultVisible: true },
+    { key: 'status', label: '상태', defaultVisible: true },
+    { key: 'capability', label: '수행기능', defaultVisible: true },
+    { key: 'customerCount', label: '사용고객', defaultVisible: true },
+    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+    { key: 'risk', label: '리스크', defaultVisible: true },
+    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+  ] as const;
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
 
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
@@ -1411,7 +1437,7 @@ const PortalAgentListPage: React.FC = () => {
     <PortalDashboardLayout
       title="에이전트 목록"
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
-      actions={<button className="ear-primary" onClick={() => navigate('/agent-management/new')}>에이전트 등록</button>}
+      actions={<button className="ear-primary" onClick={() => navigate('/portal-agent-management/new')}>에이전트 등록</button>}
     >
       <section className="ear-card ear-card--panel ear-process-overview">
         <div className="ear-process-overview__domains">
