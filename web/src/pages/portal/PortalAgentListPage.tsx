@@ -1033,14 +1033,31 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState({
-    name: '',
-    owner: '',
-    category: 'SD',
-    status: '운영' as AgentRecord['status'],
-    risk: '낮음' as AgentRecord['risk'],
-    processId: 'SD.1.3'
-  });
+
+  const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
+  const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const tableColumnOptions = [
+    { key: 'processId', label: 'process ID', defaultVisible: true },
+    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+    { key: 'module', label: '모듈', defaultVisible: false },
+    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+    { key: 'agentId', label: 'agent ID', defaultVisible: true },
+    { key: 'name', label: '이름', defaultVisible: true },
+    { key: 'owner', label: '소유 조직', defaultVisible: true },
+    { key: 'status', label: '상태', defaultVisible: true },
+    { key: 'capability', label: '수행기능', defaultVisible: true },
+    { key: 'customerCount', label: '사용고객', defaultVisible: true },
+    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+    { key: 'risk', label: '리스크', defaultVisible: true },
+    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+  ] as const;
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
 
   const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
   const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
@@ -1288,53 +1305,6 @@ const PortalAgentListPage: React.FC = () => {
     setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
 
-  const handleFormChange = (field: string, value: string) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleAddAgent = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!formValues.name.trim() || !formValues.owner.trim()) {
-      window.alert('에이전트 이름과 담당 조직을 입력해 주세요.');
-      return;
-    }
-
-    const nextAgentId = `PORTAL-${Date.now().toString().slice(-4)}`;
-    const nextProcessId = formValues.processId || selectedProcessId || visibleLevel2Items[0]?.code || 'CM.1.1';
-    const nextAgentDraft: AgentRecord = {
-      id: nextAgentId,
-      name: formValues.name.trim(),
-      owner: formValues.owner.trim(),
-      status: formValues.status,
-      category: formValues.category,
-      risk: formValues.risk,
-      lastUpdated: new Date().toISOString().slice(0, 10),
-      runtimeState: 'IDLE',
-      runtimeErrors: 0,
-      processId: nextProcessId,
-      capability: '',
-      customerCount: 0,
-      calls30d: 0
-    };
-
-    const nextAgent: AgentRecord = {
-      ...nextAgentDraft,
-      capability: buildCapabilityDescription(nextAgentDraft, processNameById.get(nextProcessId) || '신규 업무')
-    };
-
-    persistAgents((prev) => [nextAgent, ...prev]);
-    setFormValues((prev) => ({
-      ...prev,
-      name: '',
-      owner: '',
-      processId: visibleLevel2Items[0]?.code || 'CM.1.1'
-    }));
-  };
-
   const agentDetails = useMemo(() => {
     return agents.map((agent) => {
       const baseDetail = baseAgentDetailByName.get(agent.name);
@@ -1463,7 +1433,7 @@ const PortalAgentListPage: React.FC = () => {
     <PortalDashboardLayout
       title="에이전트 목록"
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
-      actions={<button className="ear-primary" onClick={() => setShowAddAgentForm((prev) => !prev)}>에이전트 등록</button>}
+      actions={<button className="ear-primary" onClick={() => navigate('/agent-management/new')}>에이전트 등록</button>}
     >
       <section className="ear-card ear-card--panel ear-process-overview">
         <div className="ear-process-overview__domains">
@@ -1493,7 +1463,6 @@ const PortalAgentListPage: React.FC = () => {
         {!isProcessCollapsed && (
           <>
             <div className="ear-process-overview__section">
-              <h4>모듈</h4>
               <div className="ear-process-overview__tabs">
                 {(selectedDomain?.level1 || []).map((module) => {
                   const moduleCount = module.level2.length;
@@ -1516,7 +1485,6 @@ const PortalAgentListPage: React.FC = () => {
               </div>
             </div>
             <div className="ear-process-overview__section">
-              <h4>Level1</h4>
               <div className="ear-process-overview__tabs">
                 {processLevel1Groups.map((group) => (
                   <button
@@ -1536,7 +1504,6 @@ const PortalAgentListPage: React.FC = () => {
             </div>
             <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
-                <h4>Level2</h4>
                 <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
