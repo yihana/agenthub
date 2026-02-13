@@ -893,7 +893,6 @@ const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
 
-
 const CAPABILITY_MAX_LENGTH = 200;
 const USAGE_WINDOW_DAYS = 30;
 
@@ -921,7 +920,9 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
 // 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
   const windowStart = new Date();
+
   windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
+
   const windowStartDate = toShortDate(windowStart);
 
   const recentEvents = AGENT_USAGE_EVENTS.filter(
@@ -1071,6 +1072,7 @@ const PortalAgentListPage: React.FC = () => {
         })
         .map((item) => item.code)
     );
+
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
@@ -1206,6 +1208,29 @@ const PortalAgentListPage: React.FC = () => {
     return count;
   }, [selectedLevel1, agents, processDomains]);
 
+  const processMetaById = useMemo(() => {
+    return new Map(
+      processDomains.flatMap((domain) =>
+        domain.level1.flatMap((module) =>
+          module.level2.map((level2) => {
+            const segments = level2.code.split('.');
+            const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
+            const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
+            return [
+              level2.code,
+              {
+                module: module.code,
+                processLevel1: `${processLevel1Code} ${processLevel1Name}`,
+                processLevel2: `${level2.code} ${level2.name}`,
+                processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
+              }
+            ];
+          })
+        )
+      )
+    );
+  }, [processDomains]);
+
 
   const processNameById = useMemo(() => {
     return new Map(
@@ -1239,7 +1264,6 @@ const PortalAgentListPage: React.FC = () => {
       )
     );
   }, [processDomains]);
-
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
@@ -1421,6 +1445,7 @@ const PortalAgentListPage: React.FC = () => {
             {isProcessCollapsed ? '펼치기' : '접기'}
           </button>
         </div>
+
         {!isProcessCollapsed && (
           <>
             <div className="ear-process-overview__section">
