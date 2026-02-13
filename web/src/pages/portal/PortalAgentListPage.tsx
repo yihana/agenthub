@@ -1031,6 +1031,32 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
 
+  const [activeProcessLevel1Code, setActiveProcessLevel1Code] = useState<string | null>(null);
+  const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const tableColumnOptions = [
+    { key: 'processId', label: 'process ID', defaultVisible: true },
+    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+    { key: 'module', label: '모듈', defaultVisible: false },
+    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+    { key: 'agentId', label: 'agent ID', defaultVisible: true },
+    { key: 'name', label: '이름', defaultVisible: true },
+    { key: 'owner', label: '소유 조직', defaultVisible: true },
+    { key: 'status', label: '상태', defaultVisible: true },
+    { key: 'capability', label: '수행기능', defaultVisible: true },
+    { key: 'customerCount', label: '사용고객', defaultVisible: true },
+    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+    { key: 'risk', label: '리스크', defaultVisible: true },
+    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+  ] as const;
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+
   const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
   const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
@@ -1100,10 +1126,10 @@ const PortalAgentListPage: React.FC = () => {
     const level2CodesInSelectedProcessLevel1 = new Set(
       (selectedLevel1?.level2 || [])
         .filter((item) => {
-          if (!selectedProcessLevel1Code) return true;
+          if (!activeProcessLevel1Code) return true;
           const segments = item.code.split('.');
           const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-          return processLevel1Code === selectedProcessLevel1Code;
+          return processLevel1Code === activeProcessLevel1Code;
         })
         .map((item) => item.code)
     );
@@ -1119,11 +1145,11 @@ const PortalAgentListPage: React.FC = () => {
       const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
       const isUnclassified = !knownProcessCodes.has(agent.processId);
       const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
-      const matchesProcessLevel1 = !selectedProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
+      const matchesProcessLevel1 = !activeProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
       const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
       return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
     });
-  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, selectedProcessLevel1Code]);
+  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, activeProcessLevel1Code]);
 
   useEffect(() => {
     const loadProcesses = async () => {
@@ -1161,7 +1187,7 @@ const PortalAgentListPage: React.FC = () => {
           setProcessDomains(domains);
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || 'COMMON');
-          setSelectedProcessLevel1Code(null);
+          setActiveProcessLevel1Code(null);
         }
       } catch {
         const fallback: ProcessDomain = {
@@ -1212,20 +1238,20 @@ const PortalAgentListPage: React.FC = () => {
 
   const selectedProcessLevel1Group = useMemo(() => {
     if (!processLevel1Groups.length) return undefined;
-    return processLevel1Groups.find((group) => group.code === selectedProcessLevel1Code) || processLevel1Groups[0];
-  }, [processLevel1Groups, selectedProcessLevel1Code]);
+    return processLevel1Groups.find((group) => group.code === activeProcessLevel1Code) || processLevel1Groups[0];
+  }, [processLevel1Groups, activeProcessLevel1Code]);
 
   const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
 
   useEffect(() => {
     if (!processLevel1Groups.length) {
-      setSelectedProcessLevel1Code(null);
+      setActiveProcessLevel1Code(null);
       return;
     }
-    if (!selectedProcessLevel1Code || !processLevel1Groups.some((group) => group.code === selectedProcessLevel1Code)) {
-      setSelectedProcessLevel1Code(processLevel1Groups[0].code);
+    if (!activeProcessLevel1Code || !processLevel1Groups.some((group) => group.code === activeProcessLevel1Code)) {
+      setActiveProcessLevel1Code(processLevel1Groups[0].code);
     }
-  }, [processLevel1Groups, selectedProcessLevel1Code]);
+  }, [processLevel1Groups, activeProcessLevel1Code]);
 
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
@@ -1449,7 +1475,7 @@ const PortalAgentListPage: React.FC = () => {
               onClick={() => {
                 setSelectedDomainCode(domain.code);
                 setSelectedLevel1Code(domain.level1[0]?.code || 'COMMON');
-                setSelectedProcessLevel1Code(null);
+                setActiveProcessLevel1Code(null);
                 setSelectedProcessId(null);
               }}
             >
@@ -1477,7 +1503,7 @@ const PortalAgentListPage: React.FC = () => {
                       className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
                       onClick={() => {
                         setSelectedLevel1Code(module.code);
-                        setSelectedProcessLevel1Code(null);
+                        setActiveProcessLevel1Code(null);
                         setSelectedProcessId(null);
                       }}
                     >
@@ -1496,7 +1522,7 @@ const PortalAgentListPage: React.FC = () => {
                     type="button"
                     className={`ear-process-tab ${selectedProcessLevel1Group?.code === group.code ? 'active' : ''}`}
                     onClick={() => {
-                      setSelectedProcessLevel1Code(group.code);
+                      setActiveProcessLevel1Code(group.code);
                       setSelectedProcessId(null);
                     }}
                   >
