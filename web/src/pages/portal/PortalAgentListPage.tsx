@@ -892,11 +892,8 @@ const formatNumber = (value: number) => numberFormatter.format(value);
 const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
-
-
 const CAPABILITY_MAX_LENGTH = 200;
 const USAGE_WINDOW_DAYS = 30;
-
 const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
 
 const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
@@ -921,7 +918,9 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
 // 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
   const windowStart = new Date();
+
   windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
+
   const windowStartDate = toShortDate(windowStart);
 
   const recentEvents = AGENT_USAGE_EVENTS.filter(
@@ -1071,6 +1070,7 @@ const PortalAgentListPage: React.FC = () => {
         })
         .map((item) => item.code)
     );
+
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
@@ -1201,6 +1201,11 @@ const PortalAgentListPage: React.FC = () => {
     }).length;
   }, [visibleLevel2Items, selectedLevel1, agents, processDomains]);
 
+    return agents.filter((agent) => {
+      const isUnclassified = !knownProcessCodes.has(agent.processId);
+      return level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
+    }).length;
+  }, [selectedLevel1, agents, processDomains]);
 
   const processNameById = useMemo(() => {
     return new Map(
@@ -1416,6 +1421,7 @@ const PortalAgentListPage: React.FC = () => {
             {isProcessCollapsed ? '펼치기' : '접기'}
           </button>
         </div>
+
         {!isProcessCollapsed && (
           <>
             <div className="ear-process-overview__section">
