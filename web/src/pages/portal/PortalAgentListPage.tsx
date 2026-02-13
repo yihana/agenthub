@@ -1282,30 +1282,35 @@ const PortalAgentListPage: React.FC = () => {
             </button>
           ))}
         </div>
-        <div className="ear-process-overview__tabs">
-          {(selectedDomain?.level1 || []).map((module) => {
-            const moduleCount = module.level2.length;
-            return (
-              <button
-                key={module.code}
-                type="button"
-                className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedLevel1Code(module.code);
-                  setSelectedProcessId(null);
-                }}
-              >
-                <span>{LEVEL1_E2E_LABELS[module.code] ? `${module.name} · ${LEVEL1_E2E_LABELS[module.code]}` : module.name}</span>
-                <em>{moduleCount}</em>
-              </button>
-            );
-          })}
+        <div className="ear-process-overview__section">
+          <h4>Level1</h4>
+          <div className="ear-process-overview__tabs">
+            {(selectedDomain?.level1 || []).map((module) => {
+              const moduleCount = module.level2.length;
+              return (
+                <button
+                  key={module.code}
+                  type="button"
+                  className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
+                  onClick={() => {
+                    setSelectedLevel1Code(module.code);
+                    setSelectedProcessId(null);
+                  }}
+                >
+                  <span>{LEVEL1_E2E_LABELS[module.code] ? `${module.name} · ${LEVEL1_E2E_LABELS[module.code]}` : module.name}</span>
+                  <em>{moduleCount}</em>
+                </button>
+              );
+            })}
+          </div>
         </div>
-        <div className="ear-process-overview__summary">
-          <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
-          <strong>Agent Count {selectedModuleAgentCount}</strong>
-        </div>
-        <div className="ear-process-overview__cards">
+        <div className="ear-process-overview__section">
+          <div className="ear-process-overview__summary">
+            <h4>Level2</h4>
+            <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
+            <strong>Agent Count {selectedModuleAgentCount}</strong>
+          </div>
+          <div className="ear-process-overview__cards">
           {(selectedLevel1?.level2 || []).map((item) => (
             <button
               key={item.id}
@@ -1323,6 +1328,7 @@ const PortalAgentListPage: React.FC = () => {
               <em>{agents.filter((agent) => agent.processId === item.code).length}</em>
             </button>
           ))}
+          </div>
         </div>
       </section>
 
