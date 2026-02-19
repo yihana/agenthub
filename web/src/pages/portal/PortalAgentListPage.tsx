@@ -1030,34 +1030,10 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
+
+  // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
   const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
   const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const tableColumnOptions = [
-    { key: 'processId', label: 'process ID', defaultVisible: true },
-    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
-    { key: 'module', label: '모듈', defaultVisible: false },
-    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
-    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
-    { key: 'agentId', label: 'agent ID', defaultVisible: true },
-    { key: 'name', label: '이름', defaultVisible: true },
-    { key: 'owner', label: '소유 조직', defaultVisible: true },
-    { key: 'status', label: '상태', defaultVisible: true },
-    { key: 'capability', label: '수행기능', defaultVisible: true },
-    { key: 'customerCount', label: '사용고객', defaultVisible: true },
-    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
-    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
-    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
-    { key: 'risk', label: '리스크', defaultVisible: true },
-    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
-  ] as const;
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
-    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
-  );
-  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
-
-  const [selectedProcessLevel1Code, setSelectedProcessLevel1Code] = useState<string | null>(null);
-  const [isProcessCollapsed, setIsProcessCollapsed] = useState(false);
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const tableColumnOptions = [
     { key: 'processId', label: 'process ID', defaultVisible: true },
@@ -1286,7 +1262,6 @@ const PortalAgentListPage: React.FC = () => {
         }
       }
     }
-
     return new Map(entries);
   }, [processDomains]);
 
