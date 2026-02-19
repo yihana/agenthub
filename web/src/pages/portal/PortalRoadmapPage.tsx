@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import PortalDashboardLayout from '../../components/portal-dashboard/PortalDashboardLayout';
 import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import TagPill from '../../components/portal-dashboard/TagPill';
@@ -85,6 +85,26 @@ const PortalRoadmapPage: React.FC = () => {
   const [domainForm, setDomainForm] = useState({ domain_code: 'SAP', domain_name: 'SAP', description: '' });
   const [level1Form, setLevel1Form] = useState({ domain_code: 'SAP', level1_code: '', level1_name: '', display_order: '10' });
   const [level2Form, setLevel2Form] = useState({ level1_id: '', level2_code: '', level2_name: '', display_order: '10' });
+
+  const level1Options = useMemo(() => {
+    const map = new Map<number, { id: number; code: string; name: string }>();
+    processRows.forEach((row) => {
+      const id = Number(row.level1_id || row.level1Id || 0);
+      if (!id || map.has(id)) return;
+      map.set(id, {
+        id,
+        code: String(row.level1_code || row.level1Code || ''),
+        name: String(row.level1_name || row.level1Name || '')
+      });
+    });
+    return Array.from(map.values()).sort((a, b) => a.id - b.id);
+  }, [processRows]);
+
+  useEffect(() => {
+    if (!level2Form.level1_id && level1Options.length > 0) {
+      setLevel2Form((prev) => ({ ...prev, level1_id: String(level1Options[0].id) }));
+    }
+  }, [level1Options, level2Form.level1_id]);
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {
     setRoadmapStages((prev) =>
       prev.map((stage, stageIndex) => {
@@ -303,8 +323,8 @@ const PortalRoadmapPage: React.FC = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          domain_code: level1Form.domain_code,
-          level1_code: level1Form.level1_code,
+          domain_code: level1Form.domain_code.trim().toUpperCase(),
+          level1_code: level1Form.level1_code.trim().toUpperCase(),
           level1_name: level1Form.level1_name,
           display_order: Number(level1Form.display_order || 0)
         })
@@ -329,7 +349,7 @@ const PortalRoadmapPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           level1_id: Number(level2Form.level1_id),
-          level2_code: level2Form.level2_code,
+          level2_code: level2Form.level2_code.trim().toUpperCase(),
           level2_name: level2Form.level2_name,
           display_order: Number(level2Form.display_order || 0)
         })
@@ -619,7 +639,19 @@ const PortalRoadmapPage: React.FC = () => {
             </WidgetCard>
             <WidgetCard title="Level2 추가/수정" description="프로세스 카드(Level2) 관리">
               <form className="ear-form" onSubmit={handleAddLevel2}>
-                <label>Level1 ID<input className="ear-input" type="number" value={level2Form.level1_id} onChange={(e)=>setLevel2Form((p)=>({...p, level1_id:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>
+                  Level1
+                  <select
+                    className="ear-input"
+                    value={level2Form.level1_id}
+                    onChange={(e)=>setLevel2Form((p)=>({...p, level1_id:e.target.value}))}
+                    disabled={!canEditRoadmap}
+                  >
+                    {level1Options.map((option) => (
+                      <option key={option.id} value={option.id}>{option.code} · {option.name} (ID:{option.id})</option>
+                    ))}
+                  </select>
+                </label>
                 <label>Level2 Code<input className="ear-input" value={level2Form.level2_code} onChange={(e)=>setLevel2Form((p)=>({...p, level2_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
                 <label>Level2 Name<input className="ear-input" value={level2Form.level2_name} onChange={(e)=>setLevel2Form((p)=>({...p, level2_name:e.target.value}))} disabled={!canEditRoadmap} /></label>
                 <label>정렬순서<input className="ear-input" type="number" value={level2Form.display_order} onChange={(e)=>setLevel2Form((p)=>({...p, display_order:e.target.value}))} disabled={!canEditRoadmap} /></label>
