@@ -141,6 +141,17 @@ interface AgentFormValues {
   processId: string;
 }
 
+
+const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
+  name: '',
+  owner: '',
+  status: '운영',
+  risk: '낮음',
+  category: 'COMMON',
+  processId: ''
+};
+
+
 interface ProcessLevel1Group {
   code: string;
   name: string;
@@ -1085,15 +1096,10 @@ const PortalAgentListPage: React.FC = () => {
     TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
   );
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+
+  // NOTE: 아래 3개 식별자는 JSX 등록 폼에서 직접 참조됨(삭제 시 Cannot find name 발생)
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
-  const [formValues, setFormValues] = useState<AgentFormValues>({
-    name: '',
-    owner: '',
-    status: '운영',
-    risk: '낮음',
-    category: 'COMMON',
-    processId: ''
-  });
+  const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
@@ -1357,11 +1363,7 @@ const PortalAgentListPage: React.FC = () => {
 
     persistAgents((prev) => [nextAgent, ...prev]);
     setFormValues({
-      name: '',
-      owner: '',
-      status: '운영',
-      risk: '낮음',
-      category: 'COMMON',
+      ...INITIAL_AGENT_FORM_VALUES,
       processId: visibleLevel2Items[0]?.code || ''
     });
     setShowAddAgentForm(false);
