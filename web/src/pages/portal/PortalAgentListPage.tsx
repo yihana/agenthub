@@ -132,6 +132,24 @@ interface DynamicFilterRule {
   value: string;
 }
 
+interface AgentFormValues {
+  name: string;
+  owner: string;
+  status: AgentRecord['status'];
+  risk: AgentRecord['risk'];
+  category: string;
+  processId: string;
+}
+
+const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
+  name: '',
+  owner: '',
+  status: '운영',
+  risk: '낮음',
+  category: 'COMMON',
+  processId: ''
+};
+
 interface ProcessLevel1Group {
   code: string;
   name: string;
@@ -1076,74 +1094,10 @@ const PortalAgentListPage: React.FC = () => {
     TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
   );
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+  // NOTE: 아래 3개 식별자는 JSX 등록 폼에서 직접 참조됨(삭제 시 Cannot find name 발생)
+  const [showAddAgentForm, setShowAddAgentForm] = useState(false);
+  const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
 
-
-  // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
-  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
-    TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
-  );
-  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
-
-
-
-  // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
-  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const tableColumnOptions = [
-    { key: 'processId', label: 'process ID', defaultVisible: true },
-    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
-    { key: 'module', label: '모듈', defaultVisible: false },
-    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
-    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
-    { key: 'agentId', label: 'agent ID', defaultVisible: true },
-    { key: 'name', label: '이름', defaultVisible: true },
-    { key: 'owner', label: '소유 조직', defaultVisible: true },
-    { key: 'status', label: '상태', defaultVisible: true },
-    { key: 'capability', label: '수행기능', defaultVisible: true },
-    { key: 'customerCount', label: '사용고객', defaultVisible: true },
-    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
-    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
-    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
-    { key: 'risk', label: '리스크', defaultVisible: true },
-    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
-  ] as const;
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
-    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
-  );
-  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
-
-
-  // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
-  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
-  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
-  const tableColumnOptions = [
-    { key: 'processId', label: 'process ID', defaultVisible: true },
-    { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
-    { key: 'module', label: '모듈', defaultVisible: false },
-    { key: 'processLevel1', label: 'Level1', defaultVisible: false },
-    { key: 'processLevel2', label: 'Level2', defaultVisible: false },
-    { key: 'agentId', label: 'agent ID', defaultVisible: true },
-    { key: 'name', label: '이름', defaultVisible: true },
-    { key: 'owner', label: '소유 조직', defaultVisible: true },
-    { key: 'status', label: '상태', defaultVisible: true },
-    { key: 'capability', label: '수행기능', defaultVisible: true },
-    { key: 'customerCount', label: '사용고객', defaultVisible: true },
-    { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
-    { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
-    { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
-    { key: 'risk', label: '리스크', defaultVisible: true },
-    { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
-  ] as const;
-  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
-    tableColumnOptions.filter((item) => item.defaultVisible).map((item) => item.key)
-  );
-
-  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
       const nextAgents = updater(prev);
@@ -1249,6 +1203,12 @@ const PortalAgentListPage: React.FC = () => {
   const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
 
   useEffect(() => {
+    if (!formValues.processId && visibleLevel2Items.length > 0) {
+      setFormValues((prev) => ({ ...prev, processId: visibleLevel2Items[0].code }));
+    }
+  }, [formValues.processId, visibleLevel2Items]);
+
+  useEffect(() => {
     if (!processLevel1Groups.length) {
       setPortalActiveProcessLevel1Code(null);
       return;
@@ -1352,16 +1312,6 @@ const PortalAgentListPage: React.FC = () => {
     return new Map(entries);
   }, [processDomains]);
 
-  const processMetaByIdMap = useMemo(() => {
-    const entries: Array<[
-      string,
-      { module: string; processLevel1: string; processLevel2: string; processPath: string }
-    ]> = [];
-
-    return new Map(entries);
-  }, [processDomains]);
-
-
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
       ...prev,
@@ -1379,6 +1329,41 @@ const PortalAgentListPage: React.FC = () => {
 
   const toggleColumnVisibility = (key: string) => {
     setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
+  };
+
+  const handleFormChange = <K extends keyof AgentFormValues>(key: K, value: AgentFormValues[K]) => {
+    setFormValues((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!formValues.name.trim() || !formValues.owner.trim()) {
+      return;
+    }
+
+    const nextId = String(Math.max(0, ...agents.map((agent) => Number(agent.id) || 0)) + 1);
+    const nextAgent: AgentRecord = {
+      id: nextId,
+      name: formValues.name.trim(),
+      owner: formValues.owner.trim(),
+      status: formValues.status,
+      category: formValues.category,
+      risk: formValues.risk,
+      processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
+      lastUpdated: new Date().toISOString().slice(0, 10),
+      runtimeState: 'IDLE',
+      runtimeErrors: 0,
+      capability: '설명',
+      customerCount: 0,
+      calls30d: 0
+    };
+
+    persistAgents((prev) => [nextAgent, ...prev]);
+    setFormValues({
+      ...INITIAL_AGENT_FORM_VALUES,
+      processId: visibleLevel2Items[0]?.code || ''
+    });
+    setShowAddAgentForm(false);
   };
 
   const agentDetails = useMemo(() => {
@@ -1511,7 +1496,7 @@ const PortalAgentListPage: React.FC = () => {
     <PortalDashboardLayout
       title="에이전트 목록"
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
-      actions={<button className="ear-primary" onClick={() => navigate('/portal-agent-management/new')}>에이전트 등록</button>}
+      actions={<button type="button" className="ear-primary" onClick={() => setShowAddAgentForm((prev) => !prev)}>에이전트 등록</button>}
     >
       <section className="ear-card ear-card--panel ear-process-overview">
         <div className="ear-process-overview__domains">
@@ -1725,7 +1710,7 @@ const PortalAgentListPage: React.FC = () => {
                 상태
                 <select
                   value={formValues.status}
-                  onChange={(event) => handleFormChange('status', event.target.value)}
+                  onChange={(event) => handleFormChange('status', event.target.value as AgentRecord['status'])}
                 >
                   <option value="운영">운영</option>
                   <option value="점검">점검</option>
@@ -1736,7 +1721,7 @@ const PortalAgentListPage: React.FC = () => {
                 리스크
                 <select
                   value={formValues.risk}
-                  onChange={(event) => handleFormChange('risk', event.target.value)}
+                  onChange={(event) => handleFormChange('risk', event.target.value as AgentRecord['risk'])}
                 >
                   <option value="낮음">낮음</option>
                   <option value="중간">중간</option>
