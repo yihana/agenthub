@@ -141,6 +141,7 @@ interface AgentFormValues {
   processId: string;
 }
 
+
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
@@ -149,6 +150,7 @@ const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   category: 'COMMON',
   processId: ''
 };
+
 
 interface ProcessLevel1Group {
   code: string;
@@ -1096,6 +1098,7 @@ const PortalAgentListPage: React.FC = () => {
   // NOTE: 아래 3개 식별자는 JSX 등록 폼에서 직접 참조됨(삭제 시 Cannot find name 발생)
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
+
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
