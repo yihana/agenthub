@@ -19,6 +19,15 @@ interface AgentRecord {
   calls30d: number;
 }
 
+
+interface AgentUsageEvent {
+  id: number;
+  agentId: string;
+  customerId: string;
+  requestedAt: string;
+  requestCount: number;
+}
+
 interface AgentTaskRecord {
   id: number;
   agentId: number;
@@ -115,6 +124,20 @@ interface ProcessRow {
   level2Name?: string;
 }
 
+
+
+interface DynamicFilterRule {
+  id: string;
+  field: string;
+  value: string;
+}
+
+interface ProcessLevel1Group {
+  code: string;
+  name: string;
+  items: Array<{ id: number; code: string; name: string }>;
+}
+
 interface ProcessDomain {
   id: number;
   code: string;
@@ -128,6 +151,25 @@ interface ProcessDomain {
 }
 
 const STORAGE_KEY = 'portal-agent-list';
+const TABLE_COLUMN_OPTIONS = [
+  { key: 'processId', label: 'process ID', defaultVisible: true },
+  { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+  { key: 'module', label: '모듈', defaultVisible: false },
+  { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+  { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+  { key: 'agentId', label: 'agent ID', defaultVisible: true },
+  { key: 'name', label: '이름', defaultVisible: true },
+  { key: 'owner', label: '소유 조직', defaultVisible: true },
+  { key: 'status', label: '상태', defaultVisible: true },
+  { key: 'capability', label: '수행기능', defaultVisible: true },
+  { key: 'customerCount', label: '사용고객', defaultVisible: true },
+  { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+  { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+  { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+  { key: 'risk', label: '리스크', defaultVisible: true },
+  { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+] as const;
+
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
   end: '2026-01-21 23:59:59'
@@ -704,11 +746,25 @@ const DEFAULT_SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items
     moduleCode: 'SD',
     moduleName: 'SD',
     items: [
-      { processId: 'SD.1.3', title: '신용 승인 근거+리스크 점수', count: 8 },
-      { processId: 'SD.2.3', title: 'ATP 대체안 추천', count: 3 },
-      { processId: 'SD.3.5', title: '클레임 자동분류·서류 안내', count: 10 },
-      { processId: 'SD.4.3', title: '청구 차이 자동설명', count: 3 },
-      { processId: 'SD.5.3', title: '독촉 우선순위+문구 생성', count: 10 }
+      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
+      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
+      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
+      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
+      { processId: 'SD.2.2', title: '판매오더', count: 7 },
+      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
+      { processId: 'SD.3.1', title: '납품생성', count: 6 },
+      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
+      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
+      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
+      { processId: 'SD.4.1', title: '청구문서', count: 7 },
+      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
+      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
+      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
+      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
+      { processId: 'SD.5.1', title: '수금', count: 8 },
+      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
+      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
+      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
     ]
   },
   {
@@ -792,11 +848,25 @@ const SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items: { proc
     moduleCode: 'SD',
     moduleName: 'SD',
     items: [
-      { processId: 'SD.1.3', title: '신용 승인 근거+리스크 점수', count: 8 },
-      { processId: 'SD.2.3', title: 'ATP 대체안 추천', count: 3 },
-      { processId: 'SD.3.5', title: '클레임 자동분류·서류 안내', count: 10 },
-      { processId: 'SD.4.3', title: '청구 차이 자동설명', count: 3 },
-      { processId: 'SD.5.3', title: '독촉 우선순위+문구 생성', count: 10 }
+      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
+      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
+      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
+      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
+      { processId: 'SD.2.2', title: '판매오더', count: 7 },
+      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
+      { processId: 'SD.3.1', title: '납품생성', count: 6 },
+      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
+      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
+      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
+      { processId: 'SD.4.1', title: '청구문서', count: 7 },
+      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
+      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
+      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
+      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
+      { processId: 'SD.5.1', title: '수금', count: 8 },
+      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
+      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
+      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
     ]
   },
   {
@@ -840,6 +910,64 @@ const formatPercent = (value: number) => `${numberFormatter.format(value)}%`;
 const formatNumber = (value: number) => numberFormatter.format(value);
 const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
+const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
+
+
+const CAPABILITY_MAX_LENGTH = 200;
+const USAGE_WINDOW_DAYS = 30;
+
+const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
+
+const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
+  { id: 1, agentId: '1', customerId: 'CUST-001', requestedAt: '2026-01-20', requestCount: 120 },
+  { id: 2, agentId: '1', customerId: 'CUST-002', requestedAt: '2026-01-18', requestCount: 84 },
+  { id: 3, agentId: '1', customerId: 'CUST-003', requestedAt: '2026-01-15', requestCount: 92 },
+  { id: 4, agentId: '2', customerId: 'CUST-001', requestedAt: '2026-01-19', requestCount: 310 },
+  { id: 5, agentId: '2', customerId: 'CUST-010', requestedAt: '2026-01-16', requestCount: 287 },
+  { id: 6, agentId: '3', customerId: 'CUST-011', requestedAt: '2026-01-20', requestCount: 201 }
+];
+
+const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) => {
+  const runtimeLabel =
+    agent.runtimeState === 'RUNNING' ? '실시간 운영' : agent.runtimeState === 'DEGRADED' ? '성능 저하 대응' : agent.runtimeState === 'ERROR' ? '장애 복구' : '대기';
+  const summary = `${agent.name}는 ${processLabel} 업무에서 ${agent.owner} 요청을 자동 분류·처리하고 ${runtimeLabel} 상태 모니터링으로 예외 전파를 줄입니다.`;
+  return summary.length > CAPABILITY_MAX_LENGTH ? `${summary.slice(0, CAPABILITY_MAX_LENGTH - 1)}…` : summary;
+};
+
+// 사용고객 집계 추천 흐름
+// 1) 30일 사용 이벤트(고객ID 단위)에서 우선 집계
+// 2) 이벤트가 없으면 Agent Metric의 totalUsers/requestsProcessed를 대체 소스로 사용
+// 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
+const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
+  const windowStartDate = toShortDate(windowStart);
+
+  const recentEvents = AGENT_USAGE_EVENTS.filter(
+    (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
+  );
+
+  if (recentEvents.length > 0) {
+    return {
+      customerCount: new Set(recentEvents.map((event) => event.customerId)).size,
+      calls30d: recentEvents.reduce((sum, event) => sum + event.requestCount, 0)
+    };
+  }
+
+  if (detail && detail.metrics.length > 0) {
+    const latestMetric = detail.metrics[detail.metrics.length - 1];
+    return {
+      customerCount: latestMetric.totalUsers || latestMetric.activeUsers || agent.customerCount,
+      calls30d: detail.metrics.reduce((sum, metric) => sum + metric.requestsProcessed, 0) || agent.calls30d
+    };
+  }
+
+  return {
+    customerCount: agent.customerCount,
+    calls30d: agent.calls30d
+  };
+};
+
 
 const LEVEL1_E2E_LABELS: Record<string, string> = {
   MM: 'Procure to Pay',
@@ -850,6 +978,15 @@ const LEVEL1_E2E_LABELS: Record<string, string> = {
   CO: 'Plan to Perform',
   BC: 'Basis to Operate'
 };
+
+const PROCESS_LEVEL1_LABELS: Record<string, string> = {
+  'SD.1': '고객/가격 마스터',
+  'SD.2': '견적/주문 관리',
+  'SD.3': '납품/출고/물류(TD/LE 모듈)',
+  'SD.4': '청구/정산',
+  'SD.5': '수금/채권/신용'
+};
+
 
 const statusToneMap: Record<AgentRecord['status'], 'success' | 'warning' | 'neutral'> = {
   운영: 'success',
@@ -900,6 +1037,18 @@ const loadAgents = () => {
   }
 };
 
+const useProcessPanelState = () => {
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
+
+  return {
+    portalActiveProcessLevel1Code,
+    setPortalActiveProcessLevel1Code,
+    portalProcessPanelCollapsed,
+    setPortalProcessPanelCollapsed
+  };
+};
+
 const PortalAgentListPage: React.FC = () => {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
@@ -914,14 +1063,19 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-  const [formValues, setFormValues] = useState({
-    name: '',
-    owner: '',
-    category: 'SD',
-    status: '운영' as AgentRecord['status'],
-    risk: '낮음' as AgentRecord['risk'],
-    processId: 'SD.1.3'
-  });
+
+  const {
+    portalActiveProcessLevel1Code,
+    setPortalActiveProcessLevel1Code,
+    portalProcessPanelCollapsed,
+    setPortalProcessPanelCollapsed
+  } = useProcessPanelState();
+
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
@@ -932,22 +1086,6 @@ const PortalAgentListPage: React.FC = () => {
       return nextAgents;
     });
   };
-
-  const filteredAgents = useMemo(() => {
-    const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
-    const selectedLevel1 = selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
-    const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
-
-    return agents.filter((agent) => {
-      const matchesSearch = agent.name.toLowerCase().includes(search.toLowerCase());
-      const matchesStatus = statusFilter === '전체' || agent.status === statusFilter;
-      const matchesRisk = riskFilter === '전체' || agent.risk === riskFilter;
-      const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
-      const matchesLevel1 = level2Codes.size === 0 || level2Codes.has(agent.processId);
-      const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
-      return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesLevel1 && matchesLevel2;
-    });
-  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId]);
 
   useEffect(() => {
     const loadProcesses = async () => {
@@ -985,6 +1123,7 @@ const PortalAgentListPage: React.FC = () => {
           setProcessDomains(domains);
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || 'COMMON');
+          setPortalActiveProcessLevel1Code(null);
         }
       } catch {
         const fallback: ProcessDomain = {
@@ -1012,60 +1151,156 @@ const PortalAgentListPage: React.FC = () => {
     return selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
   }, [selectedDomain, selectedLevel1Code]);
 
-  const selectedModuleAgentCount = useMemo(() => {
-    const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
-    return agents.filter((agent) => level2Codes.has(agent.processId)).length;
-  }, [selectedLevel1, agents]);
+  const level2Source = useMemo(() => {
+    if (selectedLevel1?.code === 'COMMON') {
+      return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
+    }
+    return selectedLevel1?.level2 || [];
+  }, [selectedDomain, selectedLevel1]);
 
+  const processLevel1Groups = useMemo<ProcessLevel1Group[]>(() => {
+    const map = new Map<string, ProcessLevel1Group>();
+    level2Source.forEach((item) => {
+      const segments = item.code.split('.');
+      const groupCode = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
+      const groupName = PROCESS_LEVEL1_LABELS[groupCode] || groupCode;
+      if (!map.has(groupCode)) {
+        map.set(groupCode, { code: groupCode, name: groupName, items: [] });
+      }
+      map.get(groupCode)!.items.push(item);
+    });
+    return Array.from(map.values());
+  }, [level2Source]);
 
+  const selectedProcessLevel1Group = useMemo(() => {
+    if (!processLevel1Groups.length) return undefined;
+    return processLevel1Groups.find((group) => group.code === portalActiveProcessLevel1Code) || processLevel1Groups[0];
+  }, [processLevel1Groups, portalActiveProcessLevel1Code]);
 
-  const selectedModuleCards = useMemo(() => {
-    return SAP_PROCESS_CARDS.find((module) => module.moduleCode === selectedModuleCode) ?? SAP_PROCESS_CARDS[0];
-  }, [selectedModuleCode]);
+  const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
 
-  const selectedModuleAgentCount = useMemo(() => {
-    return selectedModuleCards.items.reduce((sum, item) => sum + item.count, 0);
-  }, [selectedModuleCards]);
-
-
-  const handleFormChange = (field: string, value: string) => {
-    setFormValues((prev) => ({
-      ...prev,
-      [field]: value
-    }));
-  };
-
-  const handleAddAgent = (event: React.FormEvent) => {
-    event.preventDefault();
-
-    if (!formValues.name.trim() || !formValues.owner.trim()) {
-      window.alert('에이전트 이름과 담당 조직을 입력해 주세요.');
+  useEffect(() => {
+    if (!processLevel1Groups.length) {
+      setPortalActiveProcessLevel1Code(null);
       return;
     }
+    if (!portalActiveProcessLevel1Code || !processLevel1Groups.some((group) => group.code === portalActiveProcessLevel1Code)) {
+      setPortalActiveProcessLevel1Code(processLevel1Groups[0].code);
+    }
+  }, [processLevel1Groups, portalActiveProcessLevel1Code]);
 
-    const nextAgent: AgentRecord = {
-      id: `PORTAL-${Date.now().toString().slice(-4)}`,
-      name: formValues.name.trim(),
-      owner: formValues.owner.trim(),
-      status: formValues.status,
-      category: formValues.category,
-      risk: formValues.risk,
-      lastUpdated: new Date().toISOString().slice(0, 10),
-      runtimeState: 'IDLE',
-      runtimeErrors: 0,
-      processId: formValues.processId || selectedProcessId || selectedLevel1?.level2?.[0]?.code || 'CM.1.1',
-      capability: '설명',
-      customerCount: 0,
-      calls30d: 0
-    };
+  const filteredAgents = useMemo(() => {
+    const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
+    const selectedLevel1 = selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
+    const level2Codes = new Set(visibleLevel2Items.map((item) => item.code));
+    const level2CodesInSelectedProcessLevel1 = new Set(
+      (selectedLevel1?.level2 || [])
+        .filter((item) => {
+          if (!portalActiveProcessLevel1Code) return true;
+          const segments = item.code.split('.');
+          const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
+          return processLevel1Code === portalActiveProcessLevel1Code;
+        })
+        .map((item) => item.code)
+    );
+    const knownProcessCodes = new Set(
+      processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
+    );
+    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
 
-    persistAgents((prev) => [nextAgent, ...prev]);
-    setFormValues((prev) => ({
+    return agents.filter((agent) => {
+      const matchesSearch = agent.name.toLowerCase().includes(search.toLowerCase());
+      const matchesStatus = statusFilter === '전체' || agent.status === statusFilter;
+      const matchesRisk = riskFilter === '전체' || agent.risk === riskFilter;
+      const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
+      const isUnclassified = !knownProcessCodes.has(agent.processId);
+      const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
+      const matchesProcessLevel1 = !portalActiveProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
+      const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
+      return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
+    });
+  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
+
+  const selectedModuleAgentCount = useMemo(() => {
+    const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
+    const knownProcessCodes = new Set<string>();
+    for (const domain of processDomains) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
+          knownProcessCodes.add(level2.code);
+        }
+      }
+    }
+    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
+
+    let count = 0;
+    for (const agent of agents) {
+      const isUnclassified = !knownProcessCodes.has(agent.processId);
+      if (level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified)) {
+        count += 1;
+      }
+    }
+
+    return count;
+  }, [visibleLevel2Items, selectedLevel1, agents, processDomains]);
+
+  const processNameById = useMemo(() => {
+    const entries: Array<[string, string]> = [];
+    for (const domain of processDomains) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
+          entries.push([level2.code, `${level1.code} ${level1.name} > ${level2.code} ${level2.name}`]);
+        }
+      }
+    }
+    return new Map(entries);
+  }, [processDomains]);
+
+  const processMetaByIdMap = useMemo(() => {
+    const entries: Array<[
+      string,
+      { module: string; processLevel1: string; processLevel2: string; processPath: string }
+    ]> = [];
+
+    for (const domain of processDomains) {
+      for (const module of domain.level1) {
+        for (const level2 of module.level2) {
+          const segments = level2.code.split('.');
+          const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
+          const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
+          entries.push([
+            level2.code,
+            {
+              module: module.code,
+              processLevel1: `${processLevel1Code} ${processLevel1Name}`,
+              processLevel2: `${level2.code} ${level2.name}`,
+              processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
+            }
+          ]);
+        }
+      }
+    }
+
+    return new Map(entries);
+  }, [processDomains]);
+
+  const addDynamicFilter = () => {
+    setDynamicFilters((prev) => [
       ...prev,
-      name: '',
-      owner: '',
-      processId: selectedLevel1?.level2?.[0]?.code || 'CM.1.1'
-    }));
+      { id: `filter-${Date.now()}-${prev.length}`, field: 'owner', value: '' }
+    ]);
+  };
+
+  const updateDynamicFilter = (id: string, patch: Partial<DynamicFilterRule>) => {
+    setDynamicFilters((prev) => prev.map((rule) => (rule.id === id ? { ...rule, ...patch } : rule)));
+  };
+
+  const removeDynamicFilter = (id: string) => {
+    setDynamicFilters((prev) => prev.filter((rule) => rule.id !== id));
+  };
+
+  const toggleColumnVisibility = (key: string) => {
+    setVisibleColumns((prev) => (prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key]));
   };
 
   const agentDetails = useMemo(() => {
@@ -1090,6 +1325,80 @@ const PortalAgentListPage: React.FC = () => {
   const agentDetailById = useMemo(() => {
     return new Map(agentDetails.map((agent) => [String(agent.id), agent]));
   }, [agentDetails]);
+
+
+  const displayAgents = useMemo(() => {
+    return filteredAgents.map((agent) => {
+      const detail = agentDetailById.get(agent.id);
+      const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
+      const usage = aggregateCustomerUsage(agent, detail);
+
+      const processMeta = processMetaByIdMap.get(agent.processId) || {
+        module: selectedLevel1?.code || '-',
+        processLevel1: '-',
+        processLevel2: `${agent.processId} -`,
+        processPath: '-'
+      };
+
+      return {
+        ...agent,
+        capability: buildCapabilityDescription(agent, processLabel),
+        customerCount: usage.customerCount,
+        calls30d: usage.calls30d,
+        processMeta
+      };
+    });
+  }, [filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
+
+
+  const getColumnValue = (agent: (typeof displayAgents)[number], field: string) => {
+    switch (field) {
+      case 'processId':
+        return agent.processId;
+      case 'processPath':
+        return agent.processMeta.processPath;
+      case 'module':
+        return agent.processMeta.module;
+      case 'processLevel1':
+        return agent.processMeta.processLevel1;
+      case 'processLevel2':
+        return agent.processMeta.processLevel2;
+      case 'agentId':
+        return agent.id;
+      case 'name':
+        return agent.name;
+      case 'owner':
+        return agent.owner;
+      case 'status':
+        return agent.status;
+      case 'capability':
+        return agent.capability;
+      case 'customerCount':
+        return String(agent.customerCount);
+      case 'calls30d':
+        return String(agent.calls30d);
+      case 'runtimeState':
+        return agent.runtimeState;
+      case 'runtimeErrors':
+        return String(agent.runtimeErrors);
+      case 'risk':
+        return agent.risk;
+      case 'lastUpdated':
+        return agent.lastUpdated;
+      default:
+        return String((agent as Record<string, unknown>)[field] ?? '');
+    }
+  };
+
+  const filteredDisplayAgents = useMemo(() => {
+    return displayAgents.filter((agent) =>
+      dynamicFilters.every((rule) => {
+        if (!rule.value.trim()) return true;
+        const target = getColumnValue(agent, rule.field).toLowerCase();
+        return target.includes(rule.value.toLowerCase());
+      })
+    );
+  }, [displayAgents, dynamicFilters]);
 
   useEffect(() => {
     if (!agentId) {
@@ -1124,7 +1433,7 @@ const PortalAgentListPage: React.FC = () => {
     <PortalDashboardLayout
       title="에이전트 목록"
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
-      actions={<button className="ear-primary">에이전트 등록</button>}
+      actions={<button className="ear-primary" onClick={() => navigate('/portal-agent-management/new')}>에이전트 등록</button>}
     >
       <section className="ear-card ear-card--panel ear-process-overview">
         <div className="ear-process-overview__domains">
@@ -1136,50 +1445,90 @@ const PortalAgentListPage: React.FC = () => {
               onClick={() => {
                 setSelectedDomainCode(domain.code);
                 setSelectedLevel1Code(domain.level1[0]?.code || 'COMMON');
+                setPortalActiveProcessLevel1Code(null);
                 setSelectedProcessId(null);
               }}
             >
               {domain.name}
             </button>
           ))}
+          <button
+            type="button"
+            className="ear-ghost"
+            onClick={() => setPortalProcessPanelCollapsed((prev) => !prev)}
+          >
+            {portalProcessPanelCollapsed ? '펼치기' : '접기'}
+          </button>
         </div>
-        <div className="ear-process-overview__tabs">
-          {(selectedDomain?.level1 || []).map((module) => {
-            const moduleCount = module.level2.length;
-            return (
-              <button
-                key={module.code}
-                type="button"
-                className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
-                onClick={() => {
-                  setSelectedLevel1Code(module.code);
-                  setSelectedProcessId(null);
-                }}
-              >
-                <span>{LEVEL1_E2E_LABELS[module.code] ? `${module.name} · ${LEVEL1_E2E_LABELS[module.code]}` : module.name}</span>
-                <em>{moduleCount}</em>
-              </button>
-            );
-          })}
-        </div>
-        <div className="ear-process-overview__summary">
-          <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '> Level1 > Level2' : `> ${LEVEL1_E2E_LABELS[selectedLevel1.code] ? `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code]}` : selectedLevel1.name} > Level2`) : '> Level1 > Level2'}</h3>
-          <strong>Agent Count {selectedModuleAgentCount}</strong>
-        </div>
-        <div className="ear-process-overview__cards">
-          {(selectedLevel1?.level2 || []).map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              className={`ear-process-card ${selectedProcessId === item.code ? 'active' : ''}`}
-              onClick={() => setSelectedProcessId((prev) => (prev === item.code ? null : item.code))}
-            >
-              <span>{item.code}</span>
-              <strong>{item.name}</strong>
-              <em>{agents.filter((agent) => agent.processId === item.code).length}</em>
-            </button>
-          ))}
-        </div>
+        {!portalProcessPanelCollapsed && (
+          <>
+            <div className="ear-process-overview__section">
+              <div className="ear-process-overview__tabs">
+                {(selectedDomain?.level1 || []).map((module) => {
+                  const moduleCount = module.level2.length;
+                  return (
+                    <button
+                      key={module.code}
+                      type="button"
+                      className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedLevel1Code(module.code);
+                        setPortalActiveProcessLevel1Code(null);
+                        setSelectedProcessId(null);
+                      }}
+                    >
+                      <span>{LEVEL1_E2E_LABELS[module.code] ? `${module.name} · ${LEVEL1_E2E_LABELS[module.code]}` : module.name}</span>
+                      <em>{moduleCount}</em>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="ear-process-overview__section">
+              <div className="ear-process-overview__tabs">
+                {processLevel1Groups.map((group) => (
+                  <button
+                    key={group.code}
+                    type="button"
+                    className={`ear-process-tab ${selectedProcessLevel1Group?.code === group.code ? 'active' : ''}`}
+                    onClick={() => {
+                      setPortalActiveProcessLevel1Code(group.code);
+                      setSelectedProcessId(null);
+                    }}
+                  >
+                    <span>{`${group.code} ${group.name}`}</span>
+                    <em>{group.items.length}</em>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="ear-process-overview__section">
+              <div className="ear-process-overview__summary">
+                <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
+                <strong>Agent Count {selectedModuleAgentCount}</strong>
+              </div>
+              <div className="ear-process-overview__cards">
+                {visibleLevel2Items.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`ear-process-card ${selectedProcessId === item.code ? 'active' : ''}`}
+                    onClick={() => setSelectedProcessId((prev) => (prev === item.code ? null : item.code))}
+                  >
+                    <span>{(() => {
+                      const segments = item.code.split('.');
+                      const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
+                      const level1Name = PROCESS_LEVEL1_LABELS[level1Code] || selectedLevel1?.name || '프로세스';
+                      return `${level1Code} ${level1Name}`;
+                    })()}</span>
+                    <strong>{`${item.code} ${item.name}`}</strong>
+                    <em>{agents.filter((agent) => agent.processId === item.code).length}</em>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </section>
 
       <div className="ear-grid ear-grid--sidebar">
@@ -1222,74 +1571,27 @@ const PortalAgentListPage: React.FC = () => {
               <option value="MM">MM</option>
             </select>
           </label>
-          <button className="ear-secondary">필터 저장</button>
-          <form className="ear-form" onSubmit={handleAddAgent}>
-            <h3>에이전트 등록</h3>
-            <label>
-              에이전트 이름
-              <input
-                type="text"
-                placeholder="예: Finance Insight"
-                value={formValues.name}
-                onChange={(event) => handleFormChange('name', event.target.value)}
-              />
-            </label>
-            <label>
-              담당 조직
-              <input
-                type="text"
-                placeholder="예: 재무팀"
-                value={formValues.owner}
-                onChange={(event) => handleFormChange('owner', event.target.value)}
-              />
-            </label>
-            <label>
-              상태
+          <button type="button" className="ear-secondary" onClick={addDynamicFilter}>편집</button>
+          {dynamicFilters.map((rule) => (
+            <div key={rule.id} className="ear-filter__dynamic-row">
               <select
-                value={formValues.status}
-                onChange={(event) => handleFormChange('status', event.target.value)}
+                value={rule.field}
+                onChange={(event) => updateDynamicFilter(rule.id, { field: event.target.value as DynamicFilterRule['field'] })}
               >
-                <option value="운영">운영</option>
-                <option value="점검">점검</option>
-                <option value="보류">보류</option>
-              </select>
-            </label>
-            <label>
-              리스크
-              <select
-                value={formValues.risk}
-                onChange={(event) => handleFormChange('risk', event.target.value)}
-              >
-                <option value="낮음">낮음</option>
-                <option value="중간">중간</option>
-                <option value="높음">높음</option>
-              </select>
-            </label>
-            <label>
-              유형
-              <select
-                value={formValues.category}
-                onChange={(event) => handleFormChange('category', event.target.value)}
-              >
-                <option value="COMMON">통합</option>
-                <option value="SD">SD</option>
-                <option value="BC">BC</option>
-                <option value="MM">MM</option>
-              </select>
-            </label>
-            <label>
-              Process ID
-              <select
-                value={formValues.processId}
-                onChange={(event) => handleFormChange('processId', event.target.value)}
-              >
-                {(selectedLevel1?.level2 || []).map((item) => (
-                  <option key={item.id} value={item.code}>{item.code}</option>
+                {TABLE_COLUMN_OPTIONS.map((option) => (
+                  <option key={option.key} value={option.key}>{option.label}</option>
                 ))}
               </select>
-            </label>
-            <button type="submit" className="ear-primary">등록 저장</button>
-          </form>
+              <input
+                type="text"
+                placeholder="값 입력"
+                value={rule.value}
+                onChange={(event) => updateDynamicFilter(rule.id, { value: event.target.value })}
+              />
+              <button type="button" className="ear-ghost" onClick={() => removeDynamicFilter(rule.id)}>삭제</button>
+            </div>
+          ))}
+
         </aside>
 
         <div className="ear-agent-layout">
@@ -1297,32 +1599,39 @@ const PortalAgentListPage: React.FC = () => {
             <div className="ear-table-card__header">
               <div>
                 <h3>에이전트 목록</h3>
-              <p>총 {filteredAgents.length}개 에이전트</p>
+              <p>총 {filteredDisplayAgents.length}개 에이전트</p>
+              <p className="ear-muted">사용고객 집계: 30일 이벤트 기준 → 메트릭 대체 → 저장값 폴백</p>
             </div>
             <div className="ear-table-card__actions">
               <button className="ear-ghost">CSV 내보내기</button>
               <button className="ear-secondary">정렬</button>
+              <button type="button" className="ear-secondary" onClick={() => setIsColumnEditorOpen((prev) => !prev)}>편집</button>
+              {isColumnEditorOpen && (
+                <div className="ear-column-picker">
+                  {TABLE_COLUMN_OPTIONS.map((option) => (
+                    <label key={option.key}>
+                      <input
+                        type="checkbox"
+                        checked={visibleColumns.includes(option.key)}
+                        onChange={() => toggleColumnVisibility(option.key)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
           <table className="ear-table">
             <thead>
               <tr>
-                <th>process ID</th>
-                <th>agent ID</th>
-                <th>이름</th>
-                <th>소유 조직</th>
-                <th>상태</th>
-                <th>수행기능</th>
-                <th>사용고객</th>
-                <th>최근 30일 호출</th>
-                <th>런타임 상태</th>
-                <th>런타임 에러</th>
-                <th>리스크</th>
-                <th>최근 업데이트</th>
+                {TABLE_COLUMN_OPTIONS.filter((option) => visibleColumns.includes(option.key)).map((option) => (
+                  <th key={option.key}>{option.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {filteredAgents.map((agent) => {
+              {filteredDisplayAgents.map((agent) => {
                 const detail = agentDetailById.get(agent.id);
                 const isSelected = agent.id === selectedAgentId;
                 const isDrilldownOpen = drilldownAgentId === agent.id;
@@ -1351,31 +1660,26 @@ const PortalAgentListPage: React.FC = () => {
                         }
                       }}
                     >
-                      <td>{agent.processId}</td>
-                      <td>{agent.id}</td>
-                      <td>
-                        <strong>{agent.name}</strong>
-                        <span className="ear-muted">{agent.category}</span>
-                      </td>
-                      <td>{agent.owner}</td>
-                      <td>
-                        <TagPill label={agent.status} tone={statusToneMap[agent.status]} />
-                      </td>
-                      <td>{agent.capability}</td>
-                      <td>{agent.customerCount}</td>
-                      <td>{agent.calls30d}</td>
-                      <td>
-                        <TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} />
-                      </td>
-                      <td>{agent.runtimeErrors}</td>
-                      <td>
-                        <TagPill label={agent.risk} tone={riskToneMap[agent.risk]} />
-                      </td>
-                      <td>{agent.lastUpdated}</td>
+                      {visibleColumns.includes('processId') && <td>{agent.processId}</td>}
+                      {visibleColumns.includes('processPath') && <td>{agent.processMeta.processPath}</td>}
+                      {visibleColumns.includes('module') && <td>{agent.processMeta.module}</td>}
+                      {visibleColumns.includes('processLevel1') && <td>{agent.processMeta.processLevel1}</td>}
+                      {visibleColumns.includes('processLevel2') && <td>{agent.processMeta.processLevel2}</td>}
+                      {visibleColumns.includes('agentId') && <td>{agent.id}</td>}
+                      {visibleColumns.includes('name') && <td><strong>{agent.name}</strong><span className="ear-muted">{agent.category}</span></td>}
+                      {visibleColumns.includes('owner') && <td>{agent.owner}</td>}
+                      {visibleColumns.includes('status') && <td><TagPill label={agent.status} tone={statusToneMap[agent.status]} /></td>}
+                      {visibleColumns.includes('capability') && <td>{truncateText(agent.capability, 30)}</td>}
+                      {visibleColumns.includes('customerCount') && <td>{agent.customerCount}</td>}
+                      {visibleColumns.includes('calls30d') && <td>{agent.calls30d}</td>}
+                      {visibleColumns.includes('runtimeState') && <td><TagPill label={agent.runtimeState} tone={runtimeToneMap[agent.runtimeState]} /></td>}
+                      {visibleColumns.includes('runtimeErrors') && <td>{agent.runtimeErrors}</td>}
+                      {visibleColumns.includes('risk') && <td><TagPill label={agent.risk} tone={riskToneMap[agent.risk]} /></td>}
+                      {visibleColumns.includes('lastUpdated') && <td>{agent.lastUpdated}</td>}
                     </tr>
                     {isDrilldownOpen && (
                       <tr className="ear-table__row ear-table__row--drilldown">
-                        <td colSpan={12}>
+                        <td colSpan={Math.max(visibleColumns.length, 1)}>
                           <div className="ear-drilldown">
                             <div>
                               <strong>Task 드릴다운</strong>
@@ -1396,7 +1700,6 @@ const PortalAgentListPage: React.FC = () => {
                               <div key={task.id} className="ear-drilldown__item">
                                 <span>{task.jobId}</span>
                                 <span>{task.status}</span>
-                                <span>{task.receivedAt}</span>
                               </div>
                             ))}
                             {(!detail || detail.tasks.length === 0) && (
@@ -1469,8 +1772,7 @@ const PortalAgentListPage: React.FC = () => {
                       <th>ID</th>
                       <th>Job ID</th>
                       <th>Status</th>
-                      <th>Received</th>
-                    </tr>
+                                          </tr>
                   </thead>
                   <tbody>
                     {tasksInRange.map((task) => (
@@ -1478,12 +1780,11 @@ const PortalAgentListPage: React.FC = () => {
                         <td>{task.id}</td>
                         <td>{task.jobId}</td>
                         <td>{task.status}</td>
-                        <td>{task.receivedAt}</td>
-                      </tr>
+                                              </tr>
                     ))}
                     {tasksInRange.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="ear-muted">표시할 Task가 없습니다.</td>
+                        <td colSpan={3} className="ear-muted">표시할 Task가 없습니다.</td>
                       </tr>
                     )}
                   </tbody>
