@@ -151,6 +151,25 @@ interface ProcessDomain {
 }
 
 const STORAGE_KEY = 'portal-agent-list';
+const TABLE_COLUMN_OPTIONS = [
+  { key: 'processId', label: 'process ID', defaultVisible: true },
+  { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
+  { key: 'module', label: '모듈', defaultVisible: false },
+  { key: 'processLevel1', label: 'Level1', defaultVisible: false },
+  { key: 'processLevel2', label: 'Level2', defaultVisible: false },
+  { key: 'agentId', label: 'agent ID', defaultVisible: true },
+  { key: 'name', label: '이름', defaultVisible: true },
+  { key: 'owner', label: '소유 조직', defaultVisible: true },
+  { key: 'status', label: '상태', defaultVisible: true },
+  { key: 'capability', label: '수행기능', defaultVisible: true },
+  { key: 'customerCount', label: '사용고객', defaultVisible: true },
+  { key: 'calls30d', label: '최근 30일 호출', defaultVisible: true },
+  { key: 'runtimeState', label: '런타임 상태', defaultVisible: true },
+  { key: 'runtimeErrors', label: '런타임 에러', defaultVisible: true },
+  { key: 'risk', label: '리스크', defaultVisible: true },
+  { key: 'lastUpdated', label: '최근 업데이트', defaultVisible: true }
+] as const;
+
 const ANALYSIS_RANGE = {
   start: '2026-01-15 00:00:00',
   end: '2026-01-21 23:59:59'
@@ -1033,6 +1052,16 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
 
+  // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+
+
 
   // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
   const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
@@ -1171,6 +1200,7 @@ const PortalAgentListPage: React.FC = () => {
     return selectedLevel1?.level2 || [];
   }, [selectedDomain, selectedLevel1]);
 
+
   const processLevel1Groups = useMemo<ProcessLevel1Group[]>(() => {
     const map = new Map<string, ProcessLevel1Group>();
     level2Source.forEach((item) => {
@@ -1202,6 +1232,7 @@ const PortalAgentListPage: React.FC = () => {
       setPortalActiveProcessLevel1Code(processLevel1Groups[0].code);
     }
   }, [processLevel1Groups, portalActiveProcessLevel1Code]);
+
 
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
@@ -1248,6 +1279,7 @@ const PortalAgentListPage: React.FC = () => {
     }
     const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
 
+
     let count = 0;
     for (const agent of agents) {
       const isUnclassified = !knownProcessCodes.has(agent.processId);
@@ -1277,6 +1309,7 @@ const PortalAgentListPage: React.FC = () => {
       { module: string; processLevel1: string; processLevel2: string; processPath: string }
     ]> = [];
 
+
     for (const domain of processDomains) {
       for (const module of domain.level1) {
         for (const level2 of module.level2) {
@@ -1292,7 +1325,6 @@ const PortalAgentListPage: React.FC = () => {
               processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
             }
           ]);
-
         }
       }
     }
@@ -1302,6 +1334,7 @@ const PortalAgentListPage: React.FC = () => {
 
     return new Map(entries);
   }, [processDomains]);
+
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
@@ -1597,7 +1630,7 @@ const PortalAgentListPage: React.FC = () => {
                 value={rule.field}
                 onChange={(event) => updateDynamicFilter(rule.id, { field: event.target.value as DynamicFilterRule['field'] })}
               >
-                {tableColumnOptions.map((option) => (
+                {TABLE_COLUMN_OPTIONS.map((option) => (
                   <option key={option.key} value={option.key}>{option.label}</option>
                 ))}
               </select>
@@ -1627,7 +1660,7 @@ const PortalAgentListPage: React.FC = () => {
               <button type="button" className="ear-secondary" onClick={() => setIsColumnEditorOpen((prev) => !prev)}>편집</button>
               {isColumnEditorOpen && (
                 <div className="ear-column-picker">
-                  {tableColumnOptions.map((option) => (
+                  {TABLE_COLUMN_OPTIONS.map((option) => (
                     <label key={option.key}>
                       <input
                         type="checkbox"
@@ -1713,7 +1746,7 @@ const PortalAgentListPage: React.FC = () => {
           <table className="ear-table">
             <thead>
               <tr>
-                {tableColumnOptions.filter((option) => visibleColumns.includes(option.key)).map((option) => (
+                {TABLE_COLUMN_OPTIONS.filter((option) => visibleColumns.includes(option.key)).map((option) => (
                   <th key={option.key}>{option.label}</th>
                 ))}
               </tr>
