@@ -926,7 +926,6 @@ const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 
 
 const formatPercent = (value: number) => `${numberFormatter.format(value)}%`;
 const formatNumber = (value: number) => numberFormatter.format(value);
-const formatCost = (value: number) => numberFormatter.format(value);
 const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
 
@@ -1475,23 +1474,6 @@ const PortalAgentListPage: React.FC = () => {
     }
   }, [agentId, drilldownAgentId, selectedAgentId]);
 
-  const selectedAgent = agentDetails.find((agent) => String(agent.id) === selectedAgentId);
-  const tasksInRange = selectedAgent
-    ? selectedAgent.tasks.filter((task) => isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
-    : [];
-  const selectedMetricsInRange = selectedAgent
-    ? selectedAgent.metrics.filter((metric) => isWithinRange(metric.startTime, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end))
-    : [];
-  const taskCount = tasksInRange.length;
-  const successCount = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
-  const successRate = taskCount > 0 ? (successCount / taskCount) * 100 : 0;
-  const metricRequestSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.requestsProcessed, 0);
-  const metricTokenSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.totalTokenUsage, 0);
-  const metricCostSum = selectedMetricsInRange.reduce((sum, metric) => sum + metric.tokenCost, 0);
-  const avgMetricLatency = selectedMetricsInRange.length > 0
-    ? selectedMetricsInRange.reduce((sum, metric) => sum + metric.avgLatency, 0) / selectedMetricsInRange.length
-    : 0;
-
   return (
     <PortalDashboardLayout
       title="에이전트 목록"
@@ -1657,7 +1639,7 @@ const PortalAgentListPage: React.FC = () => {
 
         </aside>
 
-        <div className="ear-agent-layout">
+        <div className="ear-agent-layout ear-agent-layout--single">
           <section className="ear-table-card">
             <div className="ear-table-card__header">
               <div>
@@ -1767,6 +1749,16 @@ const PortalAgentListPage: React.FC = () => {
                 const detail = agentDetailById.get(agent.id);
                 const isSelected = agent.id === selectedAgentId;
                 const isDrilldownOpen = drilldownAgentId === agent.id;
+                const tasksInRange = (detail?.tasks ?? []).filter((task) =>
+                  isWithinRange(task.receivedAt, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end)
+                );
+                const metricsInRange = (detail?.metrics ?? []).filter((metric) =>
+                  isWithinRange(metric.startTime, ANALYSIS_RANGE.start, ANALYSIS_RANGE.end)
+                );
+                const taskCount = tasksInRange.length;
+                const successCount = tasksInRange.filter((task) => task.status === 'COMPLETED').length;
+                const successRate = taskCount > 0 ? (successCount / taskCount) * 100 : 0;
+                const metricTokenSum = metricsInRange.reduce((sum, metric) => sum + metric.totalTokenUsage, 0);
 
                 return (
                   <React.Fragment key={agent.id}>
@@ -1780,7 +1772,6 @@ const PortalAgentListPage: React.FC = () => {
                       onDoubleClick={() => {
                         setSelectedAgentId(agent.id);
                         setDrilldownAgentId(agent.id);
-                        navigate(`/portal-agents/${agent.id}`);
                       }}
                       role="button"
                       tabIndex={0}
@@ -1813,9 +1804,11 @@ const PortalAgentListPage: React.FC = () => {
                       <tr className="ear-table__row ear-table__row--drilldown">
                         <td colSpan={Math.max(visibleColumns.length, 1)}>
                           <div className="ear-drilldown">
-                            <div>
+                            <div className="ear-drilldown__summary">
                               <strong>Task 드릴다운</strong>
-                              <span>선택한 에이전트의 최근 작업</span>
+                              <span>
+                                {agent.name} · Task {formatNumber(taskCount)}건 · 성공률 {formatPercent(successRate)} · Token {formatNumber(metricTokenSum)}
+                              </span>
                             </div>
                             <div className="ear-drilldown__actions">
                               <button
@@ -1828,13 +1821,20 @@ const PortalAgentListPage: React.FC = () => {
                             </div>
                           </div>
                           <div className="ear-drilldown__list">
-                            {(detail?.tasks ?? []).slice(0, 3).map((task) => (
-                              <div key={task.id} className="ear-drilldown__item">
-                                <span>{task.jobId}</span>
+                            {tasksInRange.slice(0, 3).map((task) => (
+                              <button
+                                key={task.id}
+                                type="button"
+                                className="ear-drilldown__item"
+                                onClick={() => setSelectedAgentId(agent.id)}
+                                onDoubleClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(agent.name)}&jobId=${encodeURIComponent(task.jobId)}`)}
+                                title="더블클릭 시 Task 화면으로 이동"
+                              >
+                                <strong>{task.jobId}</strong>
                                 <span>{task.status}</span>
-                              </div>
+                              </button>
                             ))}
-                            {(!detail || detail.tasks.length === 0) && (
+                            {tasksInRange.length === 0 && (
                               <span className="ear-muted">표시할 작업이 없습니다.</span>
                             )}
                           </div>
@@ -1847,83 +1847,6 @@ const PortalAgentListPage: React.FC = () => {
             </tbody>
           </table>
           </section>
-          {selectedAgent && (
-            <aside className="ear-card ear-card--panel ear-agent-detail">
-              <div className="ear-card__header">
-                <div>
-                  <h3>{selectedAgent.agentName} Task 상세</h3>
-                  <p>에이전트 선택 시 Task 정보만 노출됩니다.</p>
-                </div>
-              <div className="ear-card__actions">
-                <button
-                  type="button"
-                  className="ear-secondary"
-                  onClick={() => navigate(`/portal-tasks?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
-                >
-                  크게 보기
-                </button>
-                <button
-                  type="button"
-                  className="ear-ghost"
-                  onClick={() => navigate(`/portal-usage?agent=${encodeURIComponent(selectedAgent.agentName)}`)}
-                >
-                  운영지표 보기
-                </button>
-              </div>
-            </div>
-              <div className="ear-card__body">
-                <div className="ear-stat-grid ear-stat-grid--compact">
-                  <div className="ear-stat">
-                    <span>Task 합계</span>
-                    <strong>{formatNumber(taskCount)}</strong>
-                  </div>
-                  <div className="ear-stat">
-                    <span>Task 성공률</span>
-                    <strong>{formatPercent(successRate)}</strong>
-                  </div>
-                  <div className="ear-stat">
-                    <span>Metric 요청 합</span>
-                    <strong>{formatNumber(metricRequestSum)}</strong>
-                  </div>
-                  <div className="ear-stat">
-                    <span>Metric Token 합</span>
-                    <strong>{formatNumber(metricTokenSum)}</strong>
-                  </div>
-                  <div className="ear-stat">
-                    <span>Metric Cost 합</span>
-                    <strong>{formatCost(metricCostSum)}</strong>
-                  </div>
-                  <div className="ear-stat">
-                    <span>평균 Latency</span>
-                    <strong>{formatNumber(avgMetricLatency)}</strong>
-                  </div>
-                </div>
-                <table className="ear-table ear-table--compact">
-                  <thead>
-                    <tr>
-                      <th>ID</th>
-                      <th>Job ID</th>
-                      <th>Status</th>
-                                          </tr>
-                  </thead>
-                  <tbody>
-                    {tasksInRange.map((task) => (
-                      <tr key={task.id}>
-                        <td>{task.id}</td>
-                        <td>{task.jobId}</td>
-                        <td>{task.status}</td>
-                                              </tr>
-                    ))}
-                    {tasksInRange.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="ear-muted">표시할 Task가 없습니다.</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </aside>
-          )}
         </div>
       </div>
     </PortalDashboardLayout>
