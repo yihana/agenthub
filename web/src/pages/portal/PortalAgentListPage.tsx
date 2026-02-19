@@ -1034,7 +1034,7 @@ const PortalAgentListPage: React.FC = () => {
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
 
   const [activeProcessLevel1Code, setActiveProcessLevel1Code] = useState<string | null>(null);
-  const [processPanelCollapsed, setProcessPanelCollapsed] = useState(false);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const tableColumnOptions = [
     { key: 'processId', label: 'process ID', defaultVisible: true },
@@ -1437,12 +1437,12 @@ const PortalAgentListPage: React.FC = () => {
           <button
             type="button"
             className="ear-ghost"
-            onClick={() => setProcessPanelCollapsed((prev) => !prev)}
+            onClick={() => setPortalProcessPanelCollapsed((prev) => !prev)}
           >
-            {processPanelCollapsed ? '펼치기' : '접기'}
+            {portalProcessPanelCollapsed ? '펼치기' : '접기'}
           </button>
         </div>
-        {!processPanelCollapsed && (
+        {!portalProcessPanelCollapsed && (
           <>
             <div className="ear-process-overview__section">
               <div className="ear-process-overview__tabs">
