@@ -124,6 +124,16 @@ interface ProcessRow {
   level2Name?: string;
 }
 
+interface AgentApiRow {
+  id: string | number;
+  name?: string;
+  type?: string;
+  status?: string;
+  owner_user_id?: string;
+  updated_at?: string;
+  updatedAt?: string;
+}
+
 
 
 interface DynamicFilterRule {
@@ -672,263 +682,10 @@ const buildGeneratedDetail = (agent: AgentRecord): AgentDetailRecord => {
   };
 };
 
-const defaultAgents: AgentRecord[] = [
-  {
-    id: '1',
-    name: 'OrderBotcommerce',
-    owner: '커머스팀',
-    status: '운영',
-    category: 'SD',
-    risk: '낮음',
-    lastUpdated: '2026-01-20',
-    runtimeState: 'RUNNING',
-    runtimeErrors: 0,
-    processId: 'SD.1.3',
-    capability: '설명',
-    customerCount: 8,
-    calls30d: 390
-  },
-  {
-    id: '2',
-    name: 'SupportGPTsupport',
-    owner: '지원팀',
-    status: '운영',
-    category: 'BC',
-    risk: '중간',
-    lastUpdated: '2026-01-20',
-    runtimeState: 'DEGRADED',
-    runtimeErrors: 1,
-    processId: 'BC.1.3',
-    capability: '설명',
-    customerCount: 3,
-    calls30d: 866
-  },
-  {
-    id: '3',
-    name: 'PricingAIanalytics',
-    owner: '데이터팀',
-    status: '운영',
-    category: 'COMMON',
-    risk: '낮음',
-    lastUpdated: '2026-01-20',
-    runtimeState: 'RUNNING',
-    runtimeErrors: 0,
-    processId: 'CM.1.1',
-    capability: '설명',
-    customerCount: 10,
-    calls30d: 412
-  }
-];
-
-const DEFAULT_SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items: { processId: string; title: string; count: number; }[] }[] = [
-  {
-    moduleCode: 'COMMON',
-    moduleName: '통합',
-    items: [
-      { processId: 'CM.1.1', title: '공통 운영 모니터링', count: 3 },
-      { processId: 'CM.1.2', title: '공통 정책/권한 관리', count: 2 }
-    ]
-  },
-  {
-    moduleCode: 'MM',
-    moduleName: 'MM',
-    items: [
-      { processId: 'MM.1.2', title: 'BP 티켓 자동접수·KYC 체크', count: 8 },
-      { processId: 'MM.1.3', title: '구매처 평가 근거 자동첨부', count: 3 },
-      { processId: 'MM.2.2', title: '선정 근거 문장 자동작성', count: 10 },
-      { processId: 'MM.3.4', title: '계획 변경·승인요청 자동생성', count: 3 },
-      { processId: 'MM.5.3', title: '3-way match 예외 분류·라우팅', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'PP',
-    moduleName: 'PP',
-    items: [
-      { processId: 'PP.2.1', title: '수요 이상치 탐지·보정 제안', count: 8 },
-      { processId: 'PP.3.1', title: 'MRP 예외 트리아지', count: 3 },
-      { processId: 'PP.3.2', title: '오더 사전검증(릴리즈 전)', count: 10 },
-      { processId: 'PP.4.2', title: '공정확인 편차 알림', count: 3 },
-      { processId: 'PP.5.3', title: '정산 차이 자동분해', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'HR',
-    moduleName: 'HR',
-    items: [
-      { processId: 'HR.2.2', title: '지원자 요약·매칭 스코어', count: 8 },
-      { processId: 'HR.2.4', title: '온보딩 티켓 자동생성', count: 3 },
-      { processId: 'HR.3.4', title: '근태 예외 자동라우팅', count: 10 },
-      { processId: 'HR.4.1', title: '급여 데이터 검증', count: 3 },
-      { processId: 'HR.5.1', title: '평가 코멘트 초안+편향체크', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'SD',
-    moduleName: 'SD',
-    items: [
-      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
-      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
-      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
-      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
-      { processId: 'SD.2.2', title: '판매오더', count: 7 },
-      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
-      { processId: 'SD.3.1', title: '납품생성', count: 6 },
-      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
-      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
-      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
-      { processId: 'SD.4.1', title: '청구문서', count: 7 },
-      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
-      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
-      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
-      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
-      { processId: 'SD.5.1', title: '수금', count: 8 },
-      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
-      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
-      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
-    ]
-  },
-  {
-    moduleCode: 'FI',
-    moduleName: 'FI',
-    items: [
-      { processId: 'FI.2.3', title: '전표 규칙 위반 탐지', count: 8 },
-      { processId: 'FI.3.1', title: '송장 캡처·전표 초안', count: 3 },
-      { processId: 'FI.3.2', title: '3-way match 예외 분류', count: 10 },
-      { processId: 'FI.4.2', title: '대사 후보 자동매칭', count: 3 },
-      { processId: 'FI.5.1', title: '결산 체크리스트 모니터', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'CO',
-    moduleName: 'CO',
-    items: [
-      { processId: 'CO.2.3', title: '계획 시나리오 비교', count: 8 },
-      { processId: 'CO.3.1', title: '실적전표 오류 탐지', count: 3 },
-      { processId: 'CO.4.1', title: '배부 실행 모니터', count: 10 },
-      { processId: 'CO.4.2', title: '정산 차이 자동설명', count: 3 },
-      { processId: 'CO.5.1', title: '수익성 내러티브 생성', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'BC',
-    moduleName: 'BC',
-    items: [
-      { processId: 'BC.2.2', title: '티켓 분류+필수정보 수집', count: 8 },
-      { processId: 'BC.1.3', title: 'SoD 리스크 스코어링', count: 3 },
-      { processId: 'BC.3.3', title: '로그 원인 후보·가이드', count: 10 },
-      { processId: 'BC.4.2', title: '릴리즈 영향도 요약', count: 3 },
-      { processId: 'BC.5.2', title: '취약점 조치안 플래닝', count: 10 }
-    ]
-  }
-];
-
-const SAP_PROCESS_CARDS: { moduleCode: string; moduleName: string; items: { processId: string; title: string; count: number; }[] }[] = [
-  {
-    moduleCode: 'COMMON',
-    moduleName: '통합',
-    items: [
-      { processId: 'CM.1.1', title: '공통 운영 모니터링', count: 3 },
-      { processId: 'CM.1.2', title: '공통 정책/권한 관리', count: 2 }
-    ]
-  },
-  {
-    moduleCode: 'MM',
-    moduleName: 'MM',
-    items: [
-      { processId: 'MM.1.2', title: 'BP 티켓 자동접수·KYC 체크', count: 8 },
-      { processId: 'MM.1.3', title: '구매처 평가 근거 자동첨부', count: 3 },
-      { processId: 'MM.2.2', title: '선정 근거 문장 자동작성', count: 10 },
-      { processId: 'MM.3.4', title: '계획 변경·승인요청 자동생성', count: 3 },
-      { processId: 'MM.5.3', title: '3-way match 예외 분류·라우팅', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'PP',
-    moduleName: 'PP',
-    items: [
-      { processId: 'PP.2.1', title: '수요 이상치 탐지·보정 제안', count: 8 },
-      { processId: 'PP.3.1', title: 'MRP 예외 트리아지', count: 3 },
-      { processId: 'PP.3.2', title: '오더 사전검증(릴리즈 전)', count: 10 },
-      { processId: 'PP.4.2', title: '공정확인 편차 알림', count: 3 },
-      { processId: 'PP.5.3', title: '정산 차이 자동분해', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'HR',
-    moduleName: 'HR',
-    items: [
-      { processId: 'HR.2.2', title: '지원자 요약·매칭 스코어', count: 8 },
-      { processId: 'HR.2.4', title: '온보딩 티켓 자동생성', count: 3 },
-      { processId: 'HR.3.4', title: '근태 예외 자동라우팅', count: 10 },
-      { processId: 'HR.4.1', title: '급여 데이터 검증', count: 3 },
-      { processId: 'HR.5.1', title: '평가 코멘트 초안+편향체크', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'SD',
-    moduleName: 'SD',
-    items: [
-      { processId: 'SD.1.1', title: '고객마스터', count: 8 },
-      { processId: 'SD.1.2', title: '가격/할인', count: 11 },
-      { processId: 'SD.1.3', title: '신용한도/위험', count: 12 },
-      { processId: 'SD.2.1', title: '견적/계약', count: 11 },
-      { processId: 'SD.2.2', title: '판매오더', count: 7 },
-      { processId: 'SD.2.3', title: 'ATP/가용성', count: 7 },
-      { processId: 'SD.3.1', title: '납품생성', count: 6 },
-      { processId: 'SD.3.2', title: '피킹/패킹', count: 11 },
-      { processId: 'SD.3.3', title: '출고(PGI)', count: 10 },
-      { processId: 'SD.3.4', title: '운송/배송추적', count: 12 },
-      { processId: 'SD.4.1', title: '청구문서', count: 7 },
-      { processId: 'SD.4.2', title: '세금/조건', count: 11 },
-      { processId: 'SD.4.3', title: '청구차이/예외', count: 3 },
-      { processId: 'SD.4.4', title: '정산/조정', count: 5 },
-      { processId: 'SD.4.5', title: '반품/클레임', count: 11 },
-      { processId: 'SD.5.1', title: '수금', count: 8 },
-      { processId: 'SD.5.2', title: '대사/미결', count: 10 },
-      { processId: 'SD.5.3', title: '연체/독촉', count: 11 },
-      { processId: 'SD.5.4', title: '채권분석/대손', count: 11 }
-    ]
-  },
-  {
-    moduleCode: 'FI',
-    moduleName: 'FI',
-    items: [
-      { processId: 'FI.2.3', title: '전표 규칙 위반 탐지', count: 8 },
-      { processId: 'FI.3.1', title: '송장 캡처·전표 초안', count: 3 },
-      { processId: 'FI.3.2', title: '3-way match 예외 분류', count: 10 },
-      { processId: 'FI.4.2', title: '대사 후보 자동매칭', count: 3 },
-      { processId: 'FI.5.1', title: '결산 체크리스트 모니터', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'CO',
-    moduleName: 'CO',
-    items: [
-      { processId: 'CO.2.3', title: '계획 시나리오 비교', count: 8 },
-      { processId: 'CO.3.1', title: '실적전표 오류 탐지', count: 3 },
-      { processId: 'CO.4.1', title: '배부 실행 모니터', count: 10 },
-      { processId: 'CO.4.2', title: '정산 차이 자동설명', count: 3 },
-      { processId: 'CO.5.1', title: '수익성 내러티브 생성', count: 10 }
-    ]
-  },
-  {
-    moduleCode: 'BC',
-    moduleName: 'BC',
-    items: [
-      { processId: 'BC.2.2', title: '티켓 분류+필수정보 수집', count: 8 },
-      { processId: 'BC.1.3', title: 'SoD 리스크 스코어링', count: 3 },
-      { processId: 'BC.3.3', title: '로그 원인 후보·가이드', count: 10 },
-      { processId: 'BC.4.2', title: '릴리즈 영향도 요약', count: 3 },
-      { processId: 'BC.5.2', title: '취약점 조치안 플래닝', count: 10 }
-    ]
-  }
-];
-
 const numberFormatter = new Intl.NumberFormat('en-US', { maximumFractionDigits: 3 });
 
 const formatPercent = (value: number) => `${numberFormatter.format(value)}%`;
 const formatNumber = (value: number) => numberFormatter.format(value);
-const formatMinutes = (value: number) => `${formatNumber(value)}분`;
 const truncateText = (value: string, max = 30) => (value.length > max ? `${value.slice(0, max)}...` : value);
 
 
@@ -1036,41 +793,53 @@ const normalizeAgent = (agent: AgentRecord): AgentRecord => ({
   calls30d: Number(agent.calls30d || 0)
 });
 
+const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
+  const rawStatus = String(agent.status || '').toLowerCase();
+  const status: AgentRecord['status'] = rawStatus === 'active' ? '운영' : rawStatus === 'error' ? '점검' : '보류';
+  const category = String(agent.type || 'COMMON').toUpperCase();
+  const updatedAt = String(agent.updatedAt || agent.updated_at || '').slice(0, 10);
+  return normalizeAgent({
+    id: String(agent.id || ''),
+    name: String(agent.name || 'Unnamed Agent'),
+    owner: String(agent.owner_user_id || '미지정'),
+    status,
+    category,
+    risk: status === '점검' ? '중간' : '낮음',
+    lastUpdated: updatedAt || toShortDate(new Date()),
+    runtimeState: status === '점검' ? 'DEGRADED' : 'RUNNING',
+    runtimeErrors: status === '점검' ? 1 : 0,
+    processId: 'CM.1.1',
+    capability: '설명',
+    customerCount: 0,
+    calls30d: 0
+  });
+};
+
 const loadAgents = () => {
   if (typeof window === 'undefined') {
-    return defaultAgents;
+    return [];
   }
 
   try {
     const stored = window.localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      return defaultAgents;
+      return [];
     }
     const parsed = JSON.parse(stored);
     if (!Array.isArray(parsed)) {
-      return defaultAgents;
+      return [];
     }
     return (parsed as AgentRecord[]).map((agent) => normalizeAgent(agent));
   } catch {
-    return defaultAgents;
+    return [];
   }
-};
-
-const useProcessPanelState = () => {
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
-  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
-
-  return {
-    portalActiveProcessLevel1Code,
-    setPortalActiveProcessLevel1Code,
-    portalProcessPanelCollapsed,
-    setPortalProcessPanelCollapsed
-  };
 };
 
 const PortalAgentListPage: React.FC = () => {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
+
+  // state declarations
   const [agents, setAgents] = useState<AgentRecord[]>(() => loadAgents());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
@@ -1080,16 +849,10 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedDomainCode, setSelectedDomainCode] = useState('SAP');
   const [selectedLevel1Code, setSelectedLevel1Code] = useState('COMMON');
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
-  const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-
-  const {
-    portalActiveProcessLevel1Code,
-    setPortalActiveProcessLevel1Code,
-    portalProcessPanelCollapsed,
-    setPortalProcessPanelCollapsed
-  } = useProcessPanelState();
-
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
     TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
@@ -1098,7 +861,6 @@ const PortalAgentListPage: React.FC = () => {
   // NOTE: 아래 3개 식별자는 JSX 등록 폼에서 직접 참조됨(삭제 시 Cannot find name 발생)
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
-
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
@@ -1109,6 +871,34 @@ const PortalAgentListPage: React.FC = () => {
       return nextAgents;
     });
   };
+
+  useEffect(() => {
+    const loadAgentRows = async () => {
+      try {
+        const response = await fetch('/api/agents?limit=500');
+        if (!response.ok) {
+          throw new Error('failed');
+        }
+        const data = await response.json();
+        const rows = Array.isArray(data?.agents) ? (data.agents as AgentApiRow[]) : [];
+        const mapped = rows.map(mapApiAgentToRecord);
+        setAgents(mapped);
+        if (typeof window !== 'undefined') {
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        }
+      } catch {
+        const fallback = loadAgents();
+        setAgents(fallback);
+      }
+    };
+    loadAgentRows();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedAgentId && agents.length > 0) {
+      setSelectedAgentId(agents[0].id);
+    }
+  }, [agents, selectedAgentId]);
 
 
   useEffect(() => {
@@ -1150,18 +940,7 @@ const PortalAgentListPage: React.FC = () => {
           setPortalActiveProcessLevel1Code(null);
         }
       } catch {
-        const fallback: ProcessDomain = {
-          id: 1,
-          code: 'SAP',
-          name: 'SAP',
-          level1: DEFAULT_SAP_PROCESS_CARDS.map((module, index) => ({
-            id: index + 1,
-            code: module.moduleCode,
-            name: module.moduleName,
-            level2: module.items.map((item, itemIndex) => ({ id: itemIndex + 1, code: item.processId, name: item.title }))
-          }))
-        };
-        setProcessDomains([fallback]);
+        setProcessDomains([]);
       }
     };
     loadProcesses();
@@ -1174,6 +953,16 @@ const PortalAgentListPage: React.FC = () => {
   const selectedLevel1 = useMemo(() => {
     return selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
   }, [selectedDomain, selectedLevel1Code]);
+
+  const categoryOptions = useMemo(() => {
+    const collected = new Set<string>(['COMMON']);
+    processDomains.forEach((domain) => {
+      domain.level1.forEach((level1) => {
+        collected.add(level1.code);
+      });
+    });
+    return Array.from(collected);
+  }, [processDomains]);
 
   const level2Source = useMemo(() => {
     if (selectedLevel1?.code === 'COMMON') {
@@ -1613,10 +1402,9 @@ const PortalAgentListPage: React.FC = () => {
             유형
             <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
               <option value="전체">전체</option>
-              <option value="COMMON">통합</option>
-              <option value="SD">SD</option>
-              <option value="BC">BC</option>
-              <option value="MM">MM</option>
+              {categoryOptions.map((category) => (
+                <option key={category} value={category}>{category === 'COMMON' ? '통합' : category}</option>
+              ))}
             </select>
           </label>
           <button type="button" className="ear-secondary" onClick={addDynamicFilter}>편집</button>
@@ -1719,10 +1507,9 @@ const PortalAgentListPage: React.FC = () => {
                   value={formValues.category}
                   onChange={(event) => handleFormChange('category', event.target.value)}
                 >
-                  <option value="COMMON">통합</option>
-                  <option value="SD">SD</option>
-                  <option value="BC">BC</option>
-                  <option value="MM">MM</option>
+                  {categoryOptions.map((category) => (
+                    <option key={category} value={category}>{category === 'COMMON' ? '통합' : category}</option>
+                  ))}
                 </select>
               </label>
               <label>
