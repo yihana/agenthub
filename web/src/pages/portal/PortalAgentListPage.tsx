@@ -1037,6 +1037,18 @@ const loadAgents = () => {
   }
 };
 
+const useProcessPanelState = () => {
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
+
+  return {
+    portalActiveProcessLevel1Code,
+    setPortalActiveProcessLevel1Code,
+    portalProcessPanelCollapsed,
+    setPortalProcessPanelCollapsed
+  };
+};
+
 const PortalAgentListPage: React.FC = () => {
   const navigate = useNavigate();
   const { agentId } = useParams<{ agentId?: string }>();
@@ -1051,6 +1063,20 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>(() => defaultAgents[0]?.id ?? '');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
+
+  const {
+    portalActiveProcessLevel1Code,
+    setPortalActiveProcessLevel1Code,
+    portalProcessPanelCollapsed,
+    setPortalProcessPanelCollapsed
+  } = useProcessPanelState();
+
+  const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
+  const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
+    TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
+  );
+  const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+
 
   // NOTE: process panel/filter state must stay declared once (merge conflicts previously duplicated this block).
   const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
@@ -1200,7 +1226,6 @@ const PortalAgentListPage: React.FC = () => {
     return selectedLevel1?.level2 || [];
   }, [selectedDomain, selectedLevel1]);
 
-
   const processLevel1Groups = useMemo<ProcessLevel1Group[]>(() => {
     const map = new Map<string, ProcessLevel1Group>();
     level2Source.forEach((item) => {
@@ -1215,11 +1240,11 @@ const PortalAgentListPage: React.FC = () => {
     return Array.from(map.values());
   }, [level2Source]);
 
-
   const selectedProcessLevel1Group = useMemo(() => {
     if (!processLevel1Groups.length) return undefined;
     return processLevel1Groups.find((group) => group.code === portalActiveProcessLevel1Code) || processLevel1Groups[0];
   }, [processLevel1Groups, portalActiveProcessLevel1Code]);
+
 
   const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
 
@@ -1232,7 +1257,6 @@ const PortalAgentListPage: React.FC = () => {
       setPortalActiveProcessLevel1Code(processLevel1Groups[0].code);
     }
   }, [processLevel1Groups, portalActiveProcessLevel1Code]);
-
 
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
@@ -1266,7 +1290,6 @@ const PortalAgentListPage: React.FC = () => {
     });
   }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
 
-
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
     const knownProcessCodes = new Set<string>();
@@ -1278,7 +1301,6 @@ const PortalAgentListPage: React.FC = () => {
       }
     }
     const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
-
 
     let count = 0;
     for (const agent of agents) {
@@ -1309,7 +1331,6 @@ const PortalAgentListPage: React.FC = () => {
       { module: string; processLevel1: string; processLevel2: string; processPath: string }
     ]> = [];
 
-
     for (const domain of processDomains) {
       for (const module of domain.level1) {
         for (const level2 of module.level2) {
@@ -1331,6 +1352,11 @@ const PortalAgentListPage: React.FC = () => {
     return new Map(entries);
   }, [processDomains]);
 
+  const processMetaByIdMap = useMemo(() => {
+    const entries: Array<[
+      string,
+      { module: string; processLevel1: string; processLevel2: string; processPath: string }
+    ]> = [];
 
     return new Map(entries);
   }, [processDomains]);
