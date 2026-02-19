@@ -666,6 +666,8 @@ function App() {
         <Route path="/portal-roadmap" element={<PortalRoadmapPage />} />
         <Route path="/portal-settings" element={<PortalSettingsPage />} />
         <Route path="/portal-login" element={<PortalLoginPage />} />
+        <Route path="/portal-agent-management/new" element={<AgentFormPage />} />
+        <Route path="/portal-agent-management/:id/edit" element={<AgentFormPage />} />
         <Route path="/main-prototype1" element={<RouteGuard><MainPrototype1 /></RouteGuard>} />
         <Route path="/main-prototype2" element={<RouteGuard><MainPrototype2 /></RouteGuard>} />
         <Route path="/main-prototype3" element={<RouteGuard><MainPrototype3 /></RouteGuard>} />
