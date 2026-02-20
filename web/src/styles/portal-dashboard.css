@@ -857,6 +857,10 @@
   color: var(--ear-muted);
 }
 
+.ear-cell-center {
+  text-align: center;
+}
+
 .ear-table__row {
   cursor: pointer;
 }

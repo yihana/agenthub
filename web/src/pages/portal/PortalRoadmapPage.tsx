@@ -4,6 +4,16 @@ import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import TagPill from '../../components/portal-dashboard/TagPill';
 import { roleLabels, usePortalRole } from '../../hooks/usePortalRole';
 
+const DOMAIN_LABELS: Record<string, string> = {
+  MM: 'Procure to Pay',
+  PP: 'Plan to Produce',
+  HR: 'Hire to Retire',
+  SD: 'Order to Cash',
+  FI: 'Record to Report',
+  CO: 'Plan to Perform',
+  BC: 'Basis to Operate'
+};
+
 
 const initialRoadmapStages = [
   {
@@ -106,9 +116,7 @@ const PortalRoadmapPage: React.FC = () => {
       const code = String(row.domain_code || row.domainCode || '').trim().toUpperCase();
       if (code) codes.add(code);
     });
-    if (!codes.size) {
-      codes.add('SAP');
-    }
+    Object.keys(DOMAIN_LABELS).forEach((code) => codes.add(code));
     return Array.from(codes).sort();
   }, [processRows]);
 
@@ -651,7 +659,7 @@ const PortalRoadmapPage: React.FC = () => {
                     disabled={!canEditRoadmap}
                   >
                     {domainCodeOptions.map((code) => (
-                      <option key={code} value={code}>{code}</option>
+                      <option key={code} value={code}>{DOMAIN_LABELS[code] ? `${code} (${DOMAIN_LABELS[code]})` : code}</option>
                     ))}
                   </select>
                 </label>
