@@ -15,16 +15,6 @@ const DOMAIN_LABELS: Record<string, string> = {
 };
 
 
-const DOMAIN_LABELS: Record<string, string> = {
-  MM: 'Procure to Pay',
-  PP: 'Plan to Produce',
-  HR: 'Hire to Retire',
-  SD: 'Order to Cash',
-  FI: 'Record to Report',
-  CO: 'Plan to Perform',
-  BC: 'Basis to Operate'
-};
-
 
 const initialRoadmapStages = [
   {
@@ -115,6 +105,23 @@ const PortalRoadmapPage: React.FC = () => {
     });
     Object.keys(DOMAIN_LABELS).forEach((code) => codes.add(code));
     return Array.from(codes).sort();
+  }, [processRows]);
+
+  const level1Options = useMemo(() => {
+    const map = new Map<number, { id: number; code: string; name: string }>();
+  
+    processRows.forEach((row) => {
+      const id = Number(row.level1_id || row.level1Id);
+      if (!id) return;
+  
+      map.set(id, {
+        id,
+        code: row.level1_code || row.level1Code,
+        name: row.level1_name || row.level1Name
+      });
+    });
+  
+    return Array.from(map.values());
   }, [processRows]);
 
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {

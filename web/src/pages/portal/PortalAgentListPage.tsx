@@ -799,7 +799,16 @@ const normalizeAgent = (agent: AgentRecord): AgentRecord => ({
 
 const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
   const rawStatus = String(agent.status || '').toLowerCase();
-  const status: AgentRecord['status'] = rawStatus === 'active' ? '운영중' : rawStatus === 'error' ? 'PoC' : '계획';
+  let status: AgentRecord['status'];
+  if (rawStatus === 'active' || rawStatus === 'running' || rawStatus === '운영중') {
+    status = '운영중';
+  } else if (rawStatus === 'error' || rawStatus === 'poc') {
+    status = 'PoC';
+  } else if (rawStatus === '계획') {
+    status = '계획';
+  } else {
+    status = '계획';
+  }
   const tags = Array.isArray(agent.tags) ? agent.tags.map((item) => String(item).toUpperCase()) : [];
   const suite: AgentRecord['suite'] = tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz';
   const category = String(agent.type || 'COMMON').toUpperCase();
@@ -887,23 +896,35 @@ const PortalAgentListPage: React.FC = () => {
 
   useEffect(() => {
     const loadAgentRows = async () => {
+      const local = loadAgents();
+  
+      if (local.length > 0) {
+        setAgents(local);
+        return;
+      }
+  
       try {
         const response = await fetch('/api/agents?limit=500');
         if (!response.ok) {
           throw new Error('failed');
         }
+  
         const data = await response.json();
         const rows = Array.isArray(data?.agents) ? (data.agents as AgentApiRow[]) : [];
         const mapped = rows.map(mapApiAgentToRecord);
-        setAgents(mapped);
-        if (typeof window !== 'undefined') {
+  
+        if (mapped.length > 0) {
+          setAgents(mapped);
           window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } else {
+          setAgents([]);
         }
-      } catch {
-        const fallback = loadAgents();
-        setAgents(fallback);
+      } catch (error) {
+        console.error('Failed to load agents:', error);
+        setAgents([]);
       }
     };
+  
     loadAgentRows();
   }, []);
 
