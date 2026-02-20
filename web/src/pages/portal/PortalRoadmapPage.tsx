@@ -110,15 +110,6 @@ const PortalRoadmapPage: React.FC = () => {
     return Array.from(map.values()).sort((a, b) => a.id - b.id);
   }, [processRows]);
 
-  const domainCodeOptions = useMemo(() => {
-    const codes = new Set<string>();
-    processRows.forEach((row) => {
-      const code = String(row.domain_code || row.domainCode || '').trim().toUpperCase();
-      if (code) codes.add(code);
-    });
-    Object.keys(DOMAIN_LABELS).forEach((code) => codes.add(code));
-    return Array.from(codes).sort();
-  }, [processRows]);
 
   useEffect(() => {
     if (!level2Form.level1_id && level1Options.length > 0) {
