@@ -148,6 +148,7 @@ interface AgentFormValues {
   name: string;
   owner: string;
   status: AgentRecord['status'];
+  suite: AgentRecord['suite'];
   risk: AgentRecord['risk'];
   category: string;
   processId: string;
@@ -157,7 +158,8 @@ interface AgentFormValues {
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
-  status: '운영',
+  status: '운영중',
+  suite: 'Biz',
   risk: '낮음',
   category: 'COMMON',
   processId: 'CM.1.1'
@@ -868,13 +870,8 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-
-  const {
-    portalActiveProcessLevel1Code,
-    setPortalActiveProcessLevel1Code,
-    portalProcessPanelCollapsed,
-    setPortalProcessPanelCollapsed
-  } = useProcessPanelState();
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
 
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
@@ -1171,6 +1168,7 @@ const PortalAgentListPage: React.FC = () => {
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
+      suite: formValues.suite,
       category: formValues.category,
       risk: formValues.risk,
       processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
