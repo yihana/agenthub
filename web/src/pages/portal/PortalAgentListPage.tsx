@@ -762,8 +762,8 @@ const DOMAIN_LABELS: Record<string, string> = {
   BC: 'Basis to Operate'
 };
 
-const DOMAIN_ORDER = ['CM', 'MM', 'PP', 'HR', 'SD', 'FI', 'CO', 'BC'] as const;
 
+const DOMAIN_ORDER = ['CM', 'MM', 'PP', 'HR', 'SD', 'FI', 'CO', 'BC'] as const;
 const getDomainCodeFromProcessCode = (value?: string) => {
   if (!value) return '';
   const matched = value.trim().toUpperCase().match(/^([A-Z]{2})/);
@@ -775,6 +775,7 @@ const formatDomainLabel = (code: string) => {
   const domainName = DOMAIN_LABELS[normalizedCode];
   return domainName ? `${normalizedCode} (${domainName})` : normalizedCode;
 };
+
 
 const COMMON_DOMAIN_CODE = 'CM';
 const COMMON_LEVEL1_CODE = 'CM.1';
@@ -994,6 +995,7 @@ const PortalAgentListPage: React.FC = () => {
           }
         });
 
+
         if (!map.has(COMMON_DOMAIN_CODE)) {
           map.set(COMMON_DOMAIN_CODE, {
             id: 0,
@@ -1013,6 +1015,7 @@ const PortalAgentListPage: React.FC = () => {
         const domains = DOMAIN_ORDER
           .map((code, index) => map.get(code) || { id: index + 1, code, name: DOMAIN_LABELS[code], level1: [] })
           .filter((domain) => domain.level1.length > 0 || domain.code === COMMON_DOMAIN_CODE);
+
 
         setProcessDomains(domains);
         if (domains.length > 0) {
