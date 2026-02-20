@@ -861,16 +861,19 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
-  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
+
+  const {
+    portalActiveProcessLevel1Code,
+    setPortalActiveProcessLevel1Code,
+    portalProcessPanelCollapsed,
+    setPortalProcessPanelCollapsed
+  } = useProcessPanelState();
+
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
     TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
   );
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
-  // NOTE: 아래 3개 식별자는 JSX 등록 폼에서 직접 참조됨(삭제 시 Cannot find name 발생)
-  const [showAddAgentForm, setShowAddAgentForm] = useState(false);
-  const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
