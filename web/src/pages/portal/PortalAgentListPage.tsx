@@ -148,6 +148,7 @@ interface AgentFormValues {
   name: string;
   owner: string;
   status: AgentRecord['status'];
+  suite: AgentRecord['suite'];
   risk: AgentRecord['risk'];
   category: string;
   processId: string;
@@ -157,7 +158,8 @@ interface AgentFormValues {
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
-  status: '운영',
+  status: '운영중',
+  suite: 'Biz',
   risk: '낮음',
   category: 'COMMON',
   processId: 'CM.1.1'
@@ -748,7 +750,8 @@ const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) 
 };
 
 
-const LEVEL1_E2E_LABELS: Record<string, string> = {
+
+const DOMAIN_LABELS: Record<string, string> = {
   MM: 'Procure to Pay',
   PP: 'Plan to Produce',
   HR: 'Hire to Retire',
@@ -757,6 +760,22 @@ const LEVEL1_E2E_LABELS: Record<string, string> = {
   CO: 'Plan to Perform',
   BC: 'Basis to Operate'
 };
+
+const DOMAIN_ORDER = ['MM', 'PP', 'HR', 'SD', 'FI', 'CO', 'BC'] as const;
+
+const getDomainCodeFromProcessCode = (value?: string) => {
+  if (!value) return '';
+  const matched = value.trim().toUpperCase().match(/^([A-Z]{2})/);
+  return matched?.[1] || '';
+};
+
+const formatDomainLabel = (code: string) => {
+  const normalizedCode = code.toUpperCase();
+  const domainName = DOMAIN_LABELS[normalizedCode];
+  return domainName ? `${normalizedCode} (${domainName})` : normalizedCode;
+};
+
+const LEVEL1_E2E_LABELS: Record<string, string> = DOMAIN_LABELS;
 
 const PROCESS_LEVEL1_LABELS: Record<string, string> = {
   'SD.1': '고객/가격 마스터',
@@ -868,13 +887,8 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-
-  const {
-    portalActiveProcessLevel1Code,
-    setPortalActiveProcessLevel1Code,
-    portalProcessPanelCollapsed,
-    setPortalProcessPanelCollapsed
-  } = useProcessPanelState();
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
 
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
@@ -943,36 +957,48 @@ const PortalAgentListPage: React.FC = () => {
         const data = await response.json();
         const rows = (data.rows || []) as ProcessRow[];
         const map = new Map<string, ProcessDomain>();
+
         rows.forEach((raw) => {
-          const domainCode = raw.domain_code || raw.domainCode;
-          const domainName = raw.domain_name || raw.domainName;
-          const domainId = Number(raw.domain_id || raw.domainId || 0);
           const level1Code = raw.level1_code || raw.level1Code;
+          const level2Code = raw.level2_code || raw.level2Code;
+          const inferredDomainCode = getDomainCodeFromProcessCode(level2Code) || getDomainCodeFromProcessCode(level1Code);
+          const explicitDomainCode = String(raw.domain_code || raw.domainCode || '').toUpperCase();
+          const domainCode = DOMAIN_LABELS[explicitDomainCode] ? explicitDomainCode : inferredDomainCode;
+          if (!domainCode || !DOMAIN_LABELS[domainCode]) return;
+
+          const domainId = Number(raw.domain_id || raw.domainId || 0);
           const level1Name = raw.level1_name || raw.level1Name;
           const level1Id = Number(raw.level1_id || raw.level1Id || 0);
-          const level2Code = raw.level2_code || raw.level2Code;
           const level2Name = raw.level2_name || raw.level2Name;
           const level2Id = Number(raw.level2_id || raw.level2Id || 0);
-          if (!domainCode) return;
-          if (!map.has(domainCode)) map.set(domainCode, { id: domainId, code: domainCode, name: domainName || domainCode, level1: [] });
+
+          if (!map.has(domainCode)) {
+            map.set(domainCode, { id: domainId, code: domainCode, name: DOMAIN_LABELS[domainCode], level1: [] });
+          }
+
           const domain = map.get(domainCode)!;
-          if (!level1Code) return;
-          let l1 = domain.level1.find((item) => item.code === level1Code);
+          const normalizedLevel1Code = level1Code || `${domainCode}.1`;
+          let l1 = domain.level1.find((item) => item.code === normalizedLevel1Code);
           if (!l1) {
-            l1 = { id: level1Id, code: level1Code, name: level1Name || level1Code, level2: [] };
+            l1 = { id: level1Id || domain.level1.length + 1, code: normalizedLevel1Code, name: level1Name || normalizedLevel1Code, level2: [] };
             domain.level1.push(l1);
           }
+
           if (level2Code && !l1.level2.some((l2) => l2.code === level2Code)) {
-            l1.level2.push({ id: level2Id, code: level2Code, name: level2Name || level2Code });
+            l1.level2.push({ id: level2Id || l1.level2.length + 1, code: level2Code, name: level2Name || level2Code });
           }
         });
-        const domains = Array.from(map.values());
+
+        const domains = DOMAIN_ORDER
+          .map((code, index) => map.get(code) || { id: index + 1, code, name: DOMAIN_LABELS[code], level1: [] })
+          .filter((domain) => domain.level1.length > 0);
+
+        setProcessDomains(domains);
         if (domains.length > 0) {
-          setProcessDomains(domains);
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || 'COMMON');
-          setPortalActiveProcessLevel1Code(null);
         }
+        setPortalActiveProcessLevel1Code(null);
       } catch {
         setProcessDomains([]);
       }
@@ -1118,18 +1144,18 @@ const PortalAgentListPage: React.FC = () => {
     ]> = [];
 
     for (const domain of processDomains) {
-      for (const module of domain.level1) {
-        for (const level2 of module.level2) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
           const segments = level2.code.split('.');
           const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
           const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
           entries.push([
             level2.code,
             {
-              module: module.code,
+              module: domain.code,
               processLevel1: `${processLevel1Code} ${processLevel1Name}`,
               processLevel2: `${level2.code} ${level2.name}`,
-              processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
+              processPath: `${domain.code} > ${processLevel1Code} > ${level2.code}`
             }
           ]);
         }
@@ -1171,6 +1197,7 @@ const PortalAgentListPage: React.FC = () => {
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
+      suite: formValues.suite,
       category: formValues.category,
       risk: formValues.risk,
       processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
@@ -1345,7 +1372,7 @@ const PortalAgentListPage: React.FC = () => {
                 setSelectedProcessId(null);
               }}
             >
-              {domain.name}
+              {formatDomainLabel(domain.code)}
             </button>
           ))}
           <button
@@ -1454,6 +1481,24 @@ const PortalAgentListPage: React.FC = () => {
               <option value="전체">전체</option>
               <option value="운영Ops.">운영Ops.</option>
               <option value="Biz">Biz</option>
+            </select>
+          </label>
+          <label>
+            도메인
+            <select
+              value={selectedDomainCode}
+              onChange={(event) => {
+                const nextDomainCode = event.target.value;
+                const nextDomain = processDomains.find((domain) => domain.code === nextDomainCode);
+                setSelectedDomainCode(nextDomainCode);
+                setSelectedLevel1Code(nextDomain?.level1[0]?.code || 'COMMON');
+                setPortalActiveProcessLevel1Code(null);
+                setSelectedProcessId(null);
+              }}
+            >
+              {processDomains.map((domain) => (
+                <option key={domain.code} value={domain.code}>{formatDomainLabel(domain.code)}</option>
+              ))}
             </select>
           </label>
           <label>
