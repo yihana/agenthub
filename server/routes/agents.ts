@@ -48,6 +48,45 @@ const logAudit = async (userId: string | null, eventType: string, targetId: stri
   }
 };
 
+const DEFAULT_PORTAL_AGENTS = [
+  { name: 'OrderBotcommerce', type: 'SD', status: 'active', level2Code: 'SD.1.3' },
+  { name: 'SupportGPTsupport', type: 'BC', status: 'active', level2Code: 'BC.1.3' },
+  { name: 'PricingAIanalytics', type: 'COMMON', status: 'active', level2Code: 'CM.1.1' }
+];
+
+const ensureDefaultAgents = async () => {
+  if (DB_TYPE === 'postgres') {
+    const countResult = await db.query('SELECT COUNT(*)::int AS count FROM agents WHERE is_active = true');
+    const count = Number(countResult.rows?.[0]?.count || 0);
+    if (count > 0) return;
+
+    for (const agent of DEFAULT_PORTAL_AGENTS) {
+      const level2Result = await db.query('SELECT id FROM business_level2 WHERE level2_code = $1 LIMIT 1', [agent.level2Code]);
+      const level2Id = level2Result.rows?.[0]?.id || null;
+      await db.query(
+        `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, is_active, business_level2_id)
+         VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb, true, $8)`,
+        [agent.name, `${agent.name} 에이전트`, agent.type, agent.status, '{}', 1, '[]', level2Id]
+      );
+    }
+    return;
+  }
+
+  const hanaCountResult = await db.query('SELECT COUNT(*) AS COUNT FROM EAR.agents WHERE IS_ACTIVE = true');
+  const hanaCount = Number(hanaCountResult.rows?.[0]?.COUNT || hanaCountResult[0]?.COUNT || 0);
+  if (hanaCount > 0) return;
+
+  for (const agent of DEFAULT_PORTAL_AGENTS) {
+    const level2Result = await db.query('SELECT TOP 1 ID FROM EAR.business_level2 WHERE LEVEL2_CODE = ?', [agent.level2Code]);
+    const level2Id = level2Result.rows?.[0]?.ID || level2Result[0]?.ID || null;
+    await db.query(
+      `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, IS_ACTIVE, BUSINESS_LEVEL2_ID)
+       VALUES (?, ?, ?, ?, ?, ?, ?, true, ?)`,
+      [agent.name, `${agent.name} 에이전트`, agent.type, agent.status, '{}', 1, '[]', level2Id]
+    );
+  }
+};
+
 router.get('/summary', authenticateToken, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
@@ -207,6 +246,7 @@ router.get('/taxonomy', authenticateToken, async (_req, res) => {
 
 router.get('/', authenticateToken, async (req, res) => {
   try {
+    await ensureDefaultAgents();
     const { search = '', status, type, role, level1Id, level2Id, page = 1, limit = 20 } = req.query as any;
     const offset = (Number(page) - 1) * Number(limit);
 
