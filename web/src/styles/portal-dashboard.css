@@ -520,6 +520,10 @@
   align-items: start;
 }
 
+.ear-agent-layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .ear-agent-detail .ear-card__body {
   padding-top: 0;
 }
@@ -853,6 +857,10 @@
   color: var(--ear-muted);
 }
 
+.ear-cell-center {
+  text-align: center;
+}
+
 .ear-table__row {
   cursor: pointer;
 }
@@ -890,6 +898,14 @@
   font-size: 12px;
 }
 
+.ear-drilldown__summary {
+  min-width: 0;
+}
+
+.ear-drilldown__summary span {
+  overflow-wrap: anywhere;
+}
+
 .ear-drilldown__actions {
   display: flex;
   gap: 8px;
@@ -911,6 +927,14 @@
   gap: 4px;
   font-size: 12px;
   color: var(--ear-text);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ear-drilldown__item:hover {
+  border-color: #b9c3d7;
+  box-shadow: 0 2px 10px rgba(15, 23, 42, 0.08);
 }
 
 .ear-filter {
