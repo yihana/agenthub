@@ -7,7 +7,8 @@ interface AgentRecord {
   id: string;
   name: string;
   owner: string;
-  status: '운영' | '점검' | '보류';
+  status: '계획' | 'PoC' | '운영중';
+  suite: '운영Ops.' | 'Biz';
   category: string;
   risk: '낮음' | '중간' | '높음';
   lastUpdated: string;
@@ -130,6 +131,7 @@ interface AgentApiRow {
   type?: string;
   status?: string;
   owner_user_id?: string;
+  tags?: unknown;
   updated_at?: string;
   updatedAt?: string;
 }
@@ -146,6 +148,7 @@ interface AgentFormValues {
   name: string;
   owner: string;
   status: AgentRecord['status'];
+  suite: AgentRecord['suite'];
   risk: AgentRecord['risk'];
   category: string;
   processId: string;
@@ -155,7 +158,8 @@ interface AgentFormValues {
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
-  status: '운영',
+  status: '계획',
+  suite: 'Biz',
   risk: '낮음',
   category: 'COMMON',
   processId: ''
@@ -190,6 +194,7 @@ const TABLE_COLUMN_OPTIONS = [
   { key: 'agentId', label: 'agent ID', defaultVisible: true },
   { key: 'name', label: '이름', defaultVisible: true },
   { key: 'owner', label: '소유 조직', defaultVisible: true },
+  { key: 'suite', label: 'Suite', defaultVisible: true },
   { key: 'status', label: '상태', defaultVisible: true },
   { key: 'capability', label: '수행기능', defaultVisible: true },
   { key: 'customerCount', label: '사용고객', defaultVisible: true },
@@ -765,9 +770,9 @@ const PROCESS_LEVEL1_LABELS: Record<string, string> = {
 
 
 const statusToneMap: Record<AgentRecord['status'], 'success' | 'warning' | 'neutral'> = {
-  운영: 'success',
-  점검: 'warning',
-  보류: 'neutral'
+  계획: 'neutral',
+  PoC: 'warning',
+  운영중: 'success'
 };
 
 const riskToneMap: Record<AgentRecord['risk'], 'success' | 'warning' | 'neutral'> = {
@@ -785,6 +790,7 @@ const runtimeToneMap: Record<AgentRecord['runtimeState'], 'success' | 'warning' 
 
 const normalizeAgent = (agent: AgentRecord): AgentRecord => ({
   ...agent,
+  suite: agent.suite || 'Biz',
   runtimeState: agent.runtimeState ?? 'IDLE',
   runtimeErrors: agent.runtimeErrors ?? 0,
   processId: agent.processId || 'CM.1.1',
@@ -795,7 +801,9 @@ const normalizeAgent = (agent: AgentRecord): AgentRecord => ({
 
 const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
   const rawStatus = String(agent.status || '').toLowerCase();
-  const status: AgentRecord['status'] = rawStatus === 'active' ? '운영' : rawStatus === 'error' ? '점검' : '보류';
+  const status: AgentRecord['status'] = rawStatus === 'active' ? '운영중' : rawStatus === 'error' ? 'PoC' : '계획';
+  const tags = Array.isArray(agent.tags) ? agent.tags.map((item) => String(item).toUpperCase()) : [];
+  const suite: AgentRecord['suite'] = tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz';
   const category = String(agent.type || 'COMMON').toUpperCase();
   const updatedAt = String(agent.updatedAt || agent.updated_at || '').slice(0, 10);
   return normalizeAgent({
@@ -803,11 +811,12 @@ const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
     name: String(agent.name || 'Unnamed Agent'),
     owner: String(agent.owner_user_id || '미지정'),
     status,
+    suite,
     category,
-    risk: status === '점검' ? '중간' : '낮음',
+    risk: status === 'PoC' ? '중간' : '낮음',
     lastUpdated: updatedAt || toShortDate(new Date()),
-    runtimeState: status === '점검' ? 'DEGRADED' : 'RUNNING',
-    runtimeErrors: status === '점검' ? 1 : 0,
+    runtimeState: status === 'PoC' ? 'DEGRADED' : 'RUNNING',
+    runtimeErrors: status === 'PoC' ? 1 : 0,
     processId: 'CM.1.1',
     capability: '설명',
     customerCount: 0,
@@ -843,6 +852,7 @@ const PortalAgentListPage: React.FC = () => {
   const [agents, setAgents] = useState<AgentRecord[]>(() => loadAgents());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
+  const [suiteFilter, setSuiteFilter] = useState('전체');
   const [riskFilter, setRiskFilter] = useState('전체');
   const [categoryFilter, setCategoryFilter] = useState('전체');
   const [processDomains, setProcessDomains] = useState<ProcessDomain[]>([]);
@@ -1031,15 +1041,16 @@ const PortalAgentListPage: React.FC = () => {
     return agents.filter((agent) => {
       const matchesSearch = agent.name.toLowerCase().includes(search.toLowerCase());
       const matchesStatus = statusFilter === '전체' || agent.status === statusFilter;
+      const matchesSuite = suiteFilter === '전체' || agent.suite === suiteFilter;
       const matchesRisk = riskFilter === '전체' || agent.risk === riskFilter;
       const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
       const isUnclassified = !knownProcessCodes.has(agent.processId);
       const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
       const matchesProcessLevel1 = !portalActiveProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
       const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
-      return matchesSearch && matchesStatus && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
+      return matchesSearch && matchesStatus && matchesSuite && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
     });
-  }, [agents, categoryFilter, riskFilter, search, statusFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
+  }, [agents, categoryFilter, riskFilter, search, statusFilter, suiteFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
 
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
@@ -1138,6 +1149,7 @@ const PortalAgentListPage: React.FC = () => {
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
+      suite: formValues.suite,
       category: formValues.category,
       risk: formValues.risk,
       processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
@@ -1181,6 +1193,24 @@ const PortalAgentListPage: React.FC = () => {
   }, [agentDetails]);
 
 
+  const agentCodeById = useMemo(() => {
+    const sortedAgents = [...agents].sort((a, b) => {
+      const processCompare = a.processId.localeCompare(b.processId);
+      if (processCompare !== 0) return processCompare;
+      return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
+    });
+    const processCounters = new Map<string, number>();
+    const codeMap = new Map<string, string>();
+
+    sortedAgents.forEach((agent) => {
+      const sequence = (processCounters.get(agent.processId) || 0) + 1;
+      processCounters.set(agent.processId, sequence);
+      codeMap.set(agent.id, `${agent.processId}.A${sequence}`);
+    });
+
+    return codeMap;
+  }, [agents]);
+
   const displayAgents = useMemo(() => {
     return filteredAgents.map((agent) => {
       const detail = agentDetailById.get(agent.id);
@@ -1194,15 +1224,18 @@ const PortalAgentListPage: React.FC = () => {
         processPath: '-'
       };
 
+      const agentCode = agentCodeById.get(agent.id) || `${agent.processId}.A1`;
+
       return {
         ...agent,
+        agentCode,
         capability: buildCapabilityDescription(agent, processLabel),
         customerCount: usage.customerCount,
         calls30d: usage.calls30d,
         processMeta
       };
     });
-  }, [filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
+  }, [agentCodeById, filteredAgents, agentDetailById, processNameById, processMetaByIdMap, selectedLevel1]);
 
 
   const getColumnValue = (agent: (typeof displayAgents)[number], field: string) => {
@@ -1218,11 +1251,13 @@ const PortalAgentListPage: React.FC = () => {
       case 'processLevel2':
         return agent.processMeta.processLevel2;
       case 'agentId':
-        return agent.id;
+        return agent.agentCode;
       case 'name':
         return agent.name;
       case 'owner':
         return agent.owner;
+      case 'suite':
+        return agent.suite;
       case 'status':
         return agent.status;
       case 'capability':
@@ -1245,13 +1280,19 @@ const PortalAgentListPage: React.FC = () => {
   };
 
   const filteredDisplayAgents = useMemo(() => {
-    return displayAgents.filter((agent) =>
-      dynamicFilters.every((rule) => {
-        if (!rule.value.trim()) return true;
-        const target = getColumnValue(agent, rule.field).toLowerCase();
-        return target.includes(rule.value.toLowerCase());
-      })
-    );
+    return displayAgents
+      .filter((agent) =>
+        dynamicFilters.every((rule) => {
+          if (!rule.value.trim()) return true;
+          const target = getColumnValue(agent, rule.field).toLowerCase();
+          return target.includes(rule.value.toLowerCase());
+        })
+      )
+      .sort((a, b) => {
+        const processCompare = a.processId.localeCompare(b.processId);
+        if (processCompare !== 0) return processCompare;
+        return a.agentCode.localeCompare(b.agentCode);
+      });
   }, [displayAgents, dynamicFilters]);
 
   useEffect(() => {
@@ -1384,9 +1425,17 @@ const PortalAgentListPage: React.FC = () => {
             상태
             <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               <option value="전체">전체</option>
-              <option value="운영">운영</option>
-              <option value="점검">점검</option>
-              <option value="보류">보류</option>
+              <option value="계획">계획</option>
+              <option value="PoC">PoC</option>
+              <option value="운영중">운영중</option>
+            </select>
+          </label>
+          <label>
+            Suite
+            <select value={suiteFilter} onChange={(event) => setSuiteFilter(event.target.value)}>
+              <option value="전체">전체</option>
+              <option value="운영Ops.">운영Ops.</option>
+              <option value="Biz">Biz</option>
             </select>
           </label>
           <label>
@@ -1485,9 +1534,19 @@ const PortalAgentListPage: React.FC = () => {
                   value={formValues.status}
                   onChange={(event) => handleFormChange('status', event.target.value as AgentRecord['status'])}
                 >
-                  <option value="운영">운영</option>
-                  <option value="점검">점검</option>
-                  <option value="보류">보류</option>
+                  <option value="계획">계획</option>
+                  <option value="PoC">PoC</option>
+                  <option value="운영중">운영중</option>
+                </select>
+              </label>
+              <label>
+                Suite
+                <select
+                  value={formValues.suite}
+                  onChange={(event) => handleFormChange('suite', event.target.value as AgentRecord['suite'])}
+                >
+                  <option value="운영Ops.">운영Ops.</option>
+                  <option value="Biz">Biz</option>
                 </select>
               </label>
               <label>
@@ -1578,9 +1637,10 @@ const PortalAgentListPage: React.FC = () => {
                       {visibleColumns.includes('module') && <td>{agent.processMeta.module}</td>}
                       {visibleColumns.includes('processLevel1') && <td>{agent.processMeta.processLevel1}</td>}
                       {visibleColumns.includes('processLevel2') && <td>{agent.processMeta.processLevel2}</td>}
-                      {visibleColumns.includes('agentId') && <td>{agent.id}</td>}
+                      {visibleColumns.includes('agentId') && <td className="ear-cell-center">{agent.agentCode}</td>}
                       {visibleColumns.includes('name') && <td><strong>{agent.name}</strong><span className="ear-muted">{agent.category}</span></td>}
                       {visibleColumns.includes('owner') && <td>{agent.owner}</td>}
+                      {visibleColumns.includes('suite') && <td className="ear-cell-center">{agent.suite}</td>}
                       {visibleColumns.includes('status') && <td><TagPill label={agent.status} tone={statusToneMap[agent.status]} /></td>}
                       {visibleColumns.includes('capability') && <td>{truncateText(agent.capability, 30)}</td>}
                       {visibleColumns.includes('customerCount') && <td>{agent.customerCount}</td>}

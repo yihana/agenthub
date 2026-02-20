@@ -4,6 +4,16 @@ import WidgetCard from '../../components/portal-dashboard/WidgetCard';
 import TagPill from '../../components/portal-dashboard/TagPill';
 import { roleLabels, usePortalRole } from '../../hooks/usePortalRole';
 
+const DOMAIN_LABELS: Record<string, string> = {
+  MM: 'Procure to Pay',
+  PP: 'Plan to Produce',
+  HR: 'Hire to Retire',
+  SD: 'Order to Cash',
+  FI: 'Record to Report',
+  CO: 'Plan to Perform',
+  BC: 'Basis to Operate'
+};
+
 
 const initialRoadmapStages = [
   {
@@ -99,6 +109,7 @@ const PortalRoadmapPage: React.FC = () => {
     });
     return Array.from(map.values()).sort((a, b) => a.id - b.id);
   }, [processRows]);
+
 
   useEffect(() => {
     if (!level2Form.level1_id && level1Options.length > 0) {
@@ -630,7 +641,19 @@ const PortalRoadmapPage: React.FC = () => {
             </WidgetCard>
             <WidgetCard title="Level1 추가/수정" description="모듈 탭에 표시되는 Level1 관리">
               <form className="ear-form" onSubmit={handleAddLevel1}>
-                <label>Domain Code<input className="ear-input" value={level1Form.domain_code} onChange={(e)=>setLevel1Form((p)=>({...p, domain_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
+                <label>
+                  Domain Code
+                  <select
+                    className="ear-input"
+                    value={level1Form.domain_code}
+                    onChange={(e)=>setLevel1Form((p)=>({...p, domain_code:e.target.value}))}
+                    disabled={!canEditRoadmap}
+                  >
+                    {domainCodeOptions.map((code) => (
+                      <option key={code} value={code}>{DOMAIN_LABELS[code] ? `${code} (${DOMAIN_LABELS[code]})` : code}</option>
+                    ))}
+                  </select>
+                </label>
                 <label>Level1 Code<input className="ear-input" value={level1Form.level1_code} onChange={(e)=>setLevel1Form((p)=>({...p, level1_code:e.target.value}))} disabled={!canEditRoadmap} /></label>
                 <label>Level1 Name<input className="ear-input" value={level1Form.level1_name} onChange={(e)=>setLevel1Form((p)=>({...p, level1_name:e.target.value}))} disabled={!canEditRoadmap} /></label>
                 <label>정렬순서<input className="ear-input" type="number" value={level1Form.display_order} onChange={(e)=>setLevel1Form((p)=>({...p, display_order:e.target.value}))} disabled={!canEditRoadmap} /></label>
