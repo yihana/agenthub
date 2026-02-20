@@ -148,7 +148,6 @@ interface AgentFormValues {
   name: string;
   owner: string;
   status: AgentRecord['status'];
-  suite: AgentRecord['suite'];
   risk: AgentRecord['risk'];
   category: string;
   processId: string;
@@ -158,11 +157,10 @@ interface AgentFormValues {
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
-  status: '계획',
-  suite: 'Biz',
+  status: '운영',
   risk: '낮음',
   category: 'COMMON',
-  processId: ''
+  processId: 'CM.1.1'
 };
 
 
@@ -874,6 +872,8 @@ const PortalAgentListPage: React.FC = () => {
     TABLE_COLUMN_OPTIONS.filter((item) => item.defaultVisible).map((item) => item.key)
   );
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
+  const [showAddAgentForm, setShowAddAgentForm] = useState(false);
+  const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
 
   const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
     setAgents((prev) => {
@@ -1142,9 +1142,7 @@ const PortalAgentListPage: React.FC = () => {
 
   const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!formValues.name.trim() || !formValues.owner.trim()) {
-      return;
-    }
+    if (!formValues.name.trim() || !formValues.owner.trim()) return;
 
     const nextId = String(Math.max(0, ...agents.map((agent) => Number(agent.id) || 0)) + 1);
     const nextAgent: AgentRecord = {
@@ -1152,7 +1150,6 @@ const PortalAgentListPage: React.FC = () => {
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
-      suite: formValues.suite,
       category: formValues.category,
       risk: formValues.risk,
       processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
@@ -1165,10 +1162,7 @@ const PortalAgentListPage: React.FC = () => {
     };
 
     persistAgents((prev) => [nextAgent, ...prev]);
-    setFormValues({
-      ...INITIAL_AGENT_FORM_VALUES,
-      processId: visibleLevel2Items[0]?.code || ''
-    });
+    setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: visibleLevel2Items[0]?.code || 'CM.1.1' });
     setShowAddAgentForm(false);
   };
 
@@ -1314,7 +1308,7 @@ const PortalAgentListPage: React.FC = () => {
     <PortalDashboardLayout
       title="에이전트 목록"
       subtitle="운영 중인 에이전트를 상태와 리스크 기준으로 필터링합니다."
-      actions={<button type="button" className="ear-primary" onClick={() => setShowAddAgentForm((prev) => !prev)}>에이전트 등록</button>}
+      actions={<button className="ear-primary" onClick={() => setShowAddAgentForm((prev) => !prev)}>에이전트 등록</button>}
     >
       <section className="ear-card ear-card--panel ear-process-overview">
         <div className="ear-process-overview__domains">

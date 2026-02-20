@@ -15,6 +15,17 @@ const DOMAIN_LABELS: Record<string, string> = {
 };
 
 
+const DOMAIN_LABELS: Record<string, string> = {
+  MM: 'Procure to Pay',
+  PP: 'Plan to Produce',
+  HR: 'Hire to Retire',
+  SD: 'Order to Cash',
+  FI: 'Record to Report',
+  CO: 'Plan to Perform',
+  BC: 'Basis to Operate'
+};
+
+
 const initialRoadmapStages = [
   {
     quarter: '2024 Q3',
@@ -96,26 +107,16 @@ const PortalRoadmapPage: React.FC = () => {
   const [level1Form, setLevel1Form] = useState({ domain_code: 'SAP', level1_code: '', level1_name: '', display_order: '10' });
   const [level2Form, setLevel2Form] = useState({ level1_id: '', level2_code: '', level2_name: '', display_order: '10' });
 
-  const level1Options = useMemo(() => {
-    const map = new Map<number, { id: number; code: string; name: string }>();
+  const domainCodeOptions = useMemo(() => {
+    const codes = new Set<string>();
     processRows.forEach((row) => {
-      const id = Number(row.level1_id || row.level1Id || 0);
-      if (!id || map.has(id)) return;
-      map.set(id, {
-        id,
-        code: String(row.level1_code || row.level1Code || ''),
-        name: String(row.level1_name || row.level1Name || '')
-      });
+      const code = String(row.domain_code || row.domainCode || '').trim().toUpperCase();
+      if (code) codes.add(code);
     });
-    return Array.from(map.values()).sort((a, b) => a.id - b.id);
+    Object.keys(DOMAIN_LABELS).forEach((code) => codes.add(code));
+    return Array.from(codes).sort();
   }, [processRows]);
 
-
-  useEffect(() => {
-    if (!level2Form.level1_id && level1Options.length > 0) {
-      setLevel2Form((prev) => ({ ...prev, level1_id: String(level1Options[0].id) }));
-    }
-  }, [level1Options, level2Form.level1_id]);
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {
     setRoadmapStages((prev) =>
       prev.map((stage, stageIndex) => {
