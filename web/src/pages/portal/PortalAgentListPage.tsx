@@ -1050,6 +1050,31 @@ const PortalAgentListPage: React.FC = () => {
     return Array.from(collected);
   }, [agents, processDomains]);
 
+
+  const processLevel1NameByCode = useMemo(() => {
+    const map = new Map<string, string>(Object.entries(PROCESS_LEVEL1_LABELS));
+
+    processDomains.forEach((domain) => {
+      domain.level1.forEach((level1) => {
+        const normalizedLevel1Code = level1.code.includes('.') ? level1.code : `${domain.code}.1`;
+        if (!map.has(normalizedLevel1Code) && level1.name) {
+          map.set(normalizedLevel1Code, level1.name);
+        }
+
+        level1.level2.forEach((level2) => {
+          const segments = level2.code.split('.');
+          const derivedLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
+          if (!map.has(derivedLevel1Code) && level1.name) {
+            map.set(derivedLevel1Code, level1.name);
+          }
+        });
+      });
+    });
+
+    return map;
+  }, [processDomains]);
+
+
   const level2Source = useMemo(() => {
     if (selectedDomain?.code === COMMON_DOMAIN_CODE) {
       return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
@@ -1062,14 +1087,14 @@ const PortalAgentListPage: React.FC = () => {
     level2Source.forEach((item) => {
       const segments = item.code.split('.');
       const groupCode = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-      const groupName = PROCESS_LEVEL1_LABELS[groupCode] || groupCode;
+      const groupName = processLevel1NameByCode.get(groupCode) || groupCode;
       if (!map.has(groupCode)) {
         map.set(groupCode, { code: groupCode, name: groupName, items: [] });
       }
       map.get(groupCode)!.items.push(item);
     });
     return Array.from(map.values());
-  }, [level2Source]);
+  }, [level2Source, processLevel1NameByCode]);
 
   const selectedProcessLevel1Group = useMemo(() => {
     if (!processLevel1Groups.length) return undefined;
@@ -1176,7 +1201,7 @@ const PortalAgentListPage: React.FC = () => {
         for (const level2 of level1.level2) {
           const segments = level2.code.split('.');
           const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
-          const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
+          const processLevel1Name = processLevel1NameByCode.get(processLevel1Code) || processLevel1Code;
           entries.push([
             level2.code,
             {
@@ -1190,7 +1215,7 @@ const PortalAgentListPage: React.FC = () => {
       }
     }
     return new Map(entries);
-  }, [processDomains]);
+  }, [processDomains, processLevel1NameByCode]);
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
@@ -1470,7 +1495,7 @@ const PortalAgentListPage: React.FC = () => {
                     <span>{(() => {
                       const segments = item.code.split('.');
                       const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-                      const level1Name = PROCESS_LEVEL1_LABELS[level1Code] || selectedLevel1?.name || '프로세스';
+                      const level1Name = processLevel1NameByCode.get(level1Code) || selectedLevel1?.name || '프로세스';
                       return `${level1Code} ${level1Name}`;
                     })()}</span>
                     <strong>{`${item.code} ${item.name}`}</strong>
