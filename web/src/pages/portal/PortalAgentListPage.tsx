@@ -764,6 +764,7 @@ const DOMAIN_LABELS: Record<string, string> = {
 
 
 const DOMAIN_ORDER = ['CM', 'MM', 'PP', 'HR', 'SD', 'FI', 'CO', 'BC'] as const;
+
 const getDomainCodeFromProcessCode = (value?: string) => {
   if (!value) return '';
   const matched = value.trim().toUpperCase().match(/^([A-Z]{2})/);
