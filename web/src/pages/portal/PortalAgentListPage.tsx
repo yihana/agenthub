@@ -148,6 +148,7 @@ interface AgentFormValues {
   name: string;
   owner: string;
   status: AgentRecord['status'];
+  suite: AgentRecord['suite'];
   risk: AgentRecord['risk'];
   category: string;
   processId: string;
@@ -157,7 +158,8 @@ interface AgentFormValues {
 const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
   name: '',
   owner: '',
-  status: '운영',
+  status: '운영중',
+  suite: 'Biz',
   risk: '낮음',
   category: 'COMMON',
   processId: 'CM.1.1'
@@ -748,7 +750,9 @@ const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) 
 };
 
 
-const LEVEL1_E2E_LABELS: Record<string, string> = {
+
+const DOMAIN_LABELS: Record<string, string> = {
+  CM: '통합',
   MM: 'Procure to Pay',
   PP: 'Plan to Produce',
   HR: 'Hire to Retire',
@@ -757,6 +761,26 @@ const LEVEL1_E2E_LABELS: Record<string, string> = {
   CO: 'Plan to Perform',
   BC: 'Basis to Operate'
 };
+
+const DOMAIN_ORDER = ['CM', 'MM', 'PP', 'HR', 'SD', 'FI', 'CO', 'BC'] as const;
+
+const getDomainCodeFromProcessCode = (value?: string) => {
+  if (!value) return '';
+  const matched = value.trim().toUpperCase().match(/^([A-Z]{2})/);
+  return matched?.[1] || '';
+};
+
+const formatDomainLabel = (code: string) => {
+  const normalizedCode = code.toUpperCase();
+  const domainName = DOMAIN_LABELS[normalizedCode];
+  return domainName ? `${normalizedCode} (${domainName})` : normalizedCode;
+};
+
+const COMMON_DOMAIN_CODE = 'CM';
+const COMMON_LEVEL1_CODE = 'CM.1';
+const COMMON_LEVEL2_CODE = 'CM.1.1';
+
+const LEVEL1_E2E_LABELS: Record<string, string> = DOMAIN_LABELS;
 
 const PROCESS_LEVEL1_LABELS: Record<string, string> = {
   'SD.1': '고객/가격 마스터',
@@ -863,18 +887,13 @@ const PortalAgentListPage: React.FC = () => {
   const [riskFilter, setRiskFilter] = useState('전체');
   const [categoryFilter, setCategoryFilter] = useState('전체');
   const [processDomains, setProcessDomains] = useState<ProcessDomain[]>([]);
-  const [selectedDomainCode, setSelectedDomainCode] = useState('SAP');
-  const [selectedLevel1Code, setSelectedLevel1Code] = useState('COMMON');
+  const [selectedDomainCode, setSelectedDomainCode] = useState(COMMON_DOMAIN_CODE);
+  const [selectedLevel1Code, setSelectedLevel1Code] = useState(COMMON_LEVEL1_CODE);
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-
-  const {
-    portalActiveProcessLevel1Code,
-    setPortalActiveProcessLevel1Code,
-    portalProcessPanelCollapsed,
-    setPortalProcessPanelCollapsed
-  } = useProcessPanelState();
+  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
+  const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
 
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
   const [visibleColumns, setVisibleColumns] = useState<string[]>(() =>
@@ -943,36 +962,64 @@ const PortalAgentListPage: React.FC = () => {
         const data = await response.json();
         const rows = (data.rows || []) as ProcessRow[];
         const map = new Map<string, ProcessDomain>();
+
         rows.forEach((raw) => {
-          const domainCode = raw.domain_code || raw.domainCode;
-          const domainName = raw.domain_name || raw.domainName;
-          const domainId = Number(raw.domain_id || raw.domainId || 0);
           const level1Code = raw.level1_code || raw.level1Code;
+          const level2Code = raw.level2_code || raw.level2Code;
+          const inferredDomainCode = getDomainCodeFromProcessCode(level2Code) || getDomainCodeFromProcessCode(level1Code);
+          const explicitDomainCode = String(raw.domain_code || raw.domainCode || '').toUpperCase();
+          const domainCode = DOMAIN_LABELS[explicitDomainCode] ? explicitDomainCode : inferredDomainCode;
+          if (!domainCode || !DOMAIN_LABELS[domainCode]) return;
+
+          const domainId = Number(raw.domain_id || raw.domainId || 0);
           const level1Name = raw.level1_name || raw.level1Name;
           const level1Id = Number(raw.level1_id || raw.level1Id || 0);
-          const level2Code = raw.level2_code || raw.level2Code;
           const level2Name = raw.level2_name || raw.level2Name;
           const level2Id = Number(raw.level2_id || raw.level2Id || 0);
-          if (!domainCode) return;
-          if (!map.has(domainCode)) map.set(domainCode, { id: domainId, code: domainCode, name: domainName || domainCode, level1: [] });
+
+          if (!map.has(domainCode)) {
+            map.set(domainCode, { id: domainId, code: domainCode, name: DOMAIN_LABELS[domainCode], level1: [] });
+          }
+
           const domain = map.get(domainCode)!;
-          if (!level1Code) return;
-          let l1 = domain.level1.find((item) => item.code === level1Code);
+          const normalizedLevel1Code = level1Code || `${domainCode}.1`;
+          let l1 = domain.level1.find((item) => item.code === normalizedLevel1Code);
           if (!l1) {
-            l1 = { id: level1Id, code: level1Code, name: level1Name || level1Code, level2: [] };
+            l1 = { id: level1Id || domain.level1.length + 1, code: normalizedLevel1Code, name: level1Name || normalizedLevel1Code, level2: [] };
             domain.level1.push(l1);
           }
+
           if (level2Code && !l1.level2.some((l2) => l2.code === level2Code)) {
-            l1.level2.push({ id: level2Id, code: level2Code, name: level2Name || level2Code });
+            l1.level2.push({ id: level2Id || l1.level2.length + 1, code: level2Code, name: level2Name || level2Code });
           }
         });
-        const domains = Array.from(map.values());
-        if (domains.length > 0) {
-          setProcessDomains(domains);
-          setSelectedDomainCode(domains[0].code);
-          setSelectedLevel1Code(domains[0].level1[0]?.code || 'COMMON');
-          setPortalActiveProcessLevel1Code(null);
+
+        if (!map.has(COMMON_DOMAIN_CODE)) {
+          map.set(COMMON_DOMAIN_CODE, {
+            id: 0,
+            code: COMMON_DOMAIN_CODE,
+            name: DOMAIN_LABELS[COMMON_DOMAIN_CODE],
+            level1: [
+              {
+                id: 0,
+                code: COMMON_LEVEL1_CODE,
+                name: '통합',
+                level2: [{ id: 0, code: COMMON_LEVEL2_CODE, name: '프로세스 미등록' }]
+              }
+            ]
+          });
         }
+
+        const domains = DOMAIN_ORDER
+          .map((code, index) => map.get(code) || { id: index + 1, code, name: DOMAIN_LABELS[code], level1: [] })
+          .filter((domain) => domain.level1.length > 0 || domain.code === COMMON_DOMAIN_CODE);
+
+        setProcessDomains(domains);
+        if (domains.length > 0) {
+          setSelectedDomainCode(domains[0].code);
+          setSelectedLevel1Code(domains[0].level1[0]?.code || COMMON_LEVEL1_CODE);
+        }
+        setPortalActiveProcessLevel1Code(null);
       } catch {
         setProcessDomains([]);
       }
@@ -995,11 +1042,36 @@ const PortalAgentListPage: React.FC = () => {
         collected.add(level1.code);
       });
     });
+    agents.forEach((agent) => collected.add(agent.category));
     return Array.from(collected);
+  }, [agents, processDomains]);
+
+
+  const processLevel1NameByCode = useMemo(() => {
+    const map = new Map<string, string>(Object.entries(PROCESS_LEVEL1_LABELS));
+
+    processDomains.forEach((domain) => {
+      domain.level1.forEach((level1) => {
+        const normalizedLevel1Code = level1.code.includes('.') ? level1.code : `${domain.code}.1`;
+        if (!map.has(normalizedLevel1Code) && level1.name) {
+          map.set(normalizedLevel1Code, level1.name);
+        }
+
+        level1.level2.forEach((level2) => {
+          const segments = level2.code.split('.');
+          const derivedLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
+          if (!map.has(derivedLevel1Code) && level1.name) {
+            map.set(derivedLevel1Code, level1.name);
+          }
+        });
+      });
+    });
+
+    return map;
   }, [processDomains]);
 
   const level2Source = useMemo(() => {
-    if (selectedLevel1?.code === 'COMMON') {
+    if (selectedDomain?.code === COMMON_DOMAIN_CODE) {
       return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
     }
     return selectedLevel1?.level2 || [];
@@ -1010,14 +1082,14 @@ const PortalAgentListPage: React.FC = () => {
     level2Source.forEach((item) => {
       const segments = item.code.split('.');
       const groupCode = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-      const groupName = PROCESS_LEVEL1_LABELS[groupCode] || groupCode;
+      const groupName = processLevel1NameByCode.get(groupCode) || groupCode;
       if (!map.has(groupCode)) {
         map.set(groupCode, { code: groupCode, name: groupName, items: [] });
       }
       map.get(groupCode)!.items.push(item);
     });
     return Array.from(map.values());
-  }, [level2Source]);
+  }, [level2Source, processLevel1NameByCode]);
 
   const selectedProcessLevel1Group = useMemo(() => {
     if (!processLevel1Groups.length) return undefined;
@@ -1060,7 +1132,7 @@ const PortalAgentListPage: React.FC = () => {
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
-    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
+    const isCommonDomain = selectedDomain?.code === COMMON_DOMAIN_CODE;
 
     return agents.filter((agent) => {
       const matchesSearch = agent.name.toLowerCase().includes(search.toLowerCase());
@@ -1069,9 +1141,11 @@ const PortalAgentListPage: React.FC = () => {
       const matchesRisk = riskFilter === '전체' || agent.risk === riskFilter;
       const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
       const isUnclassified = !knownProcessCodes.has(agent.processId);
-      const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified);
-      const matchesProcessLevel1 = !portalActiveProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId);
-      const matchesLevel2 = !selectedProcessId || agent.processId === selectedProcessId;
+      const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonDomain && isUnclassified);
+      const matchesProcessLevel1 = isCommonDomain
+        ? isUnclassified
+        : (!portalActiveProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId));
+      const matchesLevel2 = isCommonDomain ? true : (!selectedProcessId || agent.processId === selectedProcessId);
       return matchesSearch && matchesStatus && matchesSuite && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
     });
   }, [agents, categoryFilter, riskFilter, search, statusFilter, suiteFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
@@ -1086,12 +1160,12 @@ const PortalAgentListPage: React.FC = () => {
         }
       }
     }
-    const isCommonLevel1 = selectedLevel1?.code === 'COMMON';
+    const isCommonDomain = selectedDomain?.code === COMMON_DOMAIN_CODE;
 
     let count = 0;
     for (const agent of agents) {
       const isUnclassified = !knownProcessCodes.has(agent.processId);
-      if (level2Codes.has(agent.processId) || (isCommonLevel1 && isUnclassified)) {
+      if (level2Codes.has(agent.processId) || (isCommonDomain && isUnclassified)) {
         count += 1;
       }
     }
@@ -1118,25 +1192,25 @@ const PortalAgentListPage: React.FC = () => {
     ]> = [];
 
     for (const domain of processDomains) {
-      for (const module of domain.level1) {
-        for (const level2 of module.level2) {
+      for (const level1 of domain.level1) {
+        for (const level2 of level1.level2) {
           const segments = level2.code.split('.');
           const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : level2.code;
-          const processLevel1Name = PROCESS_LEVEL1_LABELS[processLevel1Code] || processLevel1Code;
+          const processLevel1Name = processLevel1NameByCode.get(processLevel1Code) || processLevel1Code;
           entries.push([
             level2.code,
             {
-              module: module.code,
+              module: domain.code,
               processLevel1: `${processLevel1Code} ${processLevel1Name}`,
               processLevel2: `${level2.code} ${level2.name}`,
-              processPath: `${module.code} > ${processLevel1Code} > ${level2.code}`
+              processPath: `${domain.code} > ${processLevel1Code} > ${level2.code}`
             }
           ]);
         }
       }
     }
     return new Map(entries);
-  }, [processDomains]);
+  }, [processDomains, processLevel1NameByCode]);
 
   const addDynamicFilter = () => {
     setDynamicFilters((prev) => [
@@ -1171,6 +1245,7 @@ const PortalAgentListPage: React.FC = () => {
       name: formValues.name.trim(),
       owner: formValues.owner.trim(),
       status: formValues.status,
+      suite: formValues.suite,
       category: formValues.category,
       risk: formValues.risk,
       processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
@@ -1235,11 +1310,12 @@ const PortalAgentListPage: React.FC = () => {
       const processLabel = processNameById.get(agent.processId) || `${agent.processId} 업무`;
       const usage = aggregateCustomerUsage(agent, detail);
 
+      const inferredDomainCode = getDomainCodeFromProcessCode(agent.processId) || COMMON_DOMAIN_CODE;
       const processMeta = processMetaByIdMap.get(agent.processId) || {
-        module: selectedLevel1?.code || '-',
-        processLevel1: '-',
-        processLevel2: `${agent.processId} -`,
-        processPath: '-'
+        module: inferredDomainCode,
+        processLevel1: `${COMMON_LEVEL1_CODE} 통합`,
+        processLevel2: `${agent.processId} 프로세스 미등록`,
+        processPath: `${COMMON_DOMAIN_CODE} > ${COMMON_LEVEL1_CODE} > ${agent.processId}`
       };
 
       const agentCode = agentCodeById.get(agent.id) || `${agent.processId}.A1`;
@@ -1340,12 +1416,12 @@ const PortalAgentListPage: React.FC = () => {
               className={`ear-process-domain ${selectedDomainCode === domain.code ? 'active' : ''}`}
               onClick={() => {
                 setSelectedDomainCode(domain.code);
-                setSelectedLevel1Code(domain.level1[0]?.code || 'COMMON');
+                setSelectedLevel1Code(domain.level1[0]?.code || COMMON_LEVEL1_CODE);
                 setPortalActiveProcessLevel1Code(null);
                 setSelectedProcessId(null);
               }}
             >
-              {domain.name}
+              {formatDomainLabel(domain.code)}
             </button>
           ))}
           <button
@@ -1358,28 +1434,6 @@ const PortalAgentListPage: React.FC = () => {
         </div>
         {!portalProcessPanelCollapsed && (
           <>
-            <div className="ear-process-overview__section">
-              <div className="ear-process-overview__tabs">
-                {(selectedDomain?.level1 || []).map((module) => {
-                  const moduleCount = module.level2.length;
-                  return (
-                    <button
-                      key={module.code}
-                      type="button"
-                      className={`ear-process-tab ${selectedLevel1Code === module.code ? 'active' : ''}`}
-                      onClick={() => {
-                        setSelectedLevel1Code(module.code);
-                        setPortalActiveProcessLevel1Code(null);
-                        setSelectedProcessId(null);
-                      }}
-                    >
-                      <span>{LEVEL1_E2E_LABELS[module.code] ? `${module.name} · ${LEVEL1_E2E_LABELS[module.code]}` : module.name}</span>
-                      <em>{moduleCount}</em>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
             <div className="ear-process-overview__section">
               <div className="ear-process-overview__tabs">
                 {processLevel1Groups.map((group) => (
@@ -1400,7 +1454,7 @@ const PortalAgentListPage: React.FC = () => {
             </div>
             <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
-                <h3>{selectedLevel1 ? (selectedLevel1.code === 'COMMON' ? '통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
+                <h3>{selectedLevel1 ? (selectedDomain?.code === COMMON_DOMAIN_CODE ? 'CM · 통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
               <div className="ear-process-overview__cards">
@@ -1414,7 +1468,7 @@ const PortalAgentListPage: React.FC = () => {
                     <span>{(() => {
                       const segments = item.code.split('.');
                       const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-                      const level1Name = PROCESS_LEVEL1_LABELS[level1Code] || selectedLevel1?.name || '프로세스';
+                      const level1Name = processLevel1NameByCode.get(level1Code) || selectedLevel1?.name || '프로세스';
                       return `${level1Code} ${level1Name}`;
                     })()}</span>
                     <strong>{`${item.code} ${item.name}`}</strong>
@@ -1457,6 +1511,24 @@ const PortalAgentListPage: React.FC = () => {
             </select>
           </label>
           <label>
+            도메인
+            <select
+              value={selectedDomainCode}
+              onChange={(event) => {
+                const nextDomainCode = event.target.value;
+                const nextDomain = processDomains.find((domain) => domain.code === nextDomainCode);
+                setSelectedDomainCode(nextDomainCode);
+                setSelectedLevel1Code(nextDomain?.level1[0]?.code || COMMON_LEVEL1_CODE);
+                setPortalActiveProcessLevel1Code(null);
+                setSelectedProcessId(null);
+              }}
+            >
+              {processDomains.map((domain) => (
+                <option key={domain.code} value={domain.code}>{formatDomainLabel(domain.code)}</option>
+              ))}
+            </select>
+          </label>
+          <label>
             리스크
             <select value={riskFilter} onChange={(event) => setRiskFilter(event.target.value)}>
               <option value="전체">전체</option>
@@ -1470,7 +1542,7 @@ const PortalAgentListPage: React.FC = () => {
             <select value={categoryFilter} onChange={(event) => setCategoryFilter(event.target.value)}>
               <option value="전체">전체</option>
               {categoryOptions.map((category) => (
-                <option key={category} value={category}>{category === 'COMMON' ? '통합' : category}</option>
+                <option key={category} value={category}>{category === 'COMMON' ? 'CM' : category}</option>
               ))}
             </select>
           </label>
@@ -1585,7 +1657,7 @@ const PortalAgentListPage: React.FC = () => {
                   onChange={(event) => handleFormChange('category', event.target.value)}
                 >
                   {categoryOptions.map((category) => (
-                    <option key={category} value={category}>{category === 'COMMON' ? '통합' : category}</option>
+                    <option key={category} value={category}>{category === 'COMMON' ? 'CM' : category}</option>
                   ))}
                 </select>
               </label>
