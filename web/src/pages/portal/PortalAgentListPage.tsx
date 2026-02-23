@@ -166,12 +166,6 @@ const INITIAL_AGENT_FORM_VALUES: AgentFormValues = {
 };
 
 
-interface ProcessLevel1Group {
-  code: string;
-  name: string;
-  items: Array<{ id: number; code: string; name: string }>;
-}
-
 interface ProcessDomain {
   id: number;
   code: string;
@@ -892,7 +886,6 @@ const PortalAgentListPage: React.FC = () => {
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null);
   const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [drilldownAgentId, setDrilldownAgentId] = useState<string | null>(null);
-  const [portalActiveProcessLevel1Code, setPortalActiveProcessLevel1Code] = useState<string | null>(null);
   const [portalProcessPanelCollapsed, setPortalProcessPanelCollapsed] = useState(false);
 
   const [dynamicFilters, setDynamicFilters] = useState<DynamicFilterRule[]>([]);
@@ -1019,7 +1012,6 @@ const PortalAgentListPage: React.FC = () => {
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || COMMON_LEVEL1_CODE);
         }
-        setPortalActiveProcessLevel1Code(null);
       } catch {
         setProcessDomains([]);
       }
@@ -1071,33 +1063,10 @@ const PortalAgentListPage: React.FC = () => {
   }, [processDomains]);
 
   const level2Source = useMemo(() => {
-    if (selectedDomain?.code === COMMON_DOMAIN_CODE) {
-      return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
-    }
-    return selectedLevel1?.level2 || [];
-  }, [selectedDomain, selectedLevel1]);
+    return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
+  }, [selectedDomain]);
 
-  const processLevel1Groups = useMemo<ProcessLevel1Group[]>(() => {
-    const map = new Map<string, ProcessLevel1Group>();
-    level2Source.forEach((item) => {
-      const segments = item.code.split('.');
-      const groupCode = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-      const groupName = processLevel1NameByCode.get(groupCode) || groupCode;
-      if (!map.has(groupCode)) {
-        map.set(groupCode, { code: groupCode, name: groupName, items: [] });
-      }
-      map.get(groupCode)!.items.push(item);
-    });
-    return Array.from(map.values());
-  }, [level2Source, processLevel1NameByCode]);
-
-  const selectedProcessLevel1Group = useMemo(() => {
-    if (!processLevel1Groups.length) return undefined;
-    return processLevel1Groups.find((group) => group.code === portalActiveProcessLevel1Code) || processLevel1Groups[0];
-  }, [processLevel1Groups, portalActiveProcessLevel1Code]);
-
-
-  const visibleLevel2Items = selectedProcessLevel1Group?.items || level2Source;
+  const visibleLevel2Items = level2Source;
 
   useEffect(() => {
     if (!formValues.processId && visibleLevel2Items.length > 0) {
@@ -1105,30 +1074,10 @@ const PortalAgentListPage: React.FC = () => {
     }
   }, [formValues.processId, visibleLevel2Items]);
 
-  useEffect(() => {
-    if (!processLevel1Groups.length) {
-      setPortalActiveProcessLevel1Code(null);
-      return;
-    }
-    if (!portalActiveProcessLevel1Code || !processLevel1Groups.some((group) => group.code === portalActiveProcessLevel1Code)) {
-      setPortalActiveProcessLevel1Code(processLevel1Groups[0].code);
-    }
-  }, [processLevel1Groups, portalActiveProcessLevel1Code]);
-
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
     const selectedLevel1 = selectedDomain?.level1.find((item) => item.code === selectedLevel1Code) || selectedDomain?.level1[0];
     const level2Codes = new Set(visibleLevel2Items.map((item) => item.code));
-    const level2CodesInSelectedProcessLevel1 = new Set(
-      (selectedLevel1?.level2 || [])
-        .filter((item) => {
-          if (!portalActiveProcessLevel1Code) return true;
-          const segments = item.code.split('.');
-          const processLevel1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : item.code;
-          return processLevel1Code === portalActiveProcessLevel1Code;
-        })
-        .map((item) => item.code)
-    );
     const knownProcessCodes = new Set(
       processDomains.flatMap((domain) => domain.level1.flatMap((level1) => level1.level2.map((level2) => level2.code)))
     );
@@ -1142,13 +1091,10 @@ const PortalAgentListPage: React.FC = () => {
       const matchesCategory = categoryFilter === '전체' || agent.category === categoryFilter;
       const isUnclassified = !knownProcessCodes.has(agent.processId);
       const matchesModule = level2Codes.size === 0 || level2Codes.has(agent.processId) || (isCommonDomain && isUnclassified);
-      const matchesProcessLevel1 = isCommonDomain
-        ? isUnclassified
-        : (!portalActiveProcessLevel1Code || level2CodesInSelectedProcessLevel1.has(agent.processId));
       const matchesLevel2 = isCommonDomain ? true : (!selectedProcessId || agent.processId === selectedProcessId);
-      return matchesSearch && matchesStatus && matchesSuite && matchesRisk && matchesCategory && matchesModule && matchesProcessLevel1 && matchesLevel2;
+      return matchesSearch && matchesStatus && matchesSuite && matchesRisk && matchesCategory && matchesModule && matchesLevel2;
     });
-  }, [agents, categoryFilter, riskFilter, search, statusFilter, suiteFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId, portalActiveProcessLevel1Code]);
+  }, [agents, categoryFilter, riskFilter, search, statusFilter, suiteFilter, processDomains, selectedDomainCode, selectedLevel1Code, selectedProcessId]);
 
   const selectedModuleAgentCount = useMemo(() => {
     const level2Codes = new Set((selectedLevel1?.level2 || []).map((item) => item.code));
@@ -1417,7 +1363,6 @@ const PortalAgentListPage: React.FC = () => {
               onClick={() => {
                 setSelectedDomainCode(domain.code);
                 setSelectedLevel1Code(domain.level1[0]?.code || COMMON_LEVEL1_CODE);
-                setPortalActiveProcessLevel1Code(null);
                 setSelectedProcessId(null);
               }}
             >
@@ -1435,26 +1380,8 @@ const PortalAgentListPage: React.FC = () => {
         {!portalProcessPanelCollapsed && (
           <>
             <div className="ear-process-overview__section">
-              <div className="ear-process-overview__tabs">
-                {processLevel1Groups.map((group) => (
-                  <button
-                    key={group.code}
-                    type="button"
-                    className={`ear-process-tab ${selectedProcessLevel1Group?.code === group.code ? 'active' : ''}`}
-                    onClick={() => {
-                      setPortalActiveProcessLevel1Code(group.code);
-                      setSelectedProcessId(null);
-                    }}
-                  >
-                    <span>{`${group.code} ${group.name}`}</span>
-                    <em>{group.items.length}</em>
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
-                <h3>{selectedLevel1 ? (selectedDomain?.code === COMMON_DOMAIN_CODE ? 'CM · 통합' : `${selectedLevel1.name} · ${LEVEL1_E2E_LABELS[selectedLevel1.code] || selectedLevel1.code}`) : '통합'}</h3>
+                <h3>{selectedDomain ? formatDomainLabel(selectedDomain.code) : '통합'}</h3>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
               <div className="ear-process-overview__cards">
@@ -1519,7 +1446,6 @@ const PortalAgentListPage: React.FC = () => {
                 const nextDomain = processDomains.find((domain) => domain.code === nextDomainCode);
                 setSelectedDomainCode(nextDomainCode);
                 setSelectedLevel1Code(nextDomain?.level1[0]?.code || COMMON_LEVEL1_CODE);
-                setPortalActiveProcessLevel1Code(null);
                 setSelectedProcessId(null);
               }}
             >
