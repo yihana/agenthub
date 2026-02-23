@@ -58,6 +58,47 @@ const initialMilestones = [
   }
 ];
 
+
+const toProcessValue = (row: any, snakeKey: string, camelKey: string) => String(row[snakeKey] || row[camelKey] || '').trim();
+
+const inferLevel1CodeFromLevel2 = (level2Code: string) => {
+  const matched = level2Code.toUpperCase().match(/^([A-Z]{2}\.\d+)/);
+  return matched?.[1] || '';
+};
+
+const normalizeLevel1Code = (row: any) => {
+  const rawLevel1Code = toProcessValue(row, 'level1_code', 'level1Code').toUpperCase();
+  const level2Code = toProcessValue(row, 'level2_code', 'level2Code');
+
+  if (rawLevel1Code === 'COMMON') {
+    return 'CM.1';
+  }
+
+  if (rawLevel1Code && /^[A-Z]{2}$/.test(rawLevel1Code)) {
+    return `${rawLevel1Code}.1`;
+  }
+
+  if (rawLevel1Code) {
+    return rawLevel1Code;
+  }
+
+  return inferLevel1CodeFromLevel2(level2Code) || '';
+};
+
+const normalizeLevel1Name = (row: any, level1Code: string) => {
+  const rawLevel1Name = toProcessValue(row, 'level1_name', 'level1Name');
+
+  if (rawLevel1Name) {
+    return rawLevel1Name;
+  }
+
+  if (level1Code === 'CM.1') {
+    return '통합';
+  }
+
+  return level1Code;
+};
+
 const PortalRoadmapPage: React.FC = () => {
   const { role } = usePortalRole();
   const canEditRoadmap = role === 'operator_admin';
@@ -114,10 +155,13 @@ const PortalRoadmapPage: React.FC = () => {
       const id = Number(row.level1_id || row.level1Id);
       if (!id) return;
   
+      const normalizedLevel1Code = normalizeLevel1Code(row);
+      const normalizedLevel1Name = normalizeLevel1Name(row, normalizedLevel1Code);
+
       map.set(id, {
         id,
-        code: row.level1_code || row.level1Code,
-        name: row.level1_name || row.level1Name
+        code: normalizedLevel1Code,
+        name: normalizedLevel1Name
       });
     });
   
@@ -623,7 +667,7 @@ const PortalRoadmapPage: React.FC = () => {
                   {processRows.map((row, index) => (
                     <tr key={`${row.level2_id || row.level2Id || 'none'}-${index}`}>
                       <td>{row.domain_name || row.domainName}</td>
-                      <td>{row.level1_code || row.level1Code} · {row.level1_name || row.level1Name}</td>
+                      <td>{normalizeLevel1Code(row)} · {normalizeLevel1Name(row, normalizeLevel1Code(row))}</td>
                       <td>{row.level2_code || row.level2Code ? `${row.level2_code || row.level2Code} · ${row.level2_name || row.level2Name}` : '-'}</td>
                       <td>
                         {(row.level2_id || row.level2Id) ? (
