@@ -40,7 +40,7 @@ const PortalDashboardLayout: React.FC<PortalDashboardLayoutProps> = ({
     <div className={`ear-shell${isSidebarCollapsed ? ' ear-shell--collapsed' : ''}`}>
       <aside className={`ear-sidebar${isSidebarCollapsed ? ' ear-sidebar--collapsed' : ''}`}>
         <div className="ear-sidebar__brand">
-          <span className="ear-badge">Agent Portal</span>
+          <span className="ear-badge">Agent Hub</span>
           {!isSidebarCollapsed && (
             <>
               <strong>Agent 관리 시스템</strong>

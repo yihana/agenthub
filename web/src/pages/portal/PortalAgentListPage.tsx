@@ -1256,19 +1256,6 @@ const PortalAgentListPage: React.FC = () => {
 
     return codeMap;
   }, [agents]);
-
-
-  const selectedLevel1Summary = useMemo(() => {
-    if (!selectedProcessId) {
-      return '전체';
-    }
-
-    const segments = selectedProcessId.split('.');
-    const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : selectedProcessId;
-    const level1Name = processLevel1NameByCode.get(level1Code) || level1Code;
-    return `${level1Code} ${level1Name}`;
-  }, [processLevel1NameByCode, selectedProcessId]);
-
   const displayAgents = useMemo(() => {
     return filteredAgents.map((agent) => {
       const detail = agentDetailById.get(agent.id);
@@ -1401,7 +1388,6 @@ const PortalAgentListPage: React.FC = () => {
             <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
                 <h3>{selectedDomain ? formatDomainLabel(selectedDomain.code) : '통합'}</h3>
-                <p className="ear-muted">Level1: {selectedLevel1Summary}</p>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
               <div className="ear-process-overview__cards">
