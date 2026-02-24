@@ -5,6 +5,7 @@ import TagPill from '../../components/portal-dashboard/TagPill';
 import { roleLabels, usePortalRole } from '../../hooks/usePortalRole';
 
 const DOMAIN_LABELS: Record<string, string> = {
+  CM: 'Common',
   MM: 'Procure to Pay',
   PP: 'Plan to Produce',
   HR: 'Hire to Retire',
@@ -166,6 +167,40 @@ const PortalRoadmapPage: React.FC = () => {
     });
   
     return Array.from(map.values());
+  }, [processRows]);
+
+  const processCardGroups = useMemo(() => {
+    const grouped = new Map<string, { level1Code: string; level1Name: string; level2: Array<{ code: string; name: string }> }[]>();
+
+    processRows.forEach((row) => {
+      const level1Code = normalizeLevel1Code(row);
+      const level1Name = normalizeLevel1Name(row, level1Code);
+      const level2Code = toProcessValue(row, 'level2_code', 'level2Code');
+      const level2Name = toProcessValue(row, 'level2_name', 'level2Name');
+      const inferredDomain = (level1Code.split('.')[0] || level2Code.split('.')[0] || '').toUpperCase();
+
+      if (!inferredDomain || !level1Code) return;
+      if (!grouped.has(inferredDomain)) grouped.set(inferredDomain, []);
+      const domainLevel1 = grouped.get(inferredDomain)!;
+
+      let level1 = domainLevel1.find((item) => item.level1Code === level1Code);
+      if (!level1) {
+        level1 = { level1Code, level1Name, level2: [] };
+        domainLevel1.push(level1);
+      }
+
+      if (level2Code && !level1.level2.some((item) => item.code === level2Code)) {
+        level1.level2.push({ code: level2Code, name: level2Name || level2Code });
+      }
+    });
+
+    return Array.from(grouped.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([domainCode, level1]) => ({
+        domainCode,
+        domainName: DOMAIN_LABELS[domainCode] || domainCode,
+        level1: level1.sort((a, b) => a.level1Code.localeCompare(b.level1Code))
+      }));
   }, [processRows]);
 
   const handleStageChange = (index: number, field: 'title' | 'status' | 'items', value: string) => {
@@ -654,6 +689,22 @@ const PortalRoadmapPage: React.FC = () => {
               </WidgetCard>
             )}
             <WidgetCard title="프로세스 테이블" description="도메인 > Level1 > Level2 등록 정보">
+              <div className="ear-process-overview">
+                {processCardGroups.map((domain) => (
+                  <div key={domain.domainCode} className="ear-process-overview__section">
+                    <h4>{domain.domainCode} · {domain.domainName}</h4>
+                    <div className="ear-process-overview__cards">
+                      {domain.level1.map((level1) => (
+                        <div key={level1.level1Code} className="ear-process-card" role="presentation">
+                          <span>{level1.level1Code}</span>
+                          <strong>{level1.level1Name}</strong>
+                          <em>{level1.level2.length}개</em>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
               <table className="ear-table ear-table--compact">
                 <thead>
                   <tr>
