@@ -39,7 +39,7 @@ const PortalLoginPage: React.FC = () => {
           <div className="login-icon">
             <Lock size={24} />
           </div>
-          <h1>Agent Portal 로그인</h1>
+          <h1>Agent Hub 로그인</h1>
           <p>회사/역할 기반 포털 권한으로 접속합니다.</p>
         </div>
 
@@ -53,7 +53,7 @@ const PortalLoginPage: React.FC = () => {
                 type="text"
                 value={userid}
                 onChange={(event) => setUserid(event.target.value)}
-                placeholder="portal-admin"
+                placeholder="hub-admin"
               />
             </div>
           </div>
