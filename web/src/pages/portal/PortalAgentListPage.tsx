@@ -1017,7 +1017,6 @@ const PortalAgentListPage: React.FC = () => {
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || COMMON_LEVEL1_CODE);
         }
-        setPortalActiveProcessLevel1Code(null);
       } catch {
         setProcessDomains([]);
       }
@@ -1070,8 +1069,11 @@ const PortalAgentListPage: React.FC = () => {
   }, [processDomains]);
 
   const level2Source = useMemo(() => {
-    return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
-  }, [selectedDomain]);
+    if (selectedDomain?.code === COMMON_DOMAIN_CODE) {
+      return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
+    }
+    return selectedLevel1?.level2 || [];
+  }, [selectedDomain, selectedLevel1]);
 
   const visibleLevel2Items = level2Source;
 
@@ -1386,8 +1388,35 @@ const PortalAgentListPage: React.FC = () => {
         {!portalProcessPanelCollapsed && (
           <>
             <div className="ear-process-overview__section">
+              <div className="ear-process-overview__tabs">
+                {(selectedDomain?.level1 || []).map((level1) => {
+                  const level1Count = level1.level2.length;
+                  return (
+                    <button
+                      key={level1.code}
+                      type="button"
+                      className={`ear-process-tab ${selectedLevel1Code === level1.code ? 'active' : ''}`}
+                      onClick={() => {
+                        setSelectedLevel1Code(level1.code);
+                        setSelectedProcessId(null);
+                      }}
+                    >
+                      <span>{level1.name}</span>
+                      <em>{level1Count}</em>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
-                <h3>{selectedDomain ? formatDomainLabel(selectedDomain.code) : '통합'}</h3>
+                <h3>
+                  {selectedLevel1
+                    ? `${selectedLevel1.name} · ${selectedLevel1.code}`
+                    : selectedDomain
+                      ? formatDomainLabel(selectedDomain.code)
+                      : '통합'}
+                </h3>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
               <div className="ear-process-overview__cards">
