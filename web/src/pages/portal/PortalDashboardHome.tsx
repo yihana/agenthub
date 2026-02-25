@@ -273,7 +273,7 @@ const PortalDashboardHome: React.FC = () => {
    * ======================= */
   return (
     <PortalDashboardLayout
-      title="Agent Portal 관리 대시보드"
+      title="Agent Hub 관리 대시보드"
       subtitle="운영 현황 / 성과 지표 / 리스크"
     >
       <section className="ear-hero">
