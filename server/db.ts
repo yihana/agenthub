@@ -4,12 +4,19 @@ dotenv.config();
 
 const localOnly = process.env.LOCAL_ONLY === 'true';
 const rawDbType = (process.env.DB_TYPE || '').toLowerCase();
+const isCloudFoundry = Boolean(process.env.VCAP_SERVICES);
 
-if (localOnly && rawDbType && rawDbType !== 'postgres') {
-  console.warn(`LOCAL_ONLY=true 이므로 DB_TYPE(${process.env.DB_TYPE})을 postgres로 강제합니다.`);
+let dbType = rawDbType;
+
+if (!dbType) {
+  if (isCloudFoundry || !localOnly) {
+    dbType = 'hana';
+    console.warn('DB_TYPE이 설정되지 않아 hana를 기본값으로 사용합니다.');
+  } else {
+    dbType = 'postgres';
+    console.warn('DB_TYPE이 설정되지 않아 LOCAL_ONLY=true 환경에서 postgres를 기본값으로 사용합니다.');
+  }
 }
-
-const dbType = localOnly ? 'postgres' : (rawDbType || 'postgres');
 
 if (dbType !== 'postgres' && dbType !== 'hana') {
   throw new Error(`Unsupported DB_TYPE: ${process.env.DB_TYPE}`);
