@@ -19,6 +19,8 @@ const DEBUG_AUTH = process.env.DEBUG_AUTH === 'true';
 
 // XSUAA 사용 여부 확인
 const USE_XSUAA = process.env.USE_XSUAA === 'true' || process.env.VCAP_SERVICES !== undefined;
+// 목업/개발 환경에서는 IAS 로그인 과정을 기본 비활성화하고, 필요한 경우에만 명시적으로 활성화
+const USE_IAS_LOGIN = process.env.ENABLE_IAS_LOGIN === 'true';
 
 // XSUAA 설정 로드 (신뢰성 높임)
 let xsuaaConfig: any = null;
@@ -702,15 +704,16 @@ router.get('/verify', async (req, res) => {
 // XSUAA/IAS 설정 정보 조회
 router.get('/config', (req, res) => {
   const useXSUAA = USE_XSUAA && xsuaaConfig !== null;
+  const iasEnabled = useXSUAA && USE_IAS_LOGIN;
   
   // 최소한의 공개 정보만 반환 (보안: 민감한 설정 정보는 제거)
   const config: any = {
     useXSUAA,
-    iasEnabled: useXSUAA,
+    iasEnabled,
     localOnly: LOCAL_ONLY
   };
   
-  if (useXSUAA && xsuaaConfig?.url) {
+  if (iasEnabled && xsuaaConfig?.url) {
     // Cloud Foundry Custom Domain 환경을 고려한 Base URL 생성
     const baseUrl = getBaseUrl(req);
     const callbackUrl = `${baseUrl}/api/auth/callback`;
@@ -724,6 +727,10 @@ router.get('/config', (req, res) => {
 
 // IAS 로그인 리다이렉트 URL 생성
 router.get('/ias-login-url', (req, res) => {
+  if (!USE_IAS_LOGIN) {
+    return res.status(400).json({ error: 'IAS 로그인이 비활성화되어 있습니다.' });
+  }
+
   if (!USE_XSUAA || !xsuaaConfig) {
     return res.status(400).json({ error: 'XSUAA가 설정되지 않았습니다.' });
   }
