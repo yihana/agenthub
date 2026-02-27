@@ -21,6 +21,14 @@ interface AgentRecord {
 }
 
 
+interface AgentUsageEvent {
+  id: number;
+  agentId: string;
+  customerId: string;
+  requestedAt: string;
+  requestCount: number;
+}
+
 interface AgentTaskRecord {
   id: number;
   agentId: number;
@@ -120,24 +128,9 @@ interface ProcessRow {
 interface AgentApiRow {
   id: string | number;
   name?: string;
-  description?: string;
   type?: string;
   status?: string;
   owner_user_id?: string;
-  ownerUserId?: string;
-  suite?: string;
-  risk?: string;
-  capability?: string;
-  runtime_state?: string;
-  runtimeState?: string;
-  runtime_errors?: number;
-  runtimeErrors?: number;
-  customer_count?: number;
-  customerCount?: number;
-  calls_30d?: number;
-  calls30d?: number;
-  process_id?: string;
-  processId?: string;
   tags?: unknown;
   updated_at?: string;
   updatedAt?: string;
@@ -185,6 +178,7 @@ interface ProcessDomain {
   }>;
 }
 
+const STORAGE_KEY = 'portal-agent-list';
 const TABLE_COLUMN_OPTIONS = [
   { key: 'processId', label: 'process ID', defaultVisible: true },
   { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
@@ -695,7 +689,18 @@ const truncateText = (value: string, max = 30) => (value.length > max ? `${value
 
 
 const CAPABILITY_MAX_LENGTH = 200;
+const USAGE_WINDOW_DAYS = 30;
+
 const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
+
+const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
+  { id: 1, agentId: '1', customerId: 'CUST-001', requestedAt: '2026-01-20', requestCount: 120 },
+  { id: 2, agentId: '1', customerId: 'CUST-002', requestedAt: '2026-01-18', requestCount: 84 },
+  { id: 3, agentId: '1', customerId: 'CUST-003', requestedAt: '2026-01-15', requestCount: 92 },
+  { id: 4, agentId: '2', customerId: 'CUST-001', requestedAt: '2026-01-19', requestCount: 310 },
+  { id: 5, agentId: '2', customerId: 'CUST-010', requestedAt: '2026-01-16', requestCount: 287 },
+  { id: 6, agentId: '3', customerId: 'CUST-011', requestedAt: '2026-01-20', requestCount: 201 }
+];
 
 const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) => {
   const runtimeLabel =
@@ -704,8 +709,26 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
   return summary.length > CAPABILITY_MAX_LENGTH ? `${summary.slice(0, CAPABILITY_MAX_LENGTH - 1)}…` : summary;
 };
 
-// 포털 목록은 agent 테이블의 저장 필드를 기본 소스로 사용
+// 사용고객 집계 추천 흐름
+// 1) 30일 사용 이벤트(고객ID 단위)에서 우선 집계
+// 2) 이벤트가 없으면 Agent Metric의 totalUsers/requestsProcessed를 대체 소스로 사용
+// 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
+  const windowStart = new Date();
+  windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
+  const windowStartDate = toShortDate(windowStart);
+
+  const recentEvents = AGENT_USAGE_EVENTS.filter(
+    (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
+  );
+
+  if (recentEvents.length > 0) {
+    return {
+      customerCount: new Set(recentEvents.map((event) => event.customerId)).size,
+      calls30d: recentEvents.reduce((sum, event) => sum + event.requestCount, 0)
+    };
+  }
+
   if (detail && detail.metrics.length > 0) {
     const latestMetric = detail.metrics[detail.metrics.length - 1];
     return {
@@ -807,20 +830,8 @@ const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
     status = '계획';
   }
   const tags = Array.isArray(agent.tags) ? agent.tags.map((item) => String(item).toUpperCase()) : [];
-  const suiteRaw = String(agent.suite || '').trim();
-  const suite: AgentRecord['suite'] = suiteRaw === '운영Ops.' || suiteRaw.toLowerCase() === 'ops'
-    ? '운영Ops.'
-    : (tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz');
+  const suite: AgentRecord['suite'] = tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz';
   const category = String(agent.type || 'COMMON').toUpperCase();
-  const processId = String(agent.process_id || agent.processId || '').trim();
-  const riskRaw = String(agent.risk || '').trim();
-  const risk: AgentRecord['risk'] = riskRaw === '높음' || riskRaw === '중간' || riskRaw === '낮음'
-    ? riskRaw
-    : (status === 'PoC' ? '중간' : '낮음');
-  const runtimeStateRaw = String(agent.runtime_state || agent.runtimeState || '').toUpperCase();
-  const runtimeState: AgentRecord['runtimeState'] = runtimeStateRaw === 'RUNNING' || runtimeStateRaw === 'DEGRADED' || runtimeStateRaw === 'IDLE' || runtimeStateRaw === 'ERROR'
-    ? runtimeStateRaw
-    : (status === 'PoC' ? 'DEGRADED' : 'RUNNING');
   const updatedAt = String(agent.updatedAt || agent.updated_at || '').slice(0, 10);
   return normalizeAgent({
     id: String(agent.id || ''),
@@ -829,15 +840,35 @@ const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
     status,
     suite,
     category,
-    risk,
+    risk: status === 'PoC' ? '중간' : '낮음',
     lastUpdated: updatedAt || toShortDate(new Date()),
-    runtimeState,
-    runtimeErrors: Number(agent.runtime_errors || agent.runtimeErrors || (status === 'PoC' ? 1 : 0)),
-    processId: processId || `${category === 'COMMON' ? 'CM' : category}.1.1`,
-    capability: String(agent.capability || agent.description || '설명'),
-    customerCount: Number(agent.customer_count || agent.customerCount || 0),
-    calls30d: Number(agent.calls_30d || agent.calls30d || 0)
+    runtimeState: status === 'PoC' ? 'DEGRADED' : 'RUNNING',
+    runtimeErrors: status === 'PoC' ? 1 : 0,
+    processId: 'CM.1.1',
+    capability: '설명',
+    customerCount: 0,
+    calls30d: 0
   });
+};
+
+const loadAgents = () => {
+  if (typeof window === 'undefined') {
+    return [];
+  }
+
+  try {
+    const stored = window.localStorage.getItem(STORAGE_KEY);
+    if (!stored) {
+      return [];
+    }
+    const parsed = JSON.parse(stored);
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return (parsed as AgentRecord[]).map((agent) => normalizeAgent(agent));
+  } catch {
+    return [];
+  }
 };
 
 const PortalAgentListPage: React.FC = () => {
@@ -845,7 +876,7 @@ const PortalAgentListPage: React.FC = () => {
   const { agentId } = useParams<{ agentId?: string }>();
 
   // state declarations
-  const [agents, setAgents] = useState<AgentRecord[]>([]);
+  const [agents, setAgents] = useState<AgentRecord[]>(() => loadAgents());
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
   const [suiteFilter, setSuiteFilter] = useState('전체');
@@ -867,36 +898,42 @@ const PortalAgentListPage: React.FC = () => {
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
-  const [submitError, setSubmitError] = useState('');
 
-  const requestWithAuth = async (input: RequestInfo, init?: RequestInit) => {
-    const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
-    const headers = new Headers(init?.headers || {});
-    if (!headers.has('Content-Type')) {
-      headers.set('Content-Type', 'application/json');
-    }
-    if (token) {
-      headers.set('Authorization', `Bearer ${token}`);
-    }
-    return fetch(input, {
-      ...init,
-      headers
+  const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
+    setAgents((prev) => {
+      const nextAgents = updater(prev);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAgents));
+      }
+      return nextAgents;
     });
   };
 
   useEffect(() => {
     const loadAgentRows = async () => {
+      const local = loadAgents();
+  
+      if (local.length > 0) {
+        setAgents(local);
+        return;
+      }
+  
       try {
-        const response = await requestWithAuth('/api/agents?limit=500');
+        const response = await fetch('/api/agents?limit=500');
         if (!response.ok) {
-          throw new Error(`failed:${response.status}`);
+          throw new Error('failed');
         }
   
         const data = await response.json();
         const rows = Array.isArray(data?.agents) ? (data.agents as AgentApiRow[]) : [];
         const mapped = rows.map(mapApiAgentToRecord);
-
-        setAgents(mapped);
+  
+        if (mapped.length > 0) {
+          setAgents(mapped);
+          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
+        } else {
+          setAgents([]);
+        }
       } catch (error) {
         console.error('Failed to load agents:', error);
         setAgents([]);
@@ -980,6 +1017,7 @@ const PortalAgentListPage: React.FC = () => {
           setSelectedDomainCode(domains[0].code);
           setSelectedLevel1Code(domains[0].level1[0]?.code || COMMON_LEVEL1_CODE);
         }
+        setPortalActiveProcessLevel1Code(null);
       } catch {
         setProcessDomains([]);
       }
@@ -998,7 +1036,9 @@ const PortalAgentListPage: React.FC = () => {
   const categoryOptions = useMemo(() => {
     const collected = new Set<string>(['COMMON']);
     processDomains.forEach((domain) => {
-      collected.add(domain.code === COMMON_DOMAIN_CODE ? 'COMMON' : domain.code);
+      domain.level1.forEach((level1) => {
+        collected.add(level1.code);
+      });
     });
     agents.forEach((agent) => collected.add(agent.category));
     return Array.from(collected);
@@ -1030,41 +1070,16 @@ const PortalAgentListPage: React.FC = () => {
   }, [processDomains]);
 
   const level2Source = useMemo(() => {
-    if (selectedDomain?.code === COMMON_DOMAIN_CODE) {
-      return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
-    }
-    return selectedLevel1?.level2 || [];
-  }, [selectedDomain, selectedLevel1]);
+    return (selectedDomain?.level1 || []).flatMap((level1) => level1.level2);
+  }, [selectedDomain]);
 
   const visibleLevel2Items = level2Source;
 
-  const formProcessOptions = useMemo(() => {
-    const categoryCode = (formValues.category || 'COMMON').toUpperCase();
-    const targetDomainCode = categoryCode === 'COMMON' || categoryCode === 'CM' ? COMMON_DOMAIN_CODE : categoryCode;
-    const targetDomain = processDomains.find((domain) => domain.code === targetDomainCode);
-
-    if (!targetDomain) {
-      return visibleLevel2Items;
-    }
-
-    return targetDomain.level1.flatMap((level1) => level1.level2);
-  }, [formValues.category, processDomains, visibleLevel2Items]);
-
-
   useEffect(() => {
-    if (!formValues.processId && formProcessOptions.length > 0) {
-      setFormValues((prev) => ({ ...prev, processId: formProcessOptions[0].code }));
+    if (!formValues.processId && visibleLevel2Items.length > 0) {
+      setFormValues((prev) => ({ ...prev, processId: visibleLevel2Items[0].code }));
     }
-  }, [formValues.processId, formProcessOptions]);
-
-  useEffect(() => {
-    if (formProcessOptions.length === 0) return;
-
-    const exists = formProcessOptions.some((item) => item.code === formValues.processId);
-    if (!exists) {
-      setFormValues((prev) => ({ ...prev, processId: formProcessOptions[0].code }));
-    }
-  }, [formProcessOptions, formValues.processId]);
+  }, [formValues.processId, visibleLevel2Items]);
 
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
@@ -1173,57 +1188,31 @@ const PortalAgentListPage: React.FC = () => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleAddAgent = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formValues.name.trim() || !formValues.owner.trim()) return;
 
-    const normalizedType = (formValues.category || formValues.processId.split('.')[0] || 'COMMON').toUpperCase();
-    const status = formValues.status === '운영중' ? 'active' : 'inactive';
+    const nextId = String(Math.max(0, ...agents.map((agent) => Number(agent.id) || 0)) + 1);
+    const nextAgent: AgentRecord = {
+      id: nextId,
+      name: formValues.name.trim(),
+      owner: formValues.owner.trim(),
+      status: formValues.status,
+      suite: formValues.suite,
+      category: formValues.category,
+      risk: formValues.risk,
+      processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
+      lastUpdated: new Date().toISOString().slice(0, 10),
+      runtimeState: 'IDLE',
+      runtimeErrors: 0,
+      capability: '설명',
+      customerCount: 0,
+      calls30d: 0
+    };
 
-    try {
-      setSubmitError('');
-
-      const response = await requestWithAuth('/api/agents', {
-        method: 'POST',
-        body: JSON.stringify({
-          name: formValues.name.trim(),
-          description: `${formValues.name.trim()} 에이전트`,
-          type: normalizedType,
-          status,
-          ownerUserId: formValues.owner.trim(),
-          suite: formValues.suite,
-          risk: formValues.risk,
-          capability: '설명',
-          runtimeState: 'IDLE',
-          runtimeErrors: 0,
-          customerCount: 0,
-          calls30d: 0,
-          processId: formValues.processId || formProcessOptions[0]?.code || 'CM.1.1',
-          maxConcurrency: 1,
-          tags: [formValues.suite === '운영Ops.' ? 'OPS' : 'BIZ'],
-          roles: []
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `등록 실패 (${response.status})`);
-      }
-
-      const listResponse = await requestWithAuth('/api/agents?limit=500');
-      if (!listResponse.ok) {
-        throw new Error(`목록 조회 실패 (${listResponse.status})`);
-      }
-
-      const listData = await listResponse.json();
-      const rows = Array.isArray(listData?.agents) ? (listData.agents as AgentApiRow[]) : [];
-      setAgents(rows.map(mapApiAgentToRecord));
-      setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: formProcessOptions[0]?.code || 'CM.1.1' });
-      setShowAddAgentForm(false);
-    } catch (error) {
-      console.error('Failed to add agent:', error);
-      setSubmitError(error instanceof Error ? error.message : '등록 실패');
-    }
+    persistAgents((prev) => [nextAgent, ...prev]);
+    setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: visibleLevel2Items[0]?.code || 'CM.1.1' });
+    setShowAddAgentForm(false);
   };
 
   const agentDetails = useMemo(() => {
@@ -1256,15 +1245,30 @@ const PortalAgentListPage: React.FC = () => {
       if (processCompare !== 0) return processCompare;
       return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
     });
+    const processCounters = new Map<string, number>();
     const codeMap = new Map<string, string>();
 
     sortedAgents.forEach((agent) => {
-      const stableSuffix = String(agent.id).replace(/\D+/g, '') || agent.id;
-      codeMap.set(agent.id, `${agent.processId}.A${stableSuffix}`);
+      const sequence = (processCounters.get(agent.processId) || 0) + 1;
+      processCounters.set(agent.processId, sequence);
+      codeMap.set(agent.id, `${agent.processId}.A${sequence}`);
     });
 
     return codeMap;
   }, [agents]);
+
+
+  const selectedLevel1Summary = useMemo(() => {
+    if (!selectedProcessId) {
+      return '전체';
+    }
+
+    const segments = selectedProcessId.split('.');
+    const level1Code = segments.length >= 2 ? `${segments[0]}.${segments[1]}` : selectedProcessId;
+    const level1Name = processLevel1NameByCode.get(level1Code) || level1Code;
+    return `${level1Code} ${level1Name}`;
+  }, [processLevel1NameByCode, selectedProcessId]);
+
   const displayAgents = useMemo(() => {
     return filteredAgents.map((agent) => {
       const detail = agentDetailById.get(agent.id);
@@ -1284,7 +1288,7 @@ const PortalAgentListPage: React.FC = () => {
       return {
         ...agent,
         agentCode,
-        capability: agent.capability || buildCapabilityDescription(agent, processLabel),
+        capability: buildCapabilityDescription(agent, processLabel),
         customerCount: usage.customerCount,
         calls30d: usage.calls30d,
         processMeta
@@ -1395,35 +1399,9 @@ const PortalAgentListPage: React.FC = () => {
         {!portalProcessPanelCollapsed && (
           <>
             <div className="ear-process-overview__section">
-              <div className="ear-process-overview__tabs">
-                {(selectedDomain?.level1 || []).map((level1) => {
-                  const level1Count = level1.level2.length;
-                  return (
-                    <button
-                      key={level1.code}
-                      type="button"
-                      className={`ear-process-tab ${selectedLevel1Code === level1.code ? 'active' : ''}`}
-                      onClick={() => {
-                        setSelectedLevel1Code(level1.code);
-                        setSelectedProcessId(null);
-                      }}
-                    >
-                      <span>{level1.name}</span>
-                      <em>{level1Count}</em>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="ear-process-overview__section">
               <div className="ear-process-overview__summary">
-                <h3>
-                  {selectedLevel1
-                    ? `${selectedLevel1.name} · ${selectedLevel1.code}`
-                    : selectedDomain
-                      ? formatDomainLabel(selectedDomain.code)
-                      : '통합'}
-                </h3>
+                <h3>{selectedDomain ? formatDomainLabel(selectedDomain.code) : '통합'}</h3>
+                <p className="ear-muted">Level1: {selectedLevel1Summary}</p>
                 <strong>Agent Count {selectedModuleAgentCount}</strong>
               </div>
               <div className="ear-process-overview__cards">
@@ -1563,7 +1541,6 @@ const PortalAgentListPage: React.FC = () => {
           {showAddAgentForm && (
             <form className="ear-form" onSubmit={handleAddAgent}>
               <h3>에이전트 등록</h3>
-              {submitError && <p className="ear-muted" style={{ color: '#c62828' }}>{submitError}</p>}
               <label>
                 에이전트 이름
                 <input
@@ -1631,7 +1608,7 @@ const PortalAgentListPage: React.FC = () => {
                   value={formValues.processId}
                   onChange={(event) => handleFormChange('processId', event.target.value)}
                 >
-                  {formProcessOptions.map((item) => (
+                  {visibleLevel2Items.map((item) => (
                     <option key={item.id} value={item.code}>{item.code}</option>
                   ))}
                 </select>
