@@ -128,9 +128,24 @@ interface ProcessRow {
 interface AgentApiRow {
   id: string | number;
   name?: string;
+  description?: string;
   type?: string;
   status?: string;
   owner_user_id?: string;
+  ownerUserId?: string;
+  suite?: string;
+  risk?: string;
+  capability?: string;
+  runtime_state?: string;
+  runtimeState?: string;
+  runtime_errors?: number;
+  runtimeErrors?: number;
+  customer_count?: number;
+  customerCount?: number;
+  calls_30d?: number;
+  calls30d?: number;
+  process_id?: string;
+  processId?: string;
   tags?: unknown;
   updated_at?: string;
   updatedAt?: string;
@@ -178,7 +193,6 @@ interface ProcessDomain {
   }>;
 }
 
-const STORAGE_KEY = 'portal-agent-list';
 const TABLE_COLUMN_OPTIONS = [
   { key: 'processId', label: 'process ID', defaultVisible: true },
   { key: 'processPath', label: '프로세스 경로', defaultVisible: false },
@@ -830,8 +844,20 @@ const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
     status = '계획';
   }
   const tags = Array.isArray(agent.tags) ? agent.tags.map((item) => String(item).toUpperCase()) : [];
-  const suite: AgentRecord['suite'] = tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz';
+  const suiteRaw = String(agent.suite || '').trim();
+  const suite: AgentRecord['suite'] = suiteRaw === '운영Ops.' || suiteRaw.toLowerCase() === 'ops'
+    ? '운영Ops.'
+    : (tags.includes('OPS') || tags.includes('OPERATIONS') ? '운영Ops.' : 'Biz');
   const category = String(agent.type || 'COMMON').toUpperCase();
+  const processId = String(agent.process_id || agent.processId || '').trim();
+  const riskRaw = String(agent.risk || '').trim();
+  const risk: AgentRecord['risk'] = riskRaw === '높음' || riskRaw === '중간' || riskRaw === '낮음'
+    ? riskRaw
+    : (status === 'PoC' ? '중간' : '낮음');
+  const runtimeStateRaw = String(agent.runtime_state || agent.runtimeState || '').toUpperCase();
+  const runtimeState: AgentRecord['runtimeState'] = runtimeStateRaw === 'RUNNING' || runtimeStateRaw === 'DEGRADED' || runtimeStateRaw === 'IDLE' || runtimeStateRaw === 'ERROR'
+    ? runtimeStateRaw
+    : (status === 'PoC' ? 'DEGRADED' : 'RUNNING');
   const updatedAt = String(agent.updatedAt || agent.updated_at || '').slice(0, 10);
   return normalizeAgent({
     id: String(agent.id || ''),
@@ -840,35 +866,15 @@ const mapApiAgentToRecord = (agent: AgentApiRow): AgentRecord => {
     status,
     suite,
     category,
-    risk: status === 'PoC' ? '중간' : '낮음',
+    risk,
     lastUpdated: updatedAt || toShortDate(new Date()),
-    runtimeState: status === 'PoC' ? 'DEGRADED' : 'RUNNING',
-    runtimeErrors: status === 'PoC' ? 1 : 0,
-    processId: 'CM.1.1',
-    capability: '설명',
-    customerCount: 0,
-    calls30d: 0
+    runtimeState,
+    runtimeErrors: Number(agent.runtime_errors || agent.runtimeErrors || (status === 'PoC' ? 1 : 0)),
+    processId: processId || `${category === 'COMMON' ? 'CM' : category}.1.1`,
+    capability: String(agent.capability || agent.description || '설명'),
+    customerCount: Number(agent.customer_count || agent.customerCount || 0),
+    calls30d: Number(agent.calls_30d || agent.calls30d || 0)
   });
-};
-
-const loadAgents = () => {
-  if (typeof window === 'undefined') {
-    return [];
-  }
-
-  try {
-    const stored = window.localStorage.getItem(STORAGE_KEY);
-    if (!stored) {
-      return [];
-    }
-    const parsed = JSON.parse(stored);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-    return (parsed as AgentRecord[]).map((agent) => normalizeAgent(agent));
-  } catch {
-    return [];
-  }
 };
 
 const PortalAgentListPage: React.FC = () => {
@@ -876,7 +882,7 @@ const PortalAgentListPage: React.FC = () => {
   const { agentId } = useParams<{ agentId?: string }>();
 
   // state declarations
-  const [agents, setAgents] = useState<AgentRecord[]>(() => loadAgents());
+  const [agents, setAgents] = useState<AgentRecord[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('전체');
   const [suiteFilter, setSuiteFilter] = useState('전체');
@@ -898,42 +904,36 @@ const PortalAgentListPage: React.FC = () => {
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
+  const [submitError, setSubmitError] = useState('');
 
-  const persistAgents = (updater: (prev: AgentRecord[]) => AgentRecord[]) => {
-    setAgents((prev) => {
-      const nextAgents = updater(prev);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(STORAGE_KEY, JSON.stringify(nextAgents));
-      }
-      return nextAgents;
+  const requestWithAuth = async (input: RequestInfo, init?: RequestInit) => {
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+    const headers = new Headers(init?.headers || {});
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    return fetch(input, {
+      ...init,
+      headers
     });
   };
 
   useEffect(() => {
     const loadAgentRows = async () => {
-      const local = loadAgents();
-  
-      if (local.length > 0) {
-        setAgents(local);
-        return;
-      }
-  
       try {
-        const response = await fetch('/api/agents?limit=500');
+        const response = await requestWithAuth('/api/agents?limit=500');
         if (!response.ok) {
-          throw new Error('failed');
+          throw new Error(`failed:${response.status}`);
         }
   
         const data = await response.json();
         const rows = Array.isArray(data?.agents) ? (data.agents as AgentApiRow[]) : [];
         const mapped = rows.map(mapApiAgentToRecord);
-  
-        if (mapped.length > 0) {
-          setAgents(mapped);
-          window.localStorage.setItem(STORAGE_KEY, JSON.stringify(mapped));
-        } else {
-          setAgents([]);
-        }
+
+        setAgents(mapped);
       } catch (error) {
         console.error('Failed to load agents:', error);
         setAgents([]);
@@ -1190,31 +1190,58 @@ const PortalAgentListPage: React.FC = () => {
     setFormValues((prev) => ({ ...prev, [key]: value }));
   };
 
-  const handleAddAgent = (event: React.FormEvent<HTMLFormElement>) => {
+  const handleAddAgent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!formValues.name.trim() || !formValues.owner.trim()) return;
 
-    const nextId = String(Math.max(0, ...agents.map((agent) => Number(agent.id) || 0)) + 1);
-    const nextAgent: AgentRecord = {
-      id: nextId,
-      name: formValues.name.trim(),
-      owner: formValues.owner.trim(),
-      status: formValues.status,
-      suite: formValues.suite,
-      category: formValues.category,
-      risk: formValues.risk,
-      processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
-      lastUpdated: new Date().toISOString().slice(0, 10),
-      runtimeState: 'IDLE',
-      runtimeErrors: 0,
-      capability: '설명',
-      customerCount: 0,
-      calls30d: 0
-    };
+    const normalizedType = (formValues.category || formValues.processId.split('.')[0] || 'COMMON').toUpperCase();
+    const status = formValues.status === '운영중' ? 'active' : 'inactive';
 
-    persistAgents((prev) => [nextAgent, ...prev]);
-    setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: visibleLevel2Items[0]?.code || 'CM.1.1' });
-    setShowAddAgentForm(false);
+    try {
+      setSubmitError('');
+
+      const response = await requestWithAuth('/api/agents', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: formValues.name.trim(),
+          description: `${formValues.name.trim()} 에이전트`,
+          type: normalizedType,
+          status,
+          ownerUserId: formValues.owner.trim(),
+          suite: formValues.suite,
+          risk: formValues.risk,
+          capability: '설명',
+          runtimeState: 'IDLE',
+          runtimeErrors: 0,
+          customerCount: 0,
+          calls30d: 0,
+          processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
+          maxConcurrency: 1,
+          tags: [formValues.suite === '운영Ops.' ? 'OPS' : 'BIZ'],
+          roles: []
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `등록 실패 (${response.status})`);
+      }
+
+      const listResponse = await requestWithAuth('/api/agents?limit=500');
+      if (!listResponse.ok) {
+        throw new Error(`목록 조회 실패 (${listResponse.status})`);
+      }
+
+      const listData = await listResponse.json();
+      const rows = Array.isArray(listData?.agents) ? (listData.agents as AgentApiRow[]) : [];
+      setAgents(rows.map(mapApiAgentToRecord));
+
+      setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: visibleLevel2Items[0]?.code || 'CM.1.1' });
+      setShowAddAgentForm(false);
+    } catch (error) {
+      console.error('Failed to add agent:', error);
+      setSubmitError(error instanceof Error ? error.message : '등록 실패');
+    }
   };
 
   const agentDetails = useMemo(() => {
@@ -1556,6 +1583,7 @@ const PortalAgentListPage: React.FC = () => {
           {showAddAgentForm && (
             <form className="ear-form" onSubmit={handleAddAgent}>
               <h3>에이전트 등록</h3>
+              {submitError && <p className="ear-muted" style={{ color: '#c62828' }}>{submitError}</p>}
               <label>
                 에이전트 이름
                 <input
