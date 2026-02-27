@@ -422,6 +422,20 @@ async function tableExists(tableName: string): Promise<boolean> {
   }
 }
 
+
+async function columnExists(tableName: string, columnName: string): Promise<boolean> {
+  try {
+    const result = await query(
+      `SELECT COUNT(*) as CNT FROM SYS.TABLE_COLUMNS WHERE SCHEMA_NAME = 'EAR' AND TABLE_NAME = ? AND COLUMN_NAME = ?`,
+      [tableName.toUpperCase(), columnName.toUpperCase()]
+    );
+    const row = result.rows?.[0] || result[0] || {};
+    return (row.cnt > 0 || row.CNT > 0);
+  } catch (error) {
+    return false;
+  }
+}
+
 // 테이블 생성
 async function createTables() {
   const tables = [
@@ -1067,41 +1081,49 @@ async function createTables() {
 }
 
 async function applyPortalDashboardMigrations() {
-  const queries = [
-    `ALTER TABLE EAR.agents ADD (BUSINESS_TYPE NVARCHAR(100))`,
-    `ALTER TABLE EAR.agents ADD (OWNER_USER_ID NVARCHAR(100))`,
-    `ALTER TABLE EAR.agents ADD (VERSION NVARCHAR(50))`,
-    `ALTER TABLE EAR.agents ADD (MODEL_NAME NVARCHAR(100))`,
-    `ALTER TABLE EAR.agents ADD (LANGUAGE NVARCHAR(50))`,
-    `ALTER TABLE EAR.agents ADD (SUPPORTED_MODES NVARCHAR(100))`,
-    `ALTER TABLE EAR.agents ADD (ENDPOINT_URL NVARCHAR(255))`,
-    `ALTER TABLE EAR.agents ADD (EXEC_MODE NVARCHAR(50))`,
-    `ALTER TABLE EAR.agents ADD (SUITE NVARCHAR(30))`,
-    `ALTER TABLE EAR.agents ADD (RISK NVARCHAR(30))`,
-    `ALTER TABLE EAR.agents ADD (CAPABILITY NCLOB)`,
-    `ALTER TABLE EAR.agents ADD (RUNTIME_STATE NVARCHAR(30))`,
-    `ALTER TABLE EAR.agents ADD (RUNTIME_ERRORS INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agents ADD (CUSTOMER_COUNT INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agents ADD (CALLS_30D INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.ear_requests ADD (AGENT_ID INTEGER)`,
-    `ALTER TABLE EAR.ear_requests ADD (BUSINESS_TYPE NVARCHAR(100))`,
-    `ALTER TABLE EAR.agent_metrics ADD (AI_ASSISTED_DECISIONS INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agent_metrics ADD (AI_ASSISTED_DECISIONS_VALIDATED INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agent_metrics ADD (AI_RECOMMENDATIONS INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agent_metrics ADD (DECISIONS_OVERRIDDEN INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agent_metrics ADD (COGNITIVE_LOAD_BEFORE_SCORE DECIMAL(6,2))`,
-    `ALTER TABLE EAR.agent_metrics ADD (COGNITIVE_LOAD_AFTER_SCORE DECIMAL(6,2))`,
-    `ALTER TABLE EAR.agent_metrics ADD (HANDOFF_TIME_SECONDS DECIMAL(10,2))`,
-    `ALTER TABLE EAR.agent_metrics ADD (TEAM_SATISFACTION_SCORE DECIMAL(6,2))`,
-    `ALTER TABLE EAR.agent_metrics ADD (INNOVATION_COUNT INTEGER DEFAULT 0)`,
-    `ALTER TABLE EAR.agents ADD (BUSINESS_LEVEL2_ID INTEGER)`
+  const migrations = [
+    { table: 'agents', column: 'BUSINESS_TYPE', sql: `ALTER TABLE EAR.agents ADD (BUSINESS_TYPE NVARCHAR(100))` },
+    { table: 'agents', column: 'OWNER_USER_ID', sql: `ALTER TABLE EAR.agents ADD (OWNER_USER_ID NVARCHAR(100))` },
+    { table: 'agents', column: 'VERSION', sql: `ALTER TABLE EAR.agents ADD (VERSION NVARCHAR(50))` },
+    { table: 'agents', column: 'MODEL_NAME', sql: `ALTER TABLE EAR.agents ADD (MODEL_NAME NVARCHAR(100))` },
+    { table: 'agents', column: 'LANGUAGE', sql: `ALTER TABLE EAR.agents ADD (LANGUAGE NVARCHAR(50))` },
+    { table: 'agents', column: 'SUPPORTED_MODES', sql: `ALTER TABLE EAR.agents ADD (SUPPORTED_MODES NVARCHAR(100))` },
+    { table: 'agents', column: 'ENDPOINT_URL', sql: `ALTER TABLE EAR.agents ADD (ENDPOINT_URL NVARCHAR(255))` },
+    { table: 'agents', column: 'EXEC_MODE', sql: `ALTER TABLE EAR.agents ADD (EXEC_MODE NVARCHAR(50))` },
+    { table: 'agents', column: 'SUITE', sql: `ALTER TABLE EAR.agents ADD (SUITE NVARCHAR(30))` },
+    { table: 'agents', column: 'RISK', sql: `ALTER TABLE EAR.agents ADD (RISK NVARCHAR(30))` },
+    { table: 'agents', column: 'CAPABILITY', sql: `ALTER TABLE EAR.agents ADD (CAPABILITY NCLOB)` },
+    { table: 'agents', column: 'RUNTIME_STATE', sql: `ALTER TABLE EAR.agents ADD (RUNTIME_STATE NVARCHAR(30))` },
+    { table: 'agents', column: 'RUNTIME_ERRORS', sql: `ALTER TABLE EAR.agents ADD (RUNTIME_ERRORS INTEGER DEFAULT 0)` },
+    { table: 'agents', column: 'CUSTOMER_COUNT', sql: `ALTER TABLE EAR.agents ADD (CUSTOMER_COUNT INTEGER DEFAULT 0)` },
+    { table: 'agents', column: 'CALLS_30D', sql: `ALTER TABLE EAR.agents ADD (CALLS_30D INTEGER DEFAULT 0)` },
+    { table: 'ear_requests', column: 'AGENT_ID', sql: `ALTER TABLE EAR.ear_requests ADD (AGENT_ID INTEGER)` },
+    { table: 'ear_requests', column: 'BUSINESS_TYPE', sql: `ALTER TABLE EAR.ear_requests ADD (BUSINESS_TYPE NVARCHAR(100))` },
+    { table: 'agent_metrics', column: 'AI_ASSISTED_DECISIONS', sql: `ALTER TABLE EAR.agent_metrics ADD (AI_ASSISTED_DECISIONS INTEGER DEFAULT 0)` },
+    { table: 'agent_metrics', column: 'AI_ASSISTED_DECISIONS_VALIDATED', sql: `ALTER TABLE EAR.agent_metrics ADD (AI_ASSISTED_DECISIONS_VALIDATED INTEGER DEFAULT 0)` },
+    { table: 'agent_metrics', column: 'AI_RECOMMENDATIONS', sql: `ALTER TABLE EAR.agent_metrics ADD (AI_RECOMMENDATIONS INTEGER DEFAULT 0)` },
+    { table: 'agent_metrics', column: 'DECISIONS_OVERRIDDEN', sql: `ALTER TABLE EAR.agent_metrics ADD (DECISIONS_OVERRIDDEN INTEGER DEFAULT 0)` },
+    { table: 'agent_metrics', column: 'COGNITIVE_LOAD_BEFORE_SCORE', sql: `ALTER TABLE EAR.agent_metrics ADD (COGNITIVE_LOAD_BEFORE_SCORE DECIMAL(6,2))` },
+    { table: 'agent_metrics', column: 'COGNITIVE_LOAD_AFTER_SCORE', sql: `ALTER TABLE EAR.agent_metrics ADD (COGNITIVE_LOAD_AFTER_SCORE DECIMAL(6,2))` },
+    { table: 'agent_metrics', column: 'HANDOFF_TIME_SECONDS', sql: `ALTER TABLE EAR.agent_metrics ADD (HANDOFF_TIME_SECONDS DECIMAL(10,2))` },
+    { table: 'agent_metrics', column: 'TEAM_SATISFACTION_SCORE', sql: `ALTER TABLE EAR.agent_metrics ADD (TEAM_SATISFACTION_SCORE DECIMAL(6,2))` },
+    { table: 'agent_metrics', column: 'INNOVATION_COUNT', sql: `ALTER TABLE EAR.agent_metrics ADD (INNOVATION_COUNT INTEGER DEFAULT 0)` },
+    { table: 'agents', column: 'BUSINESS_LEVEL2_ID', sql: `ALTER TABLE EAR.agents ADD (BUSINESS_LEVEL2_ID INTEGER)` }
   ];
 
-  for (const sql of queries) {
+  for (const migration of migrations) {
+    const exists = await columnExists(migration.table, migration.column);
+    if (exists) continue;
+
     try {
-      await query(sql);
-    } catch (error) {
-      // 컬럼이 이미 존재하면 무시
+      await query(migration.sql);
+    } catch (error: any) {
+      const message = String(error?.message || '').toLowerCase();
+      if (message.includes('column name already exists')) {
+        console.log(`ℹ️  컬럼이 이미 존재합니다: ${migration.table}.${migration.column}`);
+        continue;
+      }
+      throw error;
     }
   }
 }
@@ -1772,6 +1794,7 @@ async function initializeMenus() {
     ];
     
     // 1차 메뉴 삽입 (MERGE 사용하여 없으면 추가)
+    const hasMenuLanguageCode = await columnExists('menus', 'LANGUAGE_CODE');
     const parentMenuMap = new Map<string, number>();
     for (const menu of primaryMenus) {
       // 기존 메뉴 확인
@@ -1784,10 +1807,17 @@ async function initializeMenus() {
       if (existingResult.rows && existingResult.rows.length > 0) {
         menuId = existingResult.rows[0].ID || existingResult.rows[0].id;
       } else {
-        await query(
-          'INSERT INTO EAR.menus (MENU_CODE, LABEL, DISPLAY_ORDER, IS_ACTIVE, CREATED_BY) VALUES (?, ?, ?, ?, ?)',
-          [menu.code, menu.label, menu.order, true, 'system']
-        );
+        if (hasMenuLanguageCode) {
+          await query(
+            'INSERT INTO EAR.menus (MENU_CODE, LABEL, DISPLAY_ORDER, IS_ACTIVE, CREATED_BY, LANGUAGE_CODE) VALUES (?, ?, ?, ?, ?, ?)',
+            [menu.code, menu.label, menu.order, true, 'system', 'ko']
+          );
+        } else {
+          await query(
+            'INSERT INTO EAR.menus (MENU_CODE, LABEL, DISPLAY_ORDER, IS_ACTIVE, CREATED_BY) VALUES (?, ?, ?, ?, ?)',
+            [menu.code, menu.label, menu.order, true, 'system']
+          );
+        }
         const idResult = await query(
           'SELECT ID FROM EAR.menus WHERE MENU_CODE = ?',
           [menu.code]
@@ -1814,10 +1844,17 @@ async function initializeMenus() {
       
       if (!existingResult.rows || existingResult.rows.length === 0) {
         // 메뉴가 없으면 추가
-        await query(
-          'INSERT INTO EAR.menus (PARENT_ID, MENU_CODE, LABEL, PATH, ICON_NAME, DESCRIPTION, DISPLAY_ORDER, IS_ACTIVE, ADMIN_ONLY, CREATED_BY) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [parentId, item.code, item.label, item.path, item.icon, item.label, item.order, true, item.adminOnly || false, 'system']
-        );
+        if (hasMenuLanguageCode) {
+          await query(
+            'INSERT INTO EAR.menus (PARENT_ID, MENU_CODE, LABEL, PATH, ICON_NAME, DESCRIPTION, DISPLAY_ORDER, IS_ACTIVE, ADMIN_ONLY, CREATED_BY, LANGUAGE_CODE) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [parentId, item.code, item.label, item.path, item.icon, item.label, item.order, true, item.adminOnly || false, 'system', 'ko']
+          );
+        } else {
+          await query(
+            'INSERT INTO EAR.menus (PARENT_ID, MENU_CODE, LABEL, PATH, ICON_NAME, DESCRIPTION, DISPLAY_ORDER, IS_ACTIVE, ADMIN_ONLY, CREATED_BY) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [parentId, item.code, item.label, item.path, item.icon, item.label, item.order, true, item.adminOnly || false, 'system']
+          );
+        }
       }
     }
     

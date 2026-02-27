@@ -1050,7 +1050,6 @@ const PortalAgentListPage: React.FC = () => {
     return targetDomain.level1.flatMap((level1) => level1.level2);
   }, [formValues.category, processDomains, visibleLevel2Items]);
 
-
   useEffect(() => {
     if (!formValues.processId && formProcessOptions.length > 0) {
       setFormValues((prev) => ({ ...prev, processId: formProcessOptions[0].code }));
