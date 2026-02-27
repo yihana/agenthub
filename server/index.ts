@@ -77,6 +77,39 @@ app.use(cors());
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
+
+const API_TRACE = process.env.API_TRACE === 'true';
+
+// API 실행 트래킹 (환경변수 API_TRACE=true 일 때 활성화)
+app.use((req, res, next) => {
+  if (!API_TRACE || !req.path.startsWith('/api')) {
+    return next();
+  }
+
+  const startedAt = Date.now();
+  const incomingRequestId = req.headers['x-request-id'];
+  const requestId = typeof incomingRequestId === 'string'
+    ? incomingRequestId
+    : Array.isArray(incomingRequestId)
+      ? incomingRequestId[0]
+      : `api-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  res.setHeader('x-request-id', requestId);
+
+  console.log(`[API_TRACE] -> ${requestId} ${req.method} ${req.originalUrl}`, {
+    ip: req.ip,
+    userAgent: req.headers['user-agent'] || null,
+    contentType: req.headers['content-type'] || null
+  });
+
+  res.on('finish', () => {
+    const durationMs = Date.now() - startedAt;
+    console.log(`[API_TRACE] <- ${requestId} ${req.method} ${req.originalUrl} ${res.statusCode} ${durationMs}ms`);
+  });
+
+  next();
+});
+
 // 파일 업로드를 위한 인코딩 설정
 app.use((req, res, next) => {
   if (req.headers['content-type'] && req.headers['content-type'].includes('multipart/form-data')) {
