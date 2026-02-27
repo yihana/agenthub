@@ -4,6 +4,11 @@ import { authenticateToken, requireAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
+const isMockupMode = process.env.PORTAL_MOCKUP_NO_AUTH === 'true' || process.env.LOCAL_ONLY === 'true';
+const allowWithoutAuth: express.RequestHandler = (_req, _res, next) => next();
+const readAuth = isMockupMode ? allowWithoutAuth : authenticateToken;
+const writeAuth = isMockupMode ? allowWithoutAuth : requireAdmin;
+
 const parseJsonField = (value: any) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -22,6 +27,17 @@ const normalizeAgentRow = (row: any) => {
     name: row.name || row.NAME,
     description: row.description || row.DESCRIPTION,
     type: row.type || row.TYPE,
+    businessType: row.business_type || row.BUSINESS_TYPE,
+    ownerUserId: row.owner_user_id || row.OWNER_USER_ID,
+    suite: row.suite || row.SUITE,
+    risk: row.risk || row.RISK,
+    capability: row.capability || row.CAPABILITY,
+    runtimeState: row.runtime_state || row.RUNTIME_STATE,
+    runtimeErrors: row.runtime_errors || row.RUNTIME_ERRORS,
+    customerCount: row.customer_count || row.CUSTOMER_COUNT,
+    calls30d: row.calls_30d || row.CALLS_30D,
+    businessLevel2Id: row.business_level2_id || row.BUSINESS_LEVEL2_ID,
+    processId: row.process_id || row.PROCESS_ID,
     status: row.status || row.STATUS,
     envConfig,
     maxConcurrency: row.max_concurrency || row.MAX_CONCURRENCY,
@@ -87,7 +103,7 @@ const ensureDefaultAgents = async () => {
   }
 };
 
-router.get('/summary', authenticateToken, async (req, res) => {
+router.get('/summary', readAuth, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const statusResult = await db.query(
@@ -161,7 +177,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 });
 
 
-router.get('/taxonomy', authenticateToken, async (_req, res) => {
+router.get('/taxonomy', readAuth, async (_req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const rows = await db.query(
@@ -244,7 +260,7 @@ router.get('/taxonomy', authenticateToken, async (_req, res) => {
   }
 });
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', readAuth, async (req, res) => {
   try {
     await ensureDefaultAgents();
     const { search = '', status, type, role, level1Id, level2Id, page = 1, limit = 20 } = req.query as any;
@@ -284,8 +300,9 @@ router.get('/', authenticateToken, async (req, res) => {
       const joinSql = role ? 'LEFT JOIN agent_roles ar ON a.id = ar.agent_id' : '';
 
       const dataResult = await db.query(
-        `SELECT DISTINCT a.*
+        `SELECT DISTINCT a.*, bl2.level2_code AS process_id
          FROM agents a
+         LEFT JOIN business_level2 bl2 ON bl2.id = a.business_level2_id
          ${joinSql}
          ${whereSql}
          ORDER BY a.created_at DESC
@@ -347,7 +364,7 @@ router.get('/', authenticateToken, async (req, res) => {
         params.push(type);
       }
       if (role) {
-        whereClauses.push('ar.ROLE_NAME = ?');
+        whereClauses.push('EXISTS (SELECT 1 FROM EAR.agent_roles ar WHERE ar.AGENT_ID = a.ID AND ar.ROLE_NAME = ?)');
         params.push(role);
       }
       if (level1Id) {
@@ -360,12 +377,11 @@ router.get('/', authenticateToken, async (req, res) => {
       }
 
       const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-      const joinSql = role ? 'LEFT JOIN EAR.agent_roles ar ON a.ID = ar.AGENT_ID' : '';
 
       const dataResult = await db.query(
-        `SELECT DISTINCT a.*
+        `SELECT a.*, bl2.LEVEL2_CODE AS PROCESS_ID
          FROM EAR.agents a
-         ${joinSql}
+         LEFT JOIN EAR.business_level2 bl2 ON bl2.ID = a.BUSINESS_LEVEL2_ID
          ${whereSql}
          ORDER BY a.CREATED_AT DESC
          LIMIT ? OFFSET ?`,
@@ -373,9 +389,8 @@ router.get('/', authenticateToken, async (req, res) => {
       );
 
       const countResult = await db.query(
-        `SELECT COUNT(DISTINCT a.ID) as total
+        `SELECT COUNT(*) as total
          FROM EAR.agents a
-         ${joinSql}
          ${whereSql}`,
         params
       );
@@ -420,9 +435,28 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', writeAuth, async (req, res) => {
   try {
-    const { name, description, type, envConfig, maxConcurrency, tags, roles = [], status = 'inactive' } = req.body;
+    const {
+      name,
+      description,
+      type,
+      envConfig,
+      maxConcurrency,
+      tags,
+      roles = [],
+      status = 'inactive',
+      ownerUserId,
+      suite,
+      risk,
+      capability,
+      runtimeState,
+      runtimeErrors,
+      customerCount,
+      calls30d,
+      processId,
+      businessLevel2Id
+    } = req.body;
 
     if (!name || !type) {
       return res.status(400).json({ error: '에이전트 이름과 유형은 필수입니다.' });
@@ -430,23 +464,88 @@ router.post('/', requireAdmin, async (req, res) => {
 
     const envPayload = envConfig ? JSON.stringify(envConfig) : null;
     const tagsPayload = tags ? JSON.stringify(tags) : JSON.stringify([]);
+    let resolvedBusinessLevel2Id: number | null = Number(businessLevel2Id) || null;
+
+    if (DB_TYPE === 'postgres') {
+      const duplicateResult = await db.query(
+        'SELECT id FROM agents WHERE UPPER(name) = UPPER($1) AND is_active = true LIMIT 1',
+        [name]
+      );
+      if (duplicateResult.rows.length > 0) {
+        return res.status(409).json({ error: '동일한 이름의 에이전트가 이미 존재합니다.' });
+      }
+    } else {
+      const duplicateResult = await db.query(
+        'SELECT TOP 1 ID FROM EAR.agents WHERE UPPER(NAME) = UPPER(?) AND IS_ACTIVE = true',
+        [name]
+      );
+      const duplicateRows = duplicateResult.rows || duplicateResult;
+      if (duplicateRows && duplicateRows.length > 0) {
+        return res.status(409).json({ error: '동일한 이름의 에이전트가 이미 존재합니다.' });
+      }
+    }
+
+    if (!resolvedBusinessLevel2Id && processId) {
+      if (DB_TYPE === 'postgres') {
+        const level2Result = await db.query('SELECT id FROM business_level2 WHERE level2_code = $1 LIMIT 1', [processId]);
+        resolvedBusinessLevel2Id = Number(level2Result.rows?.[0]?.id || 0) || null;
+      } else {
+        const level2Result = await db.query('SELECT TOP 1 ID FROM EAR.business_level2 WHERE LEVEL2_CODE = ?', [processId]);
+        const row = level2Result.rows?.[0] || level2Result[0];
+        resolvedBusinessLevel2Id = Number(row?.ID || row?.id || 0) || null;
+      }
+    }
 
     let agentId: number | string;
 
     if (DB_TYPE === 'postgres') {
       const result = await db.query(
-        `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, owner_user_id, suite, risk, capability, runtime_state, runtime_errors, customer_count, calls_30d, business_level2_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
-        [name, description, type, status, envPayload, maxConcurrency || 1, tagsPayload]
+        [
+          name,
+          description,
+          type,
+          status,
+          envPayload,
+          maxConcurrency || 1,
+          tagsPayload,
+          ownerUserId || null,
+          suite || 'Biz',
+          risk || '낮음',
+          capability || null,
+          runtimeState || 'IDLE',
+          Number(runtimeErrors || 0),
+          Number(customerCount || 0),
+          Number(calls30d || 0),
+          resolvedBusinessLevel2Id
+        ]
       );
 
       agentId = result.rows[0].id;
     } else {
       await db.query(
-        `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, type, status, envPayload, maxConcurrency || 1, tagsPayload]
+        `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, OWNER_USER_ID, SUITE, RISK, CAPABILITY, RUNTIME_STATE, RUNTIME_ERRORS, CUSTOMER_COUNT, CALLS_30D, BUSINESS_LEVEL2_ID)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name,
+          description,
+          type,
+          status,
+          envPayload,
+          maxConcurrency || 1,
+          tagsPayload,
+          ownerUserId || null,
+          suite || 'Biz',
+          risk || '낮음',
+          capability || null,
+          runtimeState || 'IDLE',
+          Number(runtimeErrors || 0),
+          Number(customerCount || 0),
+          Number(calls30d || 0),
+          resolvedBusinessLevel2Id
+        ]
       );
 
       const idResult = await db.query('SELECT TOP 1 ID FROM EAR.agents ORDER BY ID DESC', []);
@@ -483,7 +582,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', writeAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, envConfig, maxConcurrency, tags, roles, status, type } = req.body;
@@ -580,7 +679,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', writeAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -614,7 +713,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/:id/metrics', authenticateToken, async (req, res) => {
+router.get('/:id/metrics', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { start_time, end_time } = req.query as any;
@@ -645,7 +744,7 @@ router.get('/:id/metrics', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/:id/tasks', authenticateToken, async (req, res) => {
+router.get('/:id/tasks', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, page = 1, limit = 20 } = req.query as any;
@@ -699,7 +798,7 @@ router.get('/:id/tasks', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
