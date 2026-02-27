@@ -6,6 +6,19 @@ import StatTile from '../../components/portal-dashboard/StatTile';
 import ChartPlaceholder from '../../components/portal-dashboard/ChartPlaceholder';
 import ProgressRow from '../../components/portal-dashboard/ProgressRow';
 
+
+
+interface PortalTaskFlowRow {
+  job_id?: string;
+  JOB_ID?: string;
+  status?: string;
+  STATUS?: string;
+  agent_name?: string;
+  AGENT_NAME?: string;
+  baseline_minutes?: number;
+  BASELINE_MINUTES?: number;
+}
+
 interface UsageMetrics {
   total_requests: number;
   quality_score: number;
@@ -44,55 +57,53 @@ const PortalUsageImpactPage: React.FC = () => {
   const clampPercent = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
   const selectedAgent = searchParams.get('agent');
 
+  const [taskRows, setTaskRows] = useState<PortalTaskFlowRow[]>([]);
+
   const agentFlowMetrics = useMemo(() => {
-    const metricByAgent = {
-      OrderBot: { taskTotal: 3, successTotal: 2, tokenUsageSum: 39500, tokenCostSum: 0.395, avgLatency: 0.325 },
-      SupportGPT: { taskTotal: 3, successTotal: 2, tokenUsageSum: 57000, tokenCostSum: 0.57, avgLatency: 0.575 },
-      PricingAI: { taskTotal: 1, successTotal: 1, tokenUsageSum: 10500, tokenCostSum: 0.105, avgLatency: 0.25 }
-    } as const;
+    const normalizedTarget = selectedAgent?.trim().toLowerCase();
+    const filtered = normalizedTarget
+      ? taskRows.filter((row) => String(row.agent_name || row.AGENT_NAME || '').toLowerCase() === normalizedTarget)
+      : taskRows;
 
-    if (selectedAgent && selectedAgent in metricByAgent) {
-      const selected = metricByAgent[selectedAgent as keyof typeof metricByAgent];
-      return {
-        taskTotal: selected.taskTotal,
-        successRate: selected.taskTotal > 0 ? (selected.successTotal / selected.taskTotal) * 100 : 0,
-        tokenUsageSum: selected.tokenUsageSum,
-        tokenCostSum: selected.tokenCostSum,
-        avgLatency: selected.avgLatency
-      };
-    }
+    const total = filtered.length;
+    const success = filtered.filter((row) => {
+      const status = String(row.status || row.STATUS || '').toUpperCase();
+      return status === 'COMPLETED' || status === 'SUCCESS';
+    }).length;
 
-    const total = Object.values(metricByAgent).reduce(
-      (acc, agent) => {
-        acc.taskTotal += agent.taskTotal;
-        acc.successTotal += agent.successTotal;
-        acc.tokenUsageSum += agent.tokenUsageSum;
-        acc.tokenCostSum += agent.tokenCostSum;
-        acc.avgLatencySum += agent.avgLatency;
-        return acc;
-      },
-      { taskTotal: 0, successTotal: 0, tokenUsageSum: 0, tokenCostSum: 0, avgLatencySum: 0 }
-    );
+    const baselineMinutes = filtered.reduce((sum, row) => sum + Number(row.baseline_minutes || row.BASELINE_MINUTES || 0), 0);
 
-    const agentCount = Object.keys(metricByAgent).length;
     return {
-      taskTotal: total.taskTotal,
-      successRate: total.taskTotal > 0 ? (total.successTotal / total.taskTotal) * 100 : 0,
-      tokenUsageSum: total.tokenUsageSum,
-      tokenCostSum: total.tokenCostSum,
-      avgLatency: agentCount > 0 ? total.avgLatencySum / agentCount : 0
+      taskTotal: total,
+      successRate: total > 0 ? (success / total) * 100 : 0,
+      tokenUsageSum: 0,
+      tokenCostSum: 0,
+      avgLatency: 0,
+      baselineMinutes
     };
-  }, [selectedAgent]);
+  }, [selectedAgent, taskRows]);
 
   useEffect(() => {
     const fetchMetrics = async () => {
       try {
-        const response = await fetch('/api/portal-dashboard/metrics?period=month');
-        if (!response.ok) {
+        const [metricsResponse, tasksResponse] = await Promise.all([
+          fetch('/api/portal-dashboard/metrics?period=month'),
+          fetch('/api/portal-dashboard/tasks?limit=500')
+        ]);
+
+        if (!metricsResponse.ok) {
           throw new Error('Failed to load metrics');
         }
-        const data = await response.json();
-        setMetrics(data);
+
+        const metricsData = await metricsResponse.json();
+        setMetrics(metricsData);
+
+        if (tasksResponse.ok) {
+          const taskData = await tasksResponse.json();
+          setTaskRows(Array.isArray(taskData?.rows) ? taskData.rows : []);
+        } else {
+          setTaskRows([]);
+        }
       } catch (error) {
         console.error('Usage impact metrics error:', error);
       }
@@ -120,7 +131,7 @@ const PortalUsageImpactPage: React.FC = () => {
             <div className="ear-stat"><span>성공률</span><strong>{agentFlowMetrics.successRate.toFixed(1)}%</strong></div>
             <div className="ear-stat"><span>Token 합계</span><strong>{agentFlowMetrics.tokenUsageSum.toLocaleString()}</strong></div>
             <div className="ear-stat"><span>Token Cost 합계</span><strong>{agentFlowMetrics.tokenCostSum.toFixed(3)}</strong></div>
-            <div className="ear-stat"><span>평균 Latency</span><strong>{agentFlowMetrics.avgLatency.toFixed(3)}</strong></div>
+            <div className="ear-stat"><span>기준 업무시간(분)</span><strong>{agentFlowMetrics.baselineMinutes.toLocaleString()}</strong></div>
           </div>
         </section>
       )}
