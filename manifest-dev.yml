@@ -1,12 +1,12 @@
 ---
 applications:
-  - name: ear-dev
+  - name: hub-dev
     memory: 2G
     disk_quota: 2G
     instances: 1
     buildpacks:
       - nodejs_buildpack
-    command: npm start
+    command: npm run build && npm start
     env:
       NODE_ENV: production
       NODE_VERSION: 22.x
