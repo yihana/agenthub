@@ -11,6 +11,7 @@ applications:
       NODE_ENV: production
       NODE_VERSION: 22.x
       DB_TYPE: hana
+      PORTAL_MOCKUP_NO_AUTH: "true"
       EMBEDDING_MODEL: text-embedding-3-large
       CHAT_MODEL: gpt-4o-mini
       JWT_SECRET: your-super-secret-jwt-key-min-32-chars
