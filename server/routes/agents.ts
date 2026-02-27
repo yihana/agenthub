@@ -364,7 +364,7 @@ router.get('/', readAuth, async (req, res) => {
         params.push(type);
       }
       if (role) {
-        whereClauses.push('ar.ROLE_NAME = ?');
+        whereClauses.push('EXISTS (SELECT 1 FROM EAR.agent_roles ar WHERE ar.AGENT_ID = a.ID AND ar.ROLE_NAME = ?)');
         params.push(role);
       }
       if (level1Id) {
@@ -377,13 +377,11 @@ router.get('/', readAuth, async (req, res) => {
       }
 
       const whereSql = whereClauses.length ? `WHERE ${whereClauses.join(' AND ')}` : '';
-      const joinSql = role ? 'LEFT JOIN EAR.agent_roles ar ON a.ID = ar.AGENT_ID' : '';
 
       const dataResult = await db.query(
-        `SELECT DISTINCT a.*, bl2.LEVEL2_CODE AS PROCESS_ID
+        `SELECT a.*, bl2.LEVEL2_CODE AS PROCESS_ID
          FROM EAR.agents a
          LEFT JOIN EAR.business_level2 bl2 ON bl2.ID = a.BUSINESS_LEVEL2_ID
-         ${joinSql}
          ${whereSql}
          ORDER BY a.CREATED_AT DESC
          LIMIT ? OFFSET ?`,
@@ -391,9 +389,8 @@ router.get('/', readAuth, async (req, res) => {
       );
 
       const countResult = await db.query(
-        `SELECT COUNT(DISTINCT a.ID) as total
+        `SELECT COUNT(*) as total
          FROM EAR.agents a
-         ${joinSql}
          ${whereSql}`,
         params
       );
