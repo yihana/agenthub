@@ -21,14 +21,6 @@ interface AgentRecord {
 }
 
 
-interface AgentUsageEvent {
-  id: number;
-  agentId: string;
-  customerId: string;
-  requestedAt: string;
-  requestCount: number;
-}
-
 interface AgentTaskRecord {
   id: number;
   agentId: number;
@@ -703,18 +695,7 @@ const truncateText = (value: string, max = 30) => (value.length > max ? `${value
 
 
 const CAPABILITY_MAX_LENGTH = 200;
-const USAGE_WINDOW_DAYS = 30;
-
 const toShortDate = (value: Date) => value.toISOString().slice(0, 10);
-
-const AGENT_USAGE_EVENTS: AgentUsageEvent[] = [
-  { id: 1, agentId: '1', customerId: 'CUST-001', requestedAt: '2026-01-20', requestCount: 120 },
-  { id: 2, agentId: '1', customerId: 'CUST-002', requestedAt: '2026-01-18', requestCount: 84 },
-  { id: 3, agentId: '1', customerId: 'CUST-003', requestedAt: '2026-01-15', requestCount: 92 },
-  { id: 4, agentId: '2', customerId: 'CUST-001', requestedAt: '2026-01-19', requestCount: 310 },
-  { id: 5, agentId: '2', customerId: 'CUST-010', requestedAt: '2026-01-16', requestCount: 287 },
-  { id: 6, agentId: '3', customerId: 'CUST-011', requestedAt: '2026-01-20', requestCount: 201 }
-];
 
 const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) => {
   const runtimeLabel =
@@ -723,26 +704,8 @@ const buildCapabilityDescription = (agent: AgentRecord, processLabel: string) =>
   return summary.length > CAPABILITY_MAX_LENGTH ? `${summary.slice(0, CAPABILITY_MAX_LENGTH - 1)}…` : summary;
 };
 
-// 사용고객 집계 추천 흐름
-// 1) 30일 사용 이벤트(고객ID 단위)에서 우선 집계
-// 2) 이벤트가 없으면 Agent Metric의 totalUsers/requestsProcessed를 대체 소스로 사용
-// 3) 둘 다 없으면 agent 레코드의 저장값으로 폴백
+// 포털 목록은 agent 테이블의 저장 필드를 기본 소스로 사용
 const aggregateCustomerUsage = (agent: AgentRecord, detail?: AgentDetailRecord) => {
-  const windowStart = new Date();
-  windowStart.setDate(windowStart.getDate() - USAGE_WINDOW_DAYS);
-  const windowStartDate = toShortDate(windowStart);
-
-  const recentEvents = AGENT_USAGE_EVENTS.filter(
-    (event) => event.agentId === agent.id && event.requestedAt >= windowStartDate
-  );
-
-  if (recentEvents.length > 0) {
-    return {
-      customerCount: new Set(recentEvents.map((event) => event.customerId)).size,
-      calls30d: recentEvents.reduce((sum, event) => sum + event.requestCount, 0)
-    };
-  }
-
   if (detail && detail.metrics.length > 0) {
     const latestMetric = detail.metrics[detail.metrics.length - 1];
     return {
@@ -1035,9 +998,7 @@ const PortalAgentListPage: React.FC = () => {
   const categoryOptions = useMemo(() => {
     const collected = new Set<string>(['COMMON']);
     processDomains.forEach((domain) => {
-      domain.level1.forEach((level1) => {
-        collected.add(level1.code);
-      });
+      collected.add(domain.code === COMMON_DOMAIN_CODE ? 'COMMON' : domain.code);
     });
     agents.forEach((agent) => collected.add(agent.category));
     return Array.from(collected);
@@ -1077,11 +1038,32 @@ const PortalAgentListPage: React.FC = () => {
 
   const visibleLevel2Items = level2Source;
 
-  useEffect(() => {
-    if (!formValues.processId && visibleLevel2Items.length > 0) {
-      setFormValues((prev) => ({ ...prev, processId: visibleLevel2Items[0].code }));
+  const formProcessOptions = useMemo(() => {
+    const categoryCode = (formValues.category || 'COMMON').toUpperCase();
+    const targetDomainCode = categoryCode === 'COMMON' || categoryCode === 'CM' ? COMMON_DOMAIN_CODE : categoryCode;
+    const targetDomain = processDomains.find((domain) => domain.code === targetDomainCode);
+
+    if (!targetDomain) {
+      return visibleLevel2Items;
     }
-  }, [formValues.processId, visibleLevel2Items]);
+
+    return targetDomain.level1.flatMap((level1) => level1.level2);
+  }, [formValues.category, processDomains, visibleLevel2Items]);
+
+  useEffect(() => {
+    if (!formValues.processId && formProcessOptions.length > 0) {
+      setFormValues((prev) => ({ ...prev, processId: formProcessOptions[0].code }));
+    }
+  }, [formValues.processId, formProcessOptions]);
+
+  useEffect(() => {
+    if (formProcessOptions.length === 0) return;
+
+    const exists = formProcessOptions.some((item) => item.code === formValues.processId);
+    if (!exists) {
+      setFormValues((prev) => ({ ...prev, processId: formProcessOptions[0].code }));
+    }
+  }, [formProcessOptions, formValues.processId]);
 
   const filteredAgents = useMemo(() => {
     const selectedDomain = processDomains.find((item) => item.code === selectedDomainCode) || processDomains[0];
@@ -1215,7 +1197,7 @@ const PortalAgentListPage: React.FC = () => {
           runtimeErrors: 0,
           customerCount: 0,
           calls30d: 0,
-          processId: formValues.processId || visibleLevel2Items[0]?.code || 'CM.1.1',
+          processId: formValues.processId || formProcessOptions[0]?.code || 'CM.1.1',
           maxConcurrency: 1,
           tags: [formValues.suite === '운영Ops.' ? 'OPS' : 'BIZ'],
           roles: []
@@ -1235,8 +1217,7 @@ const PortalAgentListPage: React.FC = () => {
       const listData = await listResponse.json();
       const rows = Array.isArray(listData?.agents) ? (listData.agents as AgentApiRow[]) : [];
       setAgents(rows.map(mapApiAgentToRecord));
-
-      setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: visibleLevel2Items[0]?.code || 'CM.1.1' });
+      setFormValues({ ...INITIAL_AGENT_FORM_VALUES, processId: formProcessOptions[0]?.code || 'CM.1.1' });
       setShowAddAgentForm(false);
     } catch (error) {
       console.error('Failed to add agent:', error);
@@ -1274,13 +1255,11 @@ const PortalAgentListPage: React.FC = () => {
       if (processCompare !== 0) return processCompare;
       return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
     });
-    const processCounters = new Map<string, number>();
     const codeMap = new Map<string, string>();
 
     sortedAgents.forEach((agent) => {
-      const sequence = (processCounters.get(agent.processId) || 0) + 1;
-      processCounters.set(agent.processId, sequence);
-      codeMap.set(agent.id, `${agent.processId}.A${sequence}`);
+      const stableSuffix = String(agent.id).replace(/\D+/g, '') || agent.id;
+      codeMap.set(agent.id, `${agent.processId}.A${stableSuffix}`);
     });
 
     return codeMap;
@@ -1304,7 +1283,7 @@ const PortalAgentListPage: React.FC = () => {
       return {
         ...agent,
         agentCode,
-        capability: buildCapabilityDescription(agent, processLabel),
+        capability: agent.capability || buildCapabilityDescription(agent, processLabel),
         customerCount: usage.customerCount,
         calls30d: usage.calls30d,
         processMeta
@@ -1651,7 +1630,7 @@ const PortalAgentListPage: React.FC = () => {
                   value={formValues.processId}
                   onChange={(event) => handleFormChange('processId', event.target.value)}
                 >
-                  {visibleLevel2Items.map((item) => (
+                  {formProcessOptions.map((item) => (
                     <option key={item.id} value={item.code}>{item.code}</option>
                   ))}
                 </select>

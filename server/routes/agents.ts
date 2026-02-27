@@ -469,6 +469,25 @@ router.post('/', writeAuth, async (req, res) => {
     const tagsPayload = tags ? JSON.stringify(tags) : JSON.stringify([]);
     let resolvedBusinessLevel2Id: number | null = Number(businessLevel2Id) || null;
 
+    if (DB_TYPE === 'postgres') {
+      const duplicateResult = await db.query(
+        'SELECT id FROM agents WHERE UPPER(name) = UPPER($1) AND is_active = true LIMIT 1',
+        [name]
+      );
+      if (duplicateResult.rows.length > 0) {
+        return res.status(409).json({ error: '동일한 이름의 에이전트가 이미 존재합니다.' });
+      }
+    } else {
+      const duplicateResult = await db.query(
+        'SELECT TOP 1 ID FROM EAR.agents WHERE UPPER(NAME) = UPPER(?) AND IS_ACTIVE = true',
+        [name]
+      );
+      const duplicateRows = duplicateResult.rows || duplicateResult;
+      if (duplicateRows && duplicateRows.length > 0) {
+        return res.status(409).json({ error: '동일한 이름의 에이전트가 이미 존재합니다.' });
+      }
+    }
+
     if (!resolvedBusinessLevel2Id && processId) {
       if (DB_TYPE === 'postgres') {
         const level2Result = await db.query('SELECT id FROM business_level2 WHERE level2_code = $1 LIMIT 1', [processId]);
