@@ -1137,6 +1137,63 @@ router.get('/metrics', async (req, res) => {
   }
 });
 
+router.get('/tasks', async (req, res) => {
+  try {
+    const limit = Math.max(1, Math.min(1000, Number(req.query.limit || 500)));
+
+    if (DB_TYPE === 'postgres') {
+      const result = await query(
+        `SELECT t.id,
+                t.job_id,
+                t.status,
+                t.received_at,
+                t.started_at,
+                t.finished_at,
+                a.id AS agent_id,
+                a.name AS agent_name,
+                a.type AS business_type,
+                COALESCE(b.before_time_min, 0) AS baseline_minutes,
+                COALESCE(lc.hourly_cost, 0) AS labor_hourly_cost
+         FROM agent_tasks t
+         JOIN agents a ON a.id = t.agent_id
+         LEFT JOIN business_task_baseline b ON b.task_code = t.job_id
+         LEFT JOIN labor_cost lc ON lc.business_type = a.type
+         ORDER BY t.received_at DESC NULLS LAST
+         LIMIT $1`,
+        [limit]
+      );
+
+      return res.json({ rows: result.rows });
+    }
+
+    const hanaResult = await query(
+      `SELECT t.ID,
+              t.JOB_ID,
+              t.STATUS,
+              t.RECEIVED_AT,
+              t.STARTED_AT,
+              t.FINISHED_AT,
+              a.ID AS AGENT_ID,
+              a.NAME AS AGENT_NAME,
+              a.TYPE AS BUSINESS_TYPE,
+              COALESCE(b.BEFORE_TIME_MIN, 0) AS BASELINE_MINUTES,
+              COALESCE(lc.HOURLY_COST, 0) AS LABOR_HOURLY_COST
+       FROM EAR.agent_tasks t
+       JOIN EAR.agents a ON a.ID = t.AGENT_ID
+       LEFT JOIN EAR.business_task_baseline b ON b.TASK_CODE = t.JOB_ID
+       LEFT JOIN EAR.labor_cost lc ON lc.BUSINESS_TYPE = a.TYPE
+       ORDER BY t.RECEIVED_AT DESC
+       LIMIT ?`,
+      [limit]
+    );
+
+    return res.json({ rows: hanaResult.rows || hanaResult });
+  } catch (error) {
+    console.error('Portal task list fetch error:', error);
+    res.status(500).json({ error: 'Task 목록을 불러오지 못했습니다.' });
+  }
+});
+
 
 router.get('/baselines', async (req, res) => {
 // router.get('/baselines', authenticatePortalToken, requirePortalAdmin, async (req, res) => {

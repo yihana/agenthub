@@ -22,6 +22,17 @@ const normalizeAgentRow = (row: any) => {
     name: row.name || row.NAME,
     description: row.description || row.DESCRIPTION,
     type: row.type || row.TYPE,
+    businessType: row.business_type || row.BUSINESS_TYPE,
+    ownerUserId: row.owner_user_id || row.OWNER_USER_ID,
+    suite: row.suite || row.SUITE,
+    risk: row.risk || row.RISK,
+    capability: row.capability || row.CAPABILITY,
+    runtimeState: row.runtime_state || row.RUNTIME_STATE,
+    runtimeErrors: row.runtime_errors || row.RUNTIME_ERRORS,
+    customerCount: row.customer_count || row.CUSTOMER_COUNT,
+    calls30d: row.calls_30d || row.CALLS_30D,
+    businessLevel2Id: row.business_level2_id || row.BUSINESS_LEVEL2_ID,
+    processId: row.process_id || row.PROCESS_ID,
     status: row.status || row.STATUS,
     envConfig,
     maxConcurrency: row.max_concurrency || row.MAX_CONCURRENCY,
@@ -284,8 +295,9 @@ router.get('/', authenticateToken, async (req, res) => {
       const joinSql = role ? 'LEFT JOIN agent_roles ar ON a.id = ar.agent_id' : '';
 
       const dataResult = await db.query(
-        `SELECT DISTINCT a.*
+        `SELECT DISTINCT a.*, bl2.level2_code AS process_id
          FROM agents a
+         LEFT JOIN business_level2 bl2 ON bl2.id = a.business_level2_id
          ${joinSql}
          ${whereSql}
          ORDER BY a.created_at DESC
@@ -363,8 +375,9 @@ router.get('/', authenticateToken, async (req, res) => {
       const joinSql = role ? 'LEFT JOIN EAR.agent_roles ar ON a.ID = ar.AGENT_ID' : '';
 
       const dataResult = await db.query(
-        `SELECT DISTINCT a.*
+        `SELECT DISTINCT a.*, bl2.LEVEL2_CODE AS PROCESS_ID
          FROM EAR.agents a
+         LEFT JOIN EAR.business_level2 bl2 ON bl2.ID = a.BUSINESS_LEVEL2_ID
          ${joinSql}
          ${whereSql}
          ORDER BY a.CREATED_AT DESC
@@ -422,7 +435,26 @@ router.get('/', authenticateToken, async (req, res) => {
 
 router.post('/', requireAdmin, async (req, res) => {
   try {
-    const { name, description, type, envConfig, maxConcurrency, tags, roles = [], status = 'inactive' } = req.body;
+    const {
+      name,
+      description,
+      type,
+      envConfig,
+      maxConcurrency,
+      tags,
+      roles = [],
+      status = 'inactive',
+      ownerUserId,
+      suite,
+      risk,
+      capability,
+      runtimeState,
+      runtimeErrors,
+      customerCount,
+      calls30d,
+      processId,
+      businessLevel2Id
+    } = req.body;
 
     if (!name || !type) {
       return res.status(400).json({ error: '에이전트 이름과 유형은 필수입니다.' });
@@ -430,23 +462,69 @@ router.post('/', requireAdmin, async (req, res) => {
 
     const envPayload = envConfig ? JSON.stringify(envConfig) : null;
     const tagsPayload = tags ? JSON.stringify(tags) : JSON.stringify([]);
+    let resolvedBusinessLevel2Id: number | null = Number(businessLevel2Id) || null;
+
+    if (!resolvedBusinessLevel2Id && processId) {
+      if (DB_TYPE === 'postgres') {
+        const level2Result = await db.query('SELECT id FROM business_level2 WHERE level2_code = $1 LIMIT 1', [processId]);
+        resolvedBusinessLevel2Id = Number(level2Result.rows?.[0]?.id || 0) || null;
+      } else {
+        const level2Result = await db.query('SELECT TOP 1 ID FROM EAR.business_level2 WHERE LEVEL2_CODE = ?', [processId]);
+        const row = level2Result.rows?.[0] || level2Result[0];
+        resolvedBusinessLevel2Id = Number(row?.ID || row?.id || 0) || null;
+      }
+    }
 
     let agentId: number | string;
 
     if (DB_TYPE === 'postgres') {
       const result = await db.query(
-        `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `INSERT INTO agents (name, description, type, status, env_config, max_concurrency, tags, owner_user_id, suite, risk, capability, runtime_state, runtime_errors, customer_count, calls_30d, business_level2_id)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
          RETURNING *`,
-        [name, description, type, status, envPayload, maxConcurrency || 1, tagsPayload]
+        [
+          name,
+          description,
+          type,
+          status,
+          envPayload,
+          maxConcurrency || 1,
+          tagsPayload,
+          ownerUserId || null,
+          suite || 'Biz',
+          risk || '낮음',
+          capability || null,
+          runtimeState || 'IDLE',
+          Number(runtimeErrors || 0),
+          Number(customerCount || 0),
+          Number(calls30d || 0),
+          resolvedBusinessLevel2Id
+        ]
       );
 
       agentId = result.rows[0].id;
     } else {
       await db.query(
-        `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        [name, description, type, status, envPayload, maxConcurrency || 1, tagsPayload]
+        `INSERT INTO EAR.agents (NAME, DESCRIPTION, TYPE, STATUS, ENV_CONFIG, MAX_CONCURRENCY, TAGS, OWNER_USER_ID, SUITE, RISK, CAPABILITY, RUNTIME_STATE, RUNTIME_ERRORS, CUSTOMER_COUNT, CALLS_30D, BUSINESS_LEVEL2_ID)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          name,
+          description,
+          type,
+          status,
+          envPayload,
+          maxConcurrency || 1,
+          tagsPayload,
+          ownerUserId || null,
+          suite || 'Biz',
+          risk || '낮음',
+          capability || null,
+          runtimeState || 'IDLE',
+          Number(runtimeErrors || 0),
+          Number(customerCount || 0),
+          Number(calls30d || 0),
+          resolvedBusinessLevel2Id
+        ]
       );
 
       const idResult = await db.query('SELECT TOP 1 ID FROM EAR.agents ORDER BY ID DESC', []);
