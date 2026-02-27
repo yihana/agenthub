@@ -904,13 +904,29 @@ const PortalAgentListPage: React.FC = () => {
   const [isColumnEditorOpen, setIsColumnEditorOpen] = useState(false);
   const [showAddAgentForm, setShowAddAgentForm] = useState(false);
   const [formValues, setFormValues] = useState<AgentFormValues>(INITIAL_AGENT_FORM_VALUES);
+  const [submitError, setSubmitError] = useState('');
+
+  const requestWithAuth = async (input: RequestInfo, init?: RequestInit) => {
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('token') : null;
+    const headers = new Headers(init?.headers || {});
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+    if (token) {
+      headers.set('Authorization', `Bearer ${token}`);
+    }
+    return fetch(input, {
+      ...init,
+      headers
+    });
+  };
 
   useEffect(() => {
     const loadAgentRows = async () => {
       try {
-        const response = await fetch('/api/agents?limit=500');
+        const response = await requestWithAuth('/api/agents?limit=500');
         if (!response.ok) {
-          throw new Error('failed');
+          throw new Error(`failed:${response.status}`);
         }
   
         const data = await response.json();
@@ -1182,9 +1198,10 @@ const PortalAgentListPage: React.FC = () => {
     const status = formValues.status === '운영중' ? 'active' : 'inactive';
 
     try {
-      const response = await fetch('/api/agents', {
+      setSubmitError('');
+
+      const response = await requestWithAuth('/api/agents', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: formValues.name.trim(),
           description: `${formValues.name.trim()} 에이전트`,
@@ -1206,12 +1223,13 @@ const PortalAgentListPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error('등록 실패');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `등록 실패 (${response.status})`);
       }
 
-      const listResponse = await fetch('/api/agents?limit=500');
+      const listResponse = await requestWithAuth('/api/agents?limit=500');
       if (!listResponse.ok) {
-        throw new Error('목록 조회 실패');
+        throw new Error(`목록 조회 실패 (${listResponse.status})`);
       }
 
       const listData = await listResponse.json();
@@ -1222,6 +1240,7 @@ const PortalAgentListPage: React.FC = () => {
       setShowAddAgentForm(false);
     } catch (error) {
       console.error('Failed to add agent:', error);
+      setSubmitError(error instanceof Error ? error.message : '등록 실패');
     }
   };
 
@@ -1564,6 +1583,7 @@ const PortalAgentListPage: React.FC = () => {
           {showAddAgentForm && (
             <form className="ear-form" onSubmit={handleAddAgent}>
               <h3>에이전트 등록</h3>
+              {submitError && <p className="ear-muted" style={{ color: '#c62828' }}>{submitError}</p>}
               <label>
                 에이전트 이름
                 <input
