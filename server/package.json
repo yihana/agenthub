@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "description": "RAG 시스템 백엔드 서버",
   "main": "index.ts",
-  "scripts": {
-    "dev": "cross-env DB_TYPE=hana tsx watch index.ts",
+  "scripts": {	  
+    "dev": "tsx watch index.ts",
+    "hana": "cross-env DB_TYPE=hana tsx watch index.ts",
     "postgres": "cross-env DB_TYPE=postgres tsx watch index.ts",
     "build": "tsc",
     "start": "node dist/index.js"
