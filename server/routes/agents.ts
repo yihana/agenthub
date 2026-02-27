@@ -4,6 +4,11 @@ import { authenticateToken, requireAdmin } from '../middleware/auth';
 
 const router = express.Router();
 
+const isMockupMode = process.env.PORTAL_MOCKUP_NO_AUTH === 'true' || process.env.LOCAL_ONLY === 'true';
+const allowWithoutAuth: express.RequestHandler = (_req, _res, next) => next();
+const readAuth = isMockupMode ? allowWithoutAuth : authenticateToken;
+const writeAuth = isMockupMode ? allowWithoutAuth : requireAdmin;
+
 const parseJsonField = (value: any) => {
   if (!value) return null;
   if (typeof value === 'object') return value;
@@ -98,7 +103,7 @@ const ensureDefaultAgents = async () => {
   }
 };
 
-router.get('/summary', authenticateToken, async (req, res) => {
+router.get('/summary', readAuth, async (req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const statusResult = await db.query(
@@ -172,7 +177,7 @@ router.get('/summary', authenticateToken, async (req, res) => {
 });
 
 
-router.get('/taxonomy', authenticateToken, async (_req, res) => {
+router.get('/taxonomy', readAuth, async (_req, res) => {
   try {
     if (DB_TYPE === 'postgres') {
       const rows = await db.query(
@@ -255,7 +260,7 @@ router.get('/taxonomy', authenticateToken, async (_req, res) => {
   }
 });
 
-router.get('/', authenticateToken, async (req, res) => {
+router.get('/', readAuth, async (req, res) => {
   try {
     await ensureDefaultAgents();
     const { search = '', status, type, role, level1Id, level2Id, page = 1, limit = 20 } = req.query as any;
@@ -433,7 +438,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-router.post('/', requireAdmin, async (req, res) => {
+router.post('/', writeAuth, async (req, res) => {
   try {
     const {
       name,
@@ -561,7 +566,7 @@ router.post('/', requireAdmin, async (req, res) => {
   }
 });
 
-router.put('/:id', requireAdmin, async (req, res) => {
+router.put('/:id', writeAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description, envConfig, maxConcurrency, tags, roles, status, type } = req.body;
@@ -658,7 +663,7 @@ router.put('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.delete('/:id', requireAdmin, async (req, res) => {
+router.delete('/:id', writeAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -692,7 +697,7 @@ router.delete('/:id', requireAdmin, async (req, res) => {
   }
 });
 
-router.get('/:id/metrics', authenticateToken, async (req, res) => {
+router.get('/:id/metrics', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { start_time, end_time } = req.query as any;
@@ -723,7 +728,7 @@ router.get('/:id/metrics', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/:id/tasks', authenticateToken, async (req, res) => {
+router.get('/:id/tasks', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { status, page = 1, limit = 20 } = req.query as any;
@@ -777,7 +782,7 @@ router.get('/:id/tasks', authenticateToken, async (req, res) => {
   }
 });
 
-router.get('/:id', authenticateToken, async (req, res) => {
+router.get('/:id', readAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
